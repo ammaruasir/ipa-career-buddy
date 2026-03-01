@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import InterviewTypeDialog from "@/components/interview/InterviewTypeDialog";
+import EligibilityDialog from "@/components/interview/EligibilityDialog";
 
 interface Vacancy {
   id: string;
@@ -43,23 +44,21 @@ const JobVacancies = () => {
   const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null);
   const [showTypeDialog, setShowTypeDialog] = useState(false);
 
-  useEffect(() => {
-    loadVacancies();
-  }, []);
+  // Eligibility state
+  const [showEligibility, setShowEligibility] = useState(false);
+  const [eligibilityLoading, setEligibilityLoading] = useState(false);
+  const [eligibilityResult, setEligibilityResult] = useState<any>(null);
+  const [noResume, setNoResume] = useState(false);
 
-  // Load user applications when authenticated
-  useEffect(() => {
-    if (!user) return;
-    loadUserApplications();
-  }, [user]);
+  useEffect(() => { loadVacancies(); }, []);
+  useEffect(() => { if (user) loadUserApplications(); }, [user]);
 
-  // Auto-apply after login redirect
   useEffect(() => {
     const applyId = searchParams.get("apply");
     if (applyId && user && !authLoading && vacancies.length > 0) {
       const vacancy = vacancies.find((v) => v.id === applyId);
       if (vacancy && !applications.has(applyId)) {
-        applyToJob(vacancy);
+        handleApplyClick(vacancy);
       }
     }
   }, [user, authLoading, vacancies, applications]);
@@ -76,14 +75,73 @@ const JobVacancies = () => {
     setApplications(new Set((data || []).map((a: any) => a.vacancy_id)));
   };
 
-  const applyToJob = async (vacancy: Vacancy) => {
+  const handleApplyClick = async (vacancy: Vacancy) => {
     if (!user) {
       navigate(`/login?redirect=${encodeURIComponent(`/jobs?apply=${vacancy.id}`)}`);
       return;
     }
-    setApplying(vacancy.id);
+    setSelectedVacancy(vacancy);
+    setEligibilityResult(null);
+    setNoResume(false);
+    setShowEligibility(true);
+    setEligibilityLoading(true);
+
+    // Fetch user profile for resume_skills
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
+
+    const resumeUrl = (profile as any)?.resume_url;
+    const resumeSkills = (profile as any)?.resume_skills;
+    const requirements = Array.isArray(vacancy.requirements) ? vacancy.requirements : [];
+
+    if (!resumeUrl && requirements.length > 0) {
+      setNoResume(true);
+      setEligibilityLoading(false);
+      return;
+    }
+
+    if (requirements.length === 0) {
+      // No requirements, skip eligibility check
+      setEligibilityLoading(false);
+      setShowEligibility(false);
+      await applyToJob(vacancy);
+      return;
+    }
+
+    try {
+      const { data: fnData, error: fnError } = await supabase.functions.invoke("check-eligibility", {
+        body: {
+          resume_skills: resumeSkills || {},
+          requirements,
+          job_title: vacancy.title,
+        },
+      });
+
+      if (fnError) throw fnError;
+      if (fnData?.error) {
+        toast.error(fnData.error);
+        setShowEligibility(false);
+      } else {
+        setEligibilityResult(fnData);
+      }
+    } catch (e) {
+      console.error("Eligibility check failed:", e);
+      toast.error("تعذر فحص الأهلية، يمكنك التقديم مباشرة");
+      setShowEligibility(false);
+      await applyToJob(vacancy);
+    }
+    setEligibilityLoading(false);
+  };
+
+  const applyToJob = async (vacancy?: Vacancy) => {
+    const v = vacancy || selectedVacancy;
+    if (!v || !user) return;
+    setApplying(v.id);
     const { error } = await supabase.from("job_applications").insert({
-      vacancy_id: vacancy.id,
+      vacancy_id: v.id,
       user_id: user.id,
       status: "applied",
     } as any);
@@ -91,11 +149,16 @@ const JobVacancies = () => {
       toast.error("حدث خطأ أثناء التقديم");
     } else {
       toast.success("تم التقديم بنجاح! اختر نوع المقابلة للبدء.");
-      setApplications((prev) => new Set(prev).add(vacancy.id));
-      setSelectedVacancy(vacancy);
+      setApplications((prev) => new Set(prev).add(v.id));
+      setSelectedVacancy(v);
       setShowTypeDialog(true);
     }
     setApplying(null);
+  };
+
+  const handleEligibilityProceed = async () => {
+    setShowEligibility(false);
+    await applyToJob();
   };
 
   const handleInterviewTypeSelect = (type: "text" | "voice" | "video") => {
@@ -135,39 +198,27 @@ const JobVacancies = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8 space-y-6">
-        {/* Hero */}
         <div className="rounded-2xl bg-gradient-to-l from-primary/10 via-secondary/5 to-transparent p-8 border border-border">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">استعرض الوظائف المتاحة</h1>
           <p className="text-muted-foreground">اختر الوظيفة المناسبة وقدّم عليها لبدء مقابلتك الذكية</p>
         </div>
 
-        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="ابحث عن وظيفة..."
-              className="pr-10"
-            />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث عن وظيفة..." className="pr-10" />
           </div>
           {departments.length > 0 && (
             <Select value={deptFilter} onValueChange={setDeptFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="جميع الأقسام" />
-              </SelectTrigger>
+              <SelectTrigger className="w-48"><SelectValue placeholder="جميع الأقسام" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">جميع الأقسام</SelectItem>
-                {departments.map((d) => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
-                ))}
+                {departments.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
               </SelectContent>
             </Select>
           )}
         </div>
 
-        {/* Vacancy Cards */}
         {filtered.length === 0 ? (
           <Card className="rounded-2xl">
             <CardContent className="p-12 text-center">
@@ -193,32 +244,24 @@ const JobVacancies = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                      {vacancy.department && (
-                        <span className="flex items-center gap-1"><Building2 className="w-4 h-4" />{vacancy.department}</span>
-                      )}
-                      {vacancy.location && (
-                        <span className="flex items-center gap-1"><MapPin className="w-4 h-4" />{vacancy.location}</span>
-                      )}
+                      {vacancy.department && <span className="flex items-center gap-1"><Building2 className="w-4 h-4" />{vacancy.department}</span>}
+                      {vacancy.location && <span className="flex items-center gap-1"><MapPin className="w-4 h-4" />{vacancy.location}</span>}
                       <span className="flex items-center gap-1"><Clock className="w-4 h-4" />{new Date(vacancy.created_at).toLocaleDateString("ar-SA")}</span>
                     </div>
                     {requirements.length > 0 && (
                       <div className="flex flex-wrap gap-2">
-                        {requirements.slice(0, 4).map((req, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">{req}</Badge>
-                        ))}
+                        {requirements.slice(0, 4).map((req, i) => <Badge key={i} variant="outline" className="text-xs">{req}</Badge>)}
                         {requirements.length > 4 && <Badge variant="outline" className="text-xs">+{requirements.length - 4}</Badge>}
                       </div>
                     )}
                     <Button
                       className="w-full rounded-xl"
                       disabled={hasApplied || applying === vacancy.id}
-                      onClick={() => applyToJob(vacancy)}
+                      onClick={() => handleApplyClick(vacancy)}
                     >
                       {applying === vacancy.id ? (
                         <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                      ) : hasApplied ? (
-                        "تم التقديم مسبقاً"
-                      ) : (
+                      ) : hasApplied ? "تم التقديم مسبقاً" : (
                         <><Send className="w-4 h-4 ml-2" /> قدّم الآن</>
                       )}
                     </Button>
@@ -229,6 +272,17 @@ const JobVacancies = () => {
           </div>
         )}
       </div>
+
+      <EligibilityDialog
+        open={showEligibility}
+        onOpenChange={setShowEligibility}
+        loading={eligibilityLoading}
+        result={eligibilityResult}
+        noResume={noResume}
+        onProceed={handleEligibilityProceed}
+        onGoToProfile={() => { setShowEligibility(false); navigate("/settings/profile"); }}
+        vacancyTitle={selectedVacancy?.title || ""}
+      />
 
       <InterviewTypeDialog
         open={showTypeDialog}
