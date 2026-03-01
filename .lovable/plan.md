@@ -1,45 +1,48 @@
 
-# Technical Integrations & Security Features
 
-## Completed ✅
+# Stunning Landing Page Redesign
 
-### 1. Session Timeout (30 min inactivity)
-- `useSessionTimeout` hook tracks mouse/keyboard/touch activity
-- Warning toast at 25 min, auto-logout at 30 min
-- Integrated into `AuthProvider`
+## Overview
+Complete rewrite of `src/pages/Index.tsx` with all requested sections: hero with animated gradient + stats bar, 3 feature cards, 4-step "How it Works", testimonials, sticky nav with mobile drawer, and comprehensive footer. Also add CSS animations for the gradient background.
 
-### 2. Anti-Cheating Features
-- `useAntiCheat` hook with tab switch detection (`visibilitychange` + `blur`)
-- Copy-paste detection (blocked in text interview)
-- Warning banner displayed during interviews
-- Tab switch count tracked and shown
+## Single File Change
+**`src/pages/Index.tsx`** — Full rewrite with:
 
-### 3. Media Storage
-- `interview-recordings` storage bucket (private, 50MB limit)
-- RLS: students upload to own folder, admin/HR can read all
-- Voice and Video interviews upload recordings after stopping
+### Sticky Navigation
+- IPA logo + name on the right (RTL), nav links center (الرئيسية, المقابلات, التقارير, الدعم), auth buttons left
+- When logged in: show user avatar dropdown with (لوحة التحكم, تسجيل الخروج)
+- Mobile: hamburger icon opens `Sheet` drawer with nav links
+- Uses `useAuth()` to detect login state
 
-### 4. Arabic Number Formatting
-- `toArabicNumerals()`, `formatArabicNumber()`, `formatArabicPercent()`
-- Applied in Student and Admin dashboards
+### Hero Section
+- Animated gradient background (CSS keyframe `gradient-shift` added to `index.css`)
+- Headline: "المقابلات الذكية - مستقبل التوظيف يبدأ هنا"
+- Subheadline as specified
+- Two CTAs: "ابدأ المقابلة التجريبية" (primary, links to `/interview/text`), "تعرف على المزيد" (outline, scrolls to `#features`)
+- Decorative floating shapes with subtle animation
+- Stats bar below hero: "١٠٠٠+ مقابلة" | "٩٥% دقة التحليل" | "٥٠+ شركة شريكة"
 
-### 5. Lazy Loading
-- Interview pages and ResetPassword loaded via `React.lazy()`
-- Suspense fallback with loading spinner
+### Features Section (3 cards)
+1. مقابلات فيديو ذكية — Video icon, AI analysis details
+2. تحليل الشخصية الآلي — Brain icon, DISC assessment
+3. تقارير احترافية — BarChart3 icon, PDF/certificates
 
-### 6. Optimistic UI for HR Notes
-- Notes appear immediately in CandidateDetail
-- Rolled back on error
+### How It Works (4 steps)
+Numbered circles with icons in a horizontal timeline layout:
+1. سجل الدخول بحساب IPA
+2. اختر نوع المقابلة
+3. أجب على أسئلة الذكاء الاصطناعي
+4. احصل على تقييم مفصل وشهادة
 
-### 7. Password Reset Flow
-- "نسيت كلمة المرور؟" link in Login
-- `/reset-password` page with recovery token handling
+### Testimonials (3 cards)
+Placeholder student quotes with avatar circles, IPA-colored accents
 
-### 8. evaluate-interview config
-- Added to `supabase/config.toml`
+### Footer
+- 3-column: links (سياسة الخصوصية, الشروط, مركز المساعدة), contact info, social icons
+- Copyright: © 2026 معهد الإدارة العامة
 
-## Out of Scope
-- Twilio SMS OTP, Google Cloud Vision, Calendar integration
-- Hijri date picker, Arabic speech-to-text, Video compression
-- Auto-delete after 1 year, Multiple face detection
-- tailwindcss-rtl plugin (RTL already handled)
+## Additional Change
+**`src/index.css`** — Add `@keyframes gradient-shift` for animated hero background
+
+## No database or backend changes needed.
+
