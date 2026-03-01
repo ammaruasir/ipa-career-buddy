@@ -19,7 +19,7 @@ const DashboardRouter = () => {
     if (role === "admin" || role === "hr") {
       navigate("/dashboard/admin", { replace: true });
     } else {
-      navigate("/dashboard/student", { replace: true });
+      navigate("/dashboard/candidate", { replace: true });
     }
   }, [user, role, loading, navigate]);
 

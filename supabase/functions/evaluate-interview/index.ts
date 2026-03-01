@@ -65,7 +65,7 @@ serve(async (req) => {
     const avgWordsPerResponse = totalResponses > 0 ? totalWords / totalResponses : 0;
     const estimatedPace = Math.round(avgWordsPerResponse * 2);
 
-    const systemPrompt = `أنت خبير تقييم مقابلات وظيفية في معهد الإدارة العامة بالمملكة العربية السعودية. 
+    const systemPrompt = `أنت خبير تقييم مقابلات وظيفية احترافي. 
 قم بتحليل نص المقابلة التالية وتقييم المرشح بشكل شامل.
 
 الوظيفة المطلوبة: ${interview.job_position}
@@ -73,7 +73,7 @@ serve(async (req) => {
 معايير التقييم:
 1. مهارات التواصل (0-100): وضوح الأفكار، التعبير باللغة العربية، تنظيم الإجابات — الوزن: ${Math.round(wComm * 100)}%
 2. الكفاءة التقنية (0-100): مطابقة المهارات مع متطلبات الوظيفة، عمق المعرفة — الوزن: ${Math.round(wTech * 100)}%
-3. التوافق الثقافي (0-100): التوافق مع قيم معهد الإدارة العامة — الوزن: ${Math.round(wCult * 100)}%
+3. التوافق الثقافي (0-100): التوافق مع قيم وثقافة المؤسسة — الوزن: ${Math.round(wCult * 100)}%
 4. نوع الشخصية DISC: (D-مسيطر / I-مؤثر / S-ثابت / C-متقن)
 5. التوصية النهائية: "موصى به بشدة" (${thresholds.highly_recommended}+) / "موصى به" (${thresholds.recommended}-${thresholds.highly_recommended - 1}) / "غير موصى به" (<${thresholds.recommended})
 

@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toArabicNumerals, formatArabicPercent } from "@/lib/arabic-utils";
 import {
-  MessageSquare, Mic, Video, LogOut, GraduationCap,
+  MessageSquare, Mic, Video, LogOut, Briefcase,
   BarChart3, Clock, CheckCircle2, Loader2, TrendingUp,
   ChevronDown, ChevronUp, Sparkles, Settings,
 } from "lucide-react";
@@ -30,7 +30,7 @@ const typeMap: Record<string, { label: string; icon: typeof MessageSquare }> = {
   video: { label: "فيديو", icon: Video },
 };
 
-const StudentDashboard = () => {
+const CandidateDashboard = () => {
   const { user, signOut, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<any>(null);
@@ -96,9 +96,9 @@ const StudentDashboard = () => {
         <div className="container mx-auto flex items-center justify-between py-4 px-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <GraduationCap className="w-6 h-6 text-primary-foreground" />
+              <Briefcase className="w-6 h-6 text-primary-foreground" />
             </div>
-            <h2 className="text-lg font-bold text-foreground">لوحة الطالب</h2>
+            <h2 className="text-lg font-bold text-foreground">لوحة المرشح</h2>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
@@ -330,4 +330,4 @@ const StudentDashboard = () => {
   );
 };
 
-export default StudentDashboard;
+export default CandidateDashboard;

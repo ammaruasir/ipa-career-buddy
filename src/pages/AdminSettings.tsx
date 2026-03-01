@@ -79,7 +79,7 @@ const AdminSettings = () => {
     const { data: profiles } = await supabase.from("profiles").select("user_id, full_name");
     const { data: roles } = await supabase.from("user_roles").select("user_id, role");
     const roleMap = new Map((roles || []).map((r) => [r.user_id, r.role]));
-    setUsers((profiles || []).map((p) => ({ ...p, role: roleMap.get(p.user_id) || "student" })));
+    setUsers((profiles || []).map((p) => ({ ...p, role: roleMap.get(p.user_id) || "candidate" })));
     setLoadingUsers(false);
   };
 
@@ -370,7 +370,7 @@ const AdminSettings = () => {
                           <TableCell className="font-tajawal">{u.full_name || "بدون اسم"}</TableCell>
                           <TableCell>
                             <Badge variant={u.role === "admin" ? "default" : "secondary"} className="font-tajawal">
-                              {u.role === "admin" ? "مدير" : u.role === "hr" ? "موارد بشرية" : "طالب"}
+                              {u.role === "admin" ? "مدير" : u.role === "hr" ? "موارد بشرية" : "مرشح"}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -379,7 +379,7 @@ const AdminSettings = () => {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="student">طالب</SelectItem>
+                                <SelectItem value="candidate">مرشح</SelectItem>
                                 <SelectItem value="hr">موارد بشرية</SelectItem>
                                 <SelectItem value="admin">مدير</SelectItem>
                               </SelectContent>

@@ -9,7 +9,7 @@ import { Loader2 } from "lucide-react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import DashboardRouter from "./pages/DashboardRouter";
-import StudentDashboard from "./pages/StudentDashboard";
+import CandidateDashboard from "./pages/CandidateDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import CandidateDetail from "./pages/CandidateDetail";
 import NotFound from "./pages/NotFound";
@@ -45,7 +45,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/dashboard" element={<DashboardRouter />} />
-              <Route path="/dashboard/student" element={<StudentDashboard />} />
+              <Route path="/dashboard/candidate" element={<CandidateDashboard />} />
               <Route path="/dashboard/admin" element={<AdminDashboard />} />
               <Route path="/dashboard/admin/candidate/:id" element={<CandidateDetail />} />
               <Route path="/interview/text" element={<TextInterview />} />

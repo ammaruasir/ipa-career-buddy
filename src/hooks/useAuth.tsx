@@ -3,7 +3,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 
-type AppRole = "student" | "admin" | "hr";
+type AppRole = "candidate" | "admin" | "hr";
 
 interface AuthContextType {
   user: User | null;
@@ -32,7 +32,7 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
     const roles = (data || []).map((r) => r.role as AppRole);
     if (roles.includes("admin")) setRole("admin");
     else if (roles.includes("hr")) setRole("hr");
-    else setRole(roles[0] || "student");
+    else setRole(roles[0] || "candidate");
   };
 
   useEffect(() => {

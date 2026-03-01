@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { GraduationCap, Loader2, CheckCircle2 } from "lucide-react";
+import { Briefcase, Loader2, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -77,7 +77,7 @@ const ResetPassword = () => {
       <Card className="w-full max-w-md rounded-2xl shadow-xl relative z-10">
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-primary flex items-center justify-center">
-            <GraduationCap className="w-9 h-9 text-primary-foreground" />
+            <Briefcase className="w-9 h-9 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl font-bold">إعادة تعيين كلمة المرور</CardTitle>
           <CardDescription>أدخل كلمة المرور الجديدة</CardDescription>
