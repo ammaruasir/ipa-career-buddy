@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ const employmentTypeMap: Record<string, string> = {
 const JobVacancies = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   const [applications, setApplications] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -40,23 +41,44 @@ const JobVacancies = () => {
   const [deptFilter, setDeptFilter] = useState("all");
 
   useEffect(() => {
-    if (!authLoading && !user) { navigate("/login"); return; }
-    if (!user) return;
-    loadData();
-  }, [user, authLoading]);
+    loadVacancies();
+  }, []);
 
-  const loadData = async () => {
-    const [vacRes, appRes] = await Promise.all([
-      supabase.from("job_vacancies").select("*").eq("is_active", true).order("created_at", { ascending: false }),
-      supabase.from("job_applications").select("vacancy_id").eq("user_id", user!.id),
-    ]);
-    setVacancies((vacRes.data as any) || []);
-    setApplications(new Set((appRes.data || []).map((a: any) => a.vacancy_id)));
+  // Load user applications when authenticated
+  useEffect(() => {
+    if (!user) return;
+    loadUserApplications();
+  }, [user]);
+
+  // Auto-apply after login redirect
+  useEffect(() => {
+    const applyId = searchParams.get("apply");
+    if (applyId && user && !authLoading && vacancies.length > 0) {
+      const vacancy = vacancies.find((v) => v.id === applyId);
+      if (vacancy && !applications.has(applyId)) {
+        applyToJob(vacancy);
+      }
+    }
+  }, [user, authLoading, vacancies, applications]);
+
+  const loadVacancies = async () => {
+    const { data } = await supabase.from("job_vacancies").select("*").eq("is_active", true).order("created_at", { ascending: false });
+    setVacancies((data as any) || []);
     setLoading(false);
   };
 
-  const applyToJob = async (vacancy: Vacancy) => {
+  const loadUserApplications = async () => {
     if (!user) return;
+    const { data } = await supabase.from("job_applications").select("vacancy_id").eq("user_id", user.id);
+    setApplications(new Set((data || []).map((a: any) => a.vacancy_id)));
+  };
+
+  const applyToJob = async (vacancy: Vacancy) => {
+    if (!user) {
+      // Redirect to login with return URL including vacancy ID
+      navigate(`/login?redirect=${encodeURIComponent(`/jobs?apply=${vacancy.id}`)}`);
+      return;
+    }
     setApplying(vacancy.id);
     const { error } = await supabase.from("job_applications").insert({
       vacancy_id: vacancy.id,
@@ -82,7 +104,7 @@ const JobVacancies = () => {
     return matchSearch && matchDept;
   });
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

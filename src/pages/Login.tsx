@@ -36,7 +36,8 @@ const Login = () => {
       if (error) {
         toast.error("خطأ في البريد الإلكتروني أو كلمة المرور");
       } else {
-        navigate("/dashboard");
+        const redirect = searchParams.get("redirect");
+        navigate(redirect || "/dashboard");
       }
     }
     setLoading(false);
