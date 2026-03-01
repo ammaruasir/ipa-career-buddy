@@ -1,0 +1,1 @@
+ALTER TABLE public.interviews ADD COLUMN recording_url TEXT;

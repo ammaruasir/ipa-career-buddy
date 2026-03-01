@@ -42,6 +42,14 @@ const VideoInterview = () => {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
+  // Full session recorder refs
+  const fullRecorderRef = useRef<MediaRecorder | null>(null);
+  const fullChunksRef = useRef<Blob[]>([]);
+
+  // Frame capture refs
+  const capturedFramesRef = useRef<string[]>([]);
+  const frameCaptureIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const { tabSwitchCount, showWarning } = useAntiCheat({ enableTabDetection: true });
 
   useEffect(() => {
@@ -60,6 +68,7 @@ const VideoInterview = () => {
     }
   }, [session.messages, session.isLoading]);
 
+  // Initialize camera and start full session recording
   useEffect(() => {
     if (!session.selectedJob) return;
     const initCamera = async () => {
@@ -70,6 +79,19 @@ const VideoInterview = () => {
           videoRef.current.srcObject = stream;
         }
         setCameraReady(true);
+
+        // Start full session recording
+        try {
+          const fullRecorder = new MediaRecorder(stream);
+          fullChunksRef.current = [];
+          fullRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) fullChunksRef.current.push(e.data);
+          };
+          fullRecorder.start(10000); // collect chunks every 10s
+          fullRecorderRef.current = fullRecorder;
+        } catch (err) {
+          console.error("Full session recorder failed to start:", err);
+        }
       } catch {
         // permission denied
       }
@@ -77,8 +99,113 @@ const VideoInterview = () => {
     initCamera();
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      if (fullRecorderRef.current?.state !== "inactive") {
+        fullRecorderRef.current?.stop();
+      }
     };
   }, [session.selectedJob]);
+
+  // Upload full recording when interview completes
+  useEffect(() => {
+    if (!session.isCompleted || !user || !session.interviewId) return;
+
+    const uploadFullRecording = async () => {
+      if (fullRecorderRef.current?.state !== "inactive") {
+        fullRecorderRef.current?.stop();
+      }
+      // Wait for final chunks
+      await new Promise((r) => setTimeout(r, 500));
+
+      if (fullChunksRef.current.length === 0) return;
+      const blob = new Blob(fullChunksRef.current, { type: "video/webm" });
+      if (blob.size > 104857600) return; // 100MB max
+
+      const fileName = `${user.id}/${session.interviewId}_full.webm`;
+      const { error } = await supabase.storage
+        .from("interview-recordings")
+        .upload(fileName, blob, { contentType: "video/webm" });
+
+      if (!error) {
+        // Get signed URL and save to interview
+        const { data: signedData } = await supabase.storage
+          .from("interview-recordings")
+          .createSignedUrl(fileName, 31536000); // 1 year
+
+        if (signedData?.signedUrl) {
+          await supabase
+            .from("interviews")
+            .update({ recording_url: signedData.signedUrl } as any)
+            .eq("id", session.interviewId!);
+        }
+        toast.success("تم حفظ التسجيل الكامل للمقابلة");
+      }
+    };
+
+    uploadFullRecording();
+  }, [session.isCompleted, user, session.interviewId]);
+
+  // Capture a frame from the video element
+  const captureFrame = useCallback((): string | null => {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = 320; // small for efficiency
+    canvas.height = 240;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, 320, 240);
+    return canvas.toDataURL("image/jpeg", 0.7);
+  }, []);
+
+  // Start frame capture interval during recording
+  const startFrameCapture = useCallback(() => {
+    capturedFramesRef.current = [];
+    // Capture first frame immediately
+    const frame = captureFrame();
+    if (frame) capturedFramesRef.current.push(frame);
+
+    // Capture every 5 seconds
+    frameCaptureIntervalRef.current = setInterval(() => {
+      const f = captureFrame();
+      if (f && capturedFramesRef.current.length < 6) {
+        capturedFramesRef.current.push(f);
+      }
+    }, 5000);
+  }, [captureFrame]);
+
+  const stopFrameCapture = useCallback(() => {
+    if (frameCaptureIntervalRef.current) {
+      clearInterval(frameCaptureIntervalRef.current);
+      frameCaptureIntervalRef.current = null;
+    }
+    // Capture final frame
+    const frame = captureFrame();
+    if (frame && capturedFramesRef.current.length < 6) {
+      capturedFramesRef.current.push(frame);
+    }
+  }, [captureFrame]);
+
+  // Send frames to analyze-video function
+  const analyzeVideoFrames = useCallback(async (responseId: string, questionText: string, answerText: string) => {
+    const frames = capturedFramesRef.current;
+    if (frames.length === 0) return;
+
+    try {
+      const resp = await supabase.functions.invoke("analyze-video", {
+        body: {
+          response_id: responseId,
+          frames,
+          question_text: questionText,
+          answer_text: answerText,
+        },
+      });
+      if (resp.error) {
+        console.error("Video analysis error:", resp.error);
+      }
+    } catch (err) {
+      console.error("Video analysis failed:", err);
+    }
+  }, []);
 
   const transcribeAudio = useCallback(async (blob: Blob) => {
     setIsTranscribing(true);
@@ -137,6 +264,8 @@ const VideoInterview = () => {
           .upload(fileName, blob, { contentType: "video/webm" });
         if (!error) toast.success("تم رفع التسجيل بنجاح");
       }
+      // Stop frame capture
+      stopFrameCapture();
       // Auto-transcribe
       transcribeAudio(blob);
     };
@@ -144,7 +273,9 @@ const VideoInterview = () => {
     recorderRef.current = recorder;
     setIsRecording(true);
     setIsPaused(false);
-  }, [user, session.interviewId, session.questionCount, transcribeAudio]);
+    // Start frame capture
+    startFrameCapture();
+  }, [user, session.interviewId, session.questionCount, transcribeAudio, startFrameCapture, stopFrameCapture]);
 
   const pauseRecording = useCallback(() => {
     recorderRef.current?.pause();
@@ -166,7 +297,28 @@ const VideoInterview = () => {
     if (!transcription.trim()) return;
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 1500);
+
+    // Get the current question text before sending
+    const lastAIMsg = [...session.messages].reverse().find((m) => m.role === "assistant");
+    const questionText = lastAIMsg?.content || "";
+
     await session.sendAnswer(transcription);
+
+    // After answer is saved, trigger video analysis on the latest response
+    if (session.interviewId && capturedFramesRef.current.length > 0) {
+      // Fetch latest response to get its ID
+      const { data: responses } = await supabase
+        .from("responses")
+        .select("id")
+        .eq("interview_id", session.interviewId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (responses?.[0]) {
+        analyzeVideoFrames(responses[0].id, questionText, transcription);
+      }
+    }
+
     setTranscription("");
     timer.pause();
   };

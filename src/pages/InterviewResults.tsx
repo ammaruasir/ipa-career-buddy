@@ -67,6 +67,7 @@ const InterviewResults = () => {
   const recColor = recColors[evaluation.recommendation] || recColors["موصى به"];
   const strengths = (evaluation.strengths as string[]) || [];
   const improvements = (evaluation.improvements as string[]) || [];
+  const videoAnalysis = (evaluation.detailed_scores as any)?.video_analysis;
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
@@ -148,6 +149,34 @@ const InterviewResults = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Video Analysis Scores */}
+        {videoAnalysis && (
+          <Card className="rounded-2xl shadow-lg">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Eye className="w-5 h-5 text-primary" />
+                تحليل الفيديو
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                  { label: "التواصل البصري", value: videoAnalysis.eye_contact },
+                  { label: "الثقة (الوجه)", value: videoAnalysis.video_confidence },
+                  { label: "الانخراط", value: videoAnalysis.engagement },
+                  { label: "المظهر المهني", value: videoAnalysis.professional_appearance },
+                ].map(({ label, value }) => (
+                  <div key={label} className="space-y-2">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="text-xl font-bold text-foreground">{value}<span className="text-xs text-muted-foreground">/100</span></p>
+                    <Progress value={value || 0} className="h-2" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Strengths & Improvements */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
