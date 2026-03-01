@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import DashboardRouter from "./pages/DashboardRouter";
 import CandidateDashboard from "./pages/CandidateDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import HRDashboard from "./pages/HRDashboard";
 import CandidateDetail from "./pages/CandidateDetail";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
@@ -67,6 +68,7 @@ const App = () => (
               <Route path="/dashboard" element={<DashboardRouter />} />
               <Route path="/dashboard/candidate" element={<CandidateDashboard />} />
               <Route path="/dashboard/admin" element={<AdminDashboard />} />
+              <Route path="/dashboard/hr" element={<HRDashboard />} />
               <Route path="/dashboard/admin/candidate/:id" element={<CandidateDetail />} />
               <Route path="/complete-profile" element={<CompleteProfile />} />
               <Route path="/jobs" element={<JobVacancies />} />
