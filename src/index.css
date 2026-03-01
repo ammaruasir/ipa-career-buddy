@@ -160,3 +160,35 @@
   animation: checkmark-draw 0.4s 0.4s ease-out forwards;
   stroke-dasharray: 0 30;
 }
+
+/* Hero animated gradient */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.hero-gradient {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.06), hsl(var(--secondary) / 0.08), hsl(var(--accent) / 0.06), hsl(var(--primary) / 0.04));
+  background-size: 300% 300%;
+  animation: gradient-shift 12s ease-in-out infinite;
+}
+
+/* Floating decorative shapes */
+@keyframes float-shape {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-20px) scale(1.05); }
+}
+
+@keyframes float-shape-delayed {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-15px) scale(0.95); }
+}
+
+.animate-float {
+  animation: float-shape 8s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-shape-delayed 10s ease-in-out infinite 2s;
+}
