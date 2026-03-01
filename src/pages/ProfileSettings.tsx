@@ -54,6 +54,8 @@ const ProfileSettings = () => {
   const [experienceYears, setExperienceYears] = useState("");
   const [resumeUrl, setResumeUrl] = useState<string | null>(null);
   const [uploadingResume, setUploadingResume] = useState(false);
+  const [analyzingResume, setAnalyzingResume] = useState(false);
+  const [resumeSkills, setResumeSkills] = useState<any>(null);
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -90,6 +92,9 @@ const ProfileSettings = () => {
         setEducationLevel((data as any).education_level || "");
         setExperienceYears((data as any).experience_years?.toString() || "");
         setResumeUrl((data as any).resume_url || null);
+        if ((data as any).resume_skills && Object.keys((data as any).resume_skills).length > 0) {
+          setResumeSkills((data as any).resume_skills);
+        }
         if ((data as any).date_of_birth) {
           setDateOfBirth(new Date((data as any).date_of_birth));
         }
@@ -162,7 +167,26 @@ const ProfileSettings = () => {
       const url = urlData.publicUrl;
       setResumeUrl(url);
       await supabase.from("profiles").update({ resume_url: url } as any).eq("user_id", user.id);
-      toast({ title: "تم رفع السيرة الذاتية بنجاح" });
+      toast({ title: "تم رفع السيرة الذاتية، جاري التحليل..." });
+
+      // Auto-analyze
+      setAnalyzingResume(true);
+      try {
+        const { data: fnData, error: fnError } = await supabase.functions.invoke("analyze-resume", {
+          body: { resume_path: path },
+        });
+        if (fnError) throw fnError;
+        if (fnData?.skills) {
+          setResumeSkills(fnData.skills);
+          toast({ title: "تم تحليل السيرة الذاتية بنجاح! ✨" });
+        } else if (fnData?.error) {
+          toast({ title: "تنبيه", description: fnData.error, variant: "destructive" });
+        }
+      } catch (err) {
+        console.error("Resume analysis error:", err);
+        toast({ title: "تم رفع الملف لكن تعذر التحليل", variant: "destructive" });
+      }
+      setAnalyzingResume(false);
     }
     setUploadingResume(false);
   };
@@ -383,6 +407,38 @@ const ProfileSettings = () => {
                 </div>
               )}
             </div>
+
+            {analyzingResume && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20 mt-4">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <p className="font-tajawal text-sm text-primary">جاري تحليل السيرة الذاتية بالذكاء الاصطناعي...</p>
+              </div>
+            )}
+
+            {resumeSkills && !analyzingResume && (
+              <div className="space-y-3 p-4 rounded-xl bg-success/5 border border-success/20 mt-4">
+                <p className="font-tajawal font-bold text-success flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> المهارات المستخرجة من السيرة</p>
+                {resumeSkills.summary && <p className="font-tajawal text-sm text-muted-foreground">{resumeSkills.summary}</p>}
+                {resumeSkills.technical_skills?.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="font-tajawal text-xs font-bold">المهارات التقنية:</p>
+                    <div className="flex flex-wrap gap-1">{resumeSkills.technical_skills.map((s: string, i: number) => <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{s}</span>)}</div>
+                  </div>
+                )}
+                {resumeSkills.soft_skills?.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="font-tajawal text-xs font-bold">المهارات الشخصية:</p>
+                    <div className="flex flex-wrap gap-1">{resumeSkills.soft_skills.map((s: string, i: number) => <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-accent/30 text-accent-foreground">{s}</span>)}</div>
+                  </div>
+                )}
+                {resumeSkills.certifications?.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="font-tajawal text-xs font-bold">الشهادات:</p>
+                    <div className="flex flex-wrap gap-1">{resumeSkills.certifications.map((s: string, i: number) => <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-secondary/10 text-secondary">{s}</span>)}</div>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 

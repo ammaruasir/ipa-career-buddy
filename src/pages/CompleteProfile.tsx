@@ -24,7 +24,9 @@ const CompleteProfile = () => {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [resumeUploaded, setResumeUploaded] = useState(false);
+  const [resumeSkills, setResumeSkills] = useState<any>(null);
   const [resumeName, setResumeName] = useState("");
 
   // Step 1 fields
@@ -132,7 +134,26 @@ const CompleteProfile = () => {
         .eq("user_id", user.id);
       setResumeUploaded(true);
       setResumeName(file.name);
-      toast({ title: "تم رفع السيرة الذاتية بنجاح" });
+      toast({ title: "تم رفع السيرة الذاتية بنجاح، جاري التحليل..." });
+
+      // Auto-analyze
+      setAnalyzing(true);
+      try {
+        const { data: fnData, error: fnError } = await supabase.functions.invoke("analyze-resume", {
+          body: { resume_path: path },
+        });
+        if (fnError) throw fnError;
+        if (fnData?.skills) {
+          setResumeSkills(fnData.skills);
+          toast({ title: "تم تحليل السيرة الذاتية بنجاح! ✨" });
+        } else if (fnData?.error) {
+          toast({ title: "تنبيه", description: fnData.error, variant: "destructive" });
+        }
+      } catch (err) {
+        console.error("Resume analysis error:", err);
+        toast({ title: "تم رفع الملف لكن تعذر التحليل التلقائي", variant: "destructive" });
+      }
+      setAnalyzing(false);
     }
     setUploading(false);
   };
@@ -358,6 +379,32 @@ const CompleteProfile = () => {
               </div>
 
               {uploading && <Progress value={60} className="h-2" />}
+
+              {analyzing && (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  <p className="font-tajawal text-sm text-primary">جاري تحليل السيرة الذاتية بالذكاء الاصطناعي...</p>
+                </div>
+              )}
+
+              {resumeSkills && !analyzing && (
+                <div className="space-y-3 p-4 rounded-xl bg-success/5 border border-success/20">
+                  <p className="font-tajawal font-bold text-success flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> تم تحليل السيرة بنجاح</p>
+                  {resumeSkills.summary && <p className="font-tajawal text-sm text-muted-foreground">{resumeSkills.summary}</p>}
+                  {resumeSkills.technical_skills?.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="font-tajawal text-xs font-bold">المهارات التقنية:</p>
+                      <div className="flex flex-wrap gap-1">{resumeSkills.technical_skills.map((s: string, i: number) => <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{s}</span>)}</div>
+                    </div>
+                  )}
+                  {resumeSkills.certifications?.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="font-tajawal text-xs font-bold">الشهادات:</p>
+                      <div className="flex flex-wrap gap-1">{resumeSkills.certifications.map((s: string, i: number) => <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-secondary/10 text-secondary">{s}</span>)}</div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex justify-between pt-4">
                 <Button variant="outline" onClick={() => setStep(1)} className="font-tajawal">
