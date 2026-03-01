@@ -18,36 +18,57 @@ export type Database = {
         Row: {
           ai_feedback_ar: string | null
           communication_score: number | null
+          confidence_score: number | null
           created_at: string
+          detailed_scores: Json | null
+          filler_words_count: number | null
           id: string
           improvements: Json | null
           interview_id: string
           overall_score: number | null
           personality_match: number | null
+          personality_type: string | null
+          recommendation: string | null
+          sentiment: string | null
+          speech_pace: number | null
           strengths: Json | null
           technical_score: number | null
         }
         Insert: {
           ai_feedback_ar?: string | null
           communication_score?: number | null
+          confidence_score?: number | null
           created_at?: string
+          detailed_scores?: Json | null
+          filler_words_count?: number | null
           id?: string
           improvements?: Json | null
           interview_id: string
           overall_score?: number | null
           personality_match?: number | null
+          personality_type?: string | null
+          recommendation?: string | null
+          sentiment?: string | null
+          speech_pace?: number | null
           strengths?: Json | null
           technical_score?: number | null
         }
         Update: {
           ai_feedback_ar?: string | null
           communication_score?: number | null
+          confidence_score?: number | null
           created_at?: string
+          detailed_scores?: Json | null
+          filler_words_count?: number | null
           id?: string
           improvements?: Json | null
           interview_id?: string
           overall_score?: number | null
           personality_match?: number | null
+          personality_type?: string | null
+          recommendation?: string | null
+          sentiment?: string | null
+          speech_pace?: number | null
           strengths?: Json | null
           technical_score?: number | null
         }
