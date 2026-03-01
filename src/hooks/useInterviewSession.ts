@@ -12,7 +12,7 @@ interface UseInterviewSessionOptions {
   totalQuestions?: number;
 }
 
-export const useInterviewSession = ({ type, totalQuestions = 5 }: UseInterviewSessionOptions) => {
+export const useInterviewSession = ({ type, totalQuestions = 8 }: UseInterviewSessionOptions) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
@@ -21,6 +21,7 @@ export const useInterviewSession = ({ type, totalQuestions = 5 }: UseInterviewSe
   const [interviewId, setInterviewId] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
 
   const startInterview = useCallback(async (job: string) => {
     if (!user) return;
@@ -43,7 +44,15 @@ export const useInterviewSession = ({ type, totalQuestions = 5 }: UseInterviewSe
 
     const systemMsg: Msg = {
       role: "system",
-      content: `أنت محاور ذكي متخصص في إجراء مقابلات وظيفية باللغة العربية لمعهد الإدارة العامة في المملكة العربية السعودية. الوظيفة المطلوبة: ${job}. اسأل المرشح ${totalQuestions} أسئلة متنوعة تغطي المهارات التقنية والشخصية والتواصل. اطرح سؤالاً واحداً في كل مرة. ابدأ بتحية المرشح ثم اطرح السؤال الأول.`,
+      content: `أنت محاور ذكي متخصص في إجراء مقابلات وظيفية باللغة العربية لمعهد الإدارة العامة في المملكة العربية السعودية.
+الوظيفة المطلوبة: ${job}.
+اسأل المرشح ${totalQuestions} أسئلة بالترتيب التالي:
+- السؤال 1-2: أسئلة سلوكية (مثال: حدثنا عن موقف واجهت فيه ضغطاً كبيراً)
+- السؤال 3-5: أسئلة تقنية متعلقة بـ ${job} (تتدرج من سهل إلى صعب)
+- السؤال 6-7: أسئلة موقفية (ماذا ستفعل إذا...)
+- السؤال 8: سؤال توافق ثقافي مع قيم معهد الإدارة العامة (التميز، الابتكار، الاحترافية)
+
+اطرح سؤالاً واحداً في كل مرة. ابدأ بتحية المرشح ثم اطرح السؤال الأول.`,
     };
 
     try {
@@ -74,12 +83,14 @@ export const useInterviewSession = ({ type, totalQuestions = 5 }: UseInterviewSe
       answer_text: userMsg.content,
     });
 
+    const questionCategories = ["سلوكي", "سلوكي", "تقني", "تقني", "تقني", "موقفي", "موقفي", "توافق ثقافي"];
+    const currentCategory = questionCategories[questionCount - 1] || "عام";
     const systemMsg: Msg = {
       role: "system",
-      content: `أنت محاور ذكي. الوظيفة: ${selectedJob}. السؤال رقم ${questionCount} من ${totalQuestions}. ${
+      content: `أنت محاور ذكي. الوظيفة: ${selectedJob}. السؤال رقم ${questionCount} من ${totalQuestions} (نوع: ${currentCategory}). ${
         questionCount >= totalQuestions
           ? "هذا كان آخر سؤال. اشكر المرشح وأخبره أن التقييم سيكون جاهزاً قريباً. لا تطرح أسئلة إضافية."
-          : "اطرح السؤال التالي بعد التعليق بإيجاز على الإجابة."
+          : `اطرح السؤال التالي (${questionCategories[questionCount] || "عام"}) بعد التعليق بإيجاز على الإجابة.`
       }`,
     };
 
@@ -99,6 +110,25 @@ export const useInterviewSession = ({ type, totalQuestions = 5 }: UseInterviewSe
           .eq("id", interviewId);
         setIsCompleted(true);
         toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم...");
+        
+        // Auto-trigger evaluation
+        setIsEvaluating(true);
+        try {
+          const evalResp = await supabase.functions.invoke("evaluate-interview", {
+            body: { interview_id: interviewId },
+          });
+          if (evalResp.error) {
+            console.error("Evaluation error:", evalResp.error);
+            toast.error("حدث خطأ في التقييم، يمكنك المحاولة لاحقاً");
+          } else {
+            toast.success("تم إعداد التقييم بنجاح!");
+            navigate(`/interview/${interviewId}/results`);
+          }
+        } catch (e) {
+          console.error("Evaluation error:", e);
+          toast.error("حدث خطأ في التقييم");
+        }
+        setIsEvaluating(false);
       }
     } catch {
       toast.error("حدث خطأ في الاتصال");
@@ -116,6 +146,7 @@ export const useInterviewSession = ({ type, totalQuestions = 5 }: UseInterviewSe
     questionCount,
     totalQuestions,
     isCompleted,
+    isEvaluating,
     startInterview,
     sendAnswer,
     setMessages,

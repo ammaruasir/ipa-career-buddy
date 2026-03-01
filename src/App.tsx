@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import TextInterview from "./pages/TextInterview";
 import VoiceInterview from "./pages/VoiceInterview";
 import VideoInterview from "./pages/VideoInterview";
+import InterviewResults from "./pages/InterviewResults";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/interview/text" element={<TextInterview />} />
             <Route path="/interview/voice" element={<VoiceInterview />} />
             <Route path="/interview/video" element={<VideoInterview />} />
+            <Route path="/interview/:id/results" element={<InterviewResults />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
