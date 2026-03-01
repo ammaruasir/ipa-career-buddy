@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowRight, Loader2, User, Briefcase, Calendar, MessageSquare, Mic, Video } from "lucide-react";
+import VideoPlayback from "@/components/interview/VideoPlayback";
 import { toast } from "sonner";
 
 const discLabels: Record<string, { label: string; desc: string; color: string }> = {
@@ -270,7 +271,39 @@ const CandidateDetail = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Video Analysis Scores */}
+            {evaluation?.detailed_scores?.video_analysis && (
+              <Card className="rounded-2xl shadow-lg">
+                <CardHeader><CardTitle className="text-base">تحليل الفيديو</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  {[
+                    { label: "التواصل البصري", value: evaluation.detailed_scores.video_analysis.eye_contact },
+                    { label: "الثقة (تحليل الوجه)", value: evaluation.detailed_scores.video_analysis.video_confidence },
+                    { label: "الانخراط والاهتمام", value: evaluation.detailed_scores.video_analysis.engagement },
+                    { label: "المظهر المهني", value: evaluation.detailed_scores.video_analysis.professional_appearance },
+                  ].map((item) => (
+                    <div key={item.label}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-muted-foreground">{item.label}</span>
+                        <span className="font-semibold text-foreground">{item.value || 0}%</span>
+                      </div>
+                      <Progress value={item.value || 0} className="h-3" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
           </>
+        )}
+
+        {/* Video Playback for HR */}
+        {interview.type === "video" && interview.user_id && (
+          <VideoPlayback
+            interviewId={interview.id}
+            userId={interview.user_id}
+            recordingUrl={(interview as any).recording_url}
+          />
         )}
 
         {/* HR Notes */}

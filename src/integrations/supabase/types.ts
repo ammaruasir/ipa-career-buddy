@@ -123,6 +123,7 @@ export type Database = {
           id: string
           job_position: string
           questions: Json | null
+          recording_url: string | null
           status: Database["public"]["Enums"]["interview_status"]
           type: Database["public"]["Enums"]["interview_type"]
           updated_at: string
@@ -133,6 +134,7 @@ export type Database = {
           id?: string
           job_position: string
           questions?: Json | null
+          recording_url?: string | null
           status?: Database["public"]["Enums"]["interview_status"]
           type: Database["public"]["Enums"]["interview_type"]
           updated_at?: string
@@ -143,6 +145,7 @@ export type Database = {
           id?: string
           job_position?: string
           questions?: Json | null
+          recording_url?: string | null
           status?: Database["public"]["Enums"]["interview_status"]
           type?: Database["public"]["Enums"]["interview_type"]
           updated_at?: string

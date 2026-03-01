@@ -21,7 +21,6 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Fetch interview, responses, and system settings in parallel
     const [interviewRes, responsesRes, settingsRes] = await Promise.all([
       supabase.from("interviews").select("*").eq("id", interview_id).single(),
       supabase.from("responses").select("*").eq("interview_id", interview_id).order("created_at", { ascending: true }),
@@ -35,7 +34,6 @@ serve(async (req) => {
     const responses = responsesRes.data || [];
     const settings = settingsRes.data;
 
-    // Read dynamic weights from settings (fallback to defaults)
     const weights = settings?.scoring_weights as any || { technical: 40, communication: 30, cultural_fit: 30 };
     const totalWeight = (weights.technical || 40) + (weights.communication || 30) + (weights.cultural_fit || 30);
     const wTech = (weights.technical || 40) / totalWeight;
@@ -65,6 +63,31 @@ serve(async (req) => {
     const avgWordsPerResponse = totalResponses > 0 ? totalWords / totalResponses : 0;
     const estimatedPace = Math.round(avgWordsPerResponse * 2);
 
+    // Aggregate video analysis data if available (for video interviews)
+    const videoAnalyses = responses
+      .filter((r: any) => r.ai_analysis && typeof r.ai_analysis === "object")
+      .map((r: any) => r.ai_analysis);
+
+    let videoAnalysisSummary = "";
+    let avgEyeContact = 0, avgVideoConfidence = 0, avgEngagement = 0, avgProfAppearance = 0;
+
+    if (videoAnalyses.length > 0) {
+      avgEyeContact = Math.round(videoAnalyses.reduce((sum: number, a: any) => sum + (a.eye_contact_score || 0), 0) / videoAnalyses.length);
+      avgVideoConfidence = Math.round(videoAnalyses.reduce((sum: number, a: any) => sum + (a.confidence_score || 0), 0) / videoAnalyses.length);
+      avgEngagement = Math.round(videoAnalyses.reduce((sum: number, a: any) => sum + (a.engagement_score || 0), 0) / videoAnalyses.length);
+      avgProfAppearance = Math.round(videoAnalyses.reduce((sum: number, a: any) => sum + (a.professional_appearance || 0), 0) / videoAnalyses.length);
+
+      const bodyLanguageNotes = videoAnalyses.map((a: any) => a.body_language_assessment).filter(Boolean).join(" | ");
+
+      videoAnalysisSummary = `
+تحليل الفيديو (متوسط الدرجات):
+- التواصل البصري: ${avgEyeContact}/100
+- الثقة من تحليل الوجه: ${avgVideoConfidence}/100
+- الانخراط والاهتمام: ${avgEngagement}/100
+- المظهر المهني: ${avgProfAppearance}/100
+- ملاحظات لغة الجسد: ${bodyLanguageNotes}`;
+    }
+
     const systemPrompt = `أنت خبير تقييم مقابلات وظيفية احترافي. 
 قم بتحليل نص المقابلة التالية وتقييم المرشح بشكل شامل.
 
@@ -85,7 +108,10 @@ serve(async (req) => {
 - ملاحظات عامة بالعربية
 
 عدد كلمات الحشو المكتشفة: ${fillerCount}
-سرعة الكلام التقديرية: ${estimatedPace} كلمة في الدقيقة`;
+سرعة الكلام التقديرية: ${estimatedPace} كلمة في الدقيقة
+${videoAnalysisSummary}
+
+${videoAnalyses.length > 0 ? "ملاحظة: خذ بعين الاعتبار نتائج تحليل الفيديو عند التقييم، خصوصاً التواصل البصري ولغة الجسد والثقة." : ""}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -161,7 +187,7 @@ serve(async (req) => {
       (evaluation.cultural_fit_score * wCult)
     );
 
-    const evalRecord = {
+    const evalRecord: Record<string, any> = {
       interview_id,
       communication_score: evaluation.communication_score,
       technical_score: evaluation.technical_score,
@@ -184,6 +210,16 @@ serve(async (req) => {
         filler_words: fillerCount,
         speech_pace: estimatedPace,
         weights: { technical: wTech, communication: wComm, cultural_fit: wCult },
+        // Video analysis scores (if available)
+        ...(videoAnalyses.length > 0 ? {
+          video_analysis: {
+            eye_contact: avgEyeContact,
+            video_confidence: avgVideoConfidence,
+            engagement: avgEngagement,
+            professional_appearance: avgProfAppearance,
+            analyses_count: videoAnalyses.length,
+          },
+        } : {}),
       },
     };
 
