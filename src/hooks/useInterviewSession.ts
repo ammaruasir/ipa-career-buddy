@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ interface UseInterviewSessionOptions {
 export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestions }: UseInterviewSessionOptions) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { settings, loading: settingsLoading } = useSystemSettings();
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -48,6 +49,16 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
 
     setInterviewId(interview.id);
 
+    // Link interview to job application if vacancy_id is present
+    const vacancyId = searchParams.get("vacancy_id");
+    if (vacancyId) {
+      await supabase
+        .from("job_applications")
+        .update({ interview_id: interview.id, status: "interviewing" } as any)
+        .eq("vacancy_id", vacancyId)
+        .eq("user_id", user.id);
+    }
+
     const systemMsg: Msg = {
       role: "system",
       content: `أنت محاور ذكي متخصص في إجراء مقابلات وظيفية احترافية باللغة العربية.
@@ -73,7 +84,15 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
       toast.error("حدث خطأ في الاتصال بالذكاء الاصطناعي");
     }
     setIsLoading(false);
-  }, [user, type, totalQuestions]);
+  }, [user, type, totalQuestions, searchParams]);
+
+  // Auto-start interview when job URL param is present (from job vacancies page)
+  useEffect(() => {
+    const jobParam = searchParams.get("job");
+    if (jobParam && user && !selectedJob && !isLoading && !settingsLoading) {
+      startInterview(jobParam);
+    }
+  }, [user, settingsLoading]);
 
   const sendAnswer = useCallback(async (answerText: string) => {
     if (!answerText.trim() || isLoading || !interviewId) return;
