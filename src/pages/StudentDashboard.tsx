@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { toArabicNumerals, formatArabicPercent } from "@/lib/arabic-utils";
 import {
   MessageSquare, Mic, Video, LogOut, GraduationCap,
   BarChart3, Clock, CheckCircle2, Loader2, TrendingUp,
@@ -123,7 +124,7 @@ const StudentDashboard = () => {
                 <BarChart3 className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{interviews.length}</p>
+                <p className="text-2xl font-bold text-foreground">{toArabicNumerals(interviews.length)}</p>
                 <p className="text-sm text-muted-foreground">إجمالي المقابلات</p>
               </div>
             </CardContent>
@@ -134,7 +135,7 @@ const StudentDashboard = () => {
                 <TrendingUp className="w-6 h-6 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{avgScore}%</p>
+                <p className="text-2xl font-bold text-foreground">{formatArabicPercent(avgScore)}</p>
                 <p className="text-sm text-muted-foreground">متوسط التقييم</p>
               </div>
             </CardContent>
@@ -145,7 +146,7 @@ const StudentDashboard = () => {
                 <Clock className="w-6 h-6 text-warning" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{inProgress}</p>
+                <p className="text-2xl font-bold text-foreground">{toArabicNumerals(inProgress)}</p>
                 <p className="text-sm text-muted-foreground">مقابلات جارية</p>
               </div>
             </CardContent>

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useInterviewSession } from "@/hooks/useInterviewSession";
 import { useInterviewTimer } from "@/hooks/useInterviewTimer";
+import { useAntiCheat } from "@/hooks/useAntiCheat";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
 import JobSelector from "@/components/interview/JobSelector";
@@ -13,7 +14,9 @@ import SuccessCheckmark from "@/components/interview/SuccessCheckmark";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Video, Eye, EyeOff, GraduationCap, Send } from "lucide-react";
+import { Video, Eye, EyeOff, GraduationCap, Send, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const VideoInterview = () => {
   const { user, loading: authLoading } = useAuth();
@@ -33,6 +36,9 @@ const VideoInterview = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  const { tabSwitchCount, showWarning } = useAntiCheat({ enableTabDetection: true });
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
@@ -42,7 +48,6 @@ const VideoInterview = () => {
     if (session.questionCount > 0 && !session.isCompleted) timer.restart();
   }, [session.questionCount]);
 
-  // Start camera when job is selected
   useEffect(() => {
     if (!session.selectedJob) return;
     const initCamera = async () => {
@@ -71,11 +76,24 @@ const VideoInterview = () => {
     setShowCountdown(false);
     if (!streamRef.current) return;
     const recorder = new MediaRecorder(streamRef.current);
+    chunksRef.current = [];
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    recorder.onstop = async () => {
+      const blob = new Blob(chunksRef.current, { type: "video/webm" });
+      // Upload to storage
+      if (user && session.interviewId && blob.size <= 52428800) {
+        const fileName = `${user.id}/${session.interviewId}_q${session.questionCount}_${Date.now()}.webm`;
+        const { error } = await supabase.storage
+          .from("interview-recordings")
+          .upload(fileName, blob, { contentType: "video/webm" });
+        if (!error) toast.success("تم رفع التسجيل بنجاح");
+      }
+    };
     recorder.start();
     recorderRef.current = recorder;
     setIsRecording(true);
     setIsPaused(false);
-  }, []);
+  }, [user, session.interviewId, session.questionCount]);
 
   const pauseRecording = useCallback(() => {
     recorderRef.current?.pause();
@@ -123,7 +141,15 @@ const VideoInterview = () => {
         onBack={handleBack}
       />
 
-      {/* Question card */}
+      {showWarning && (
+        <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-2 flex items-center justify-center gap-2 animate-fade-in">
+          <AlertTriangle className="w-4 h-4 text-destructive" />
+          <span className="text-sm font-medium text-destructive">
+            تحذير: تم اكتشاف مغادرة النافذة ({tabSwitchCount} مرة)
+          </span>
+        </div>
+      )}
+
       {lastAIMessage && (
         <div className="px-4 pt-4">
           <Card className="container mx-auto max-w-5xl p-4 rounded-2xl shadow-lg animate-fade-in">
@@ -139,11 +165,9 @@ const VideoInterview = () => {
         <div className="flex justify-center py-4"><SuccessCheckmark /></div>
       )}
 
-      {/* Split screen */}
       <div className="flex-1 container mx-auto max-w-5xl px-4 py-4 flex gap-4 relative">
         {showCountdown && <CountdownOverlay onComplete={onCountdownComplete} />}
 
-        {/* Student camera — 60% */}
         <div className="w-[60%] relative rounded-2xl overflow-hidden bg-muted shadow-xl">
           <video
             ref={videoRef}
@@ -153,18 +177,15 @@ const VideoInterview = () => {
             className="w-full h-full object-cover"
             style={{ transform: "scaleX(-1)" }}
           />
-          {/* Recording indicator */}
           {isRecording && (
             <div className="absolute top-4 left-4 flex items-center gap-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full">
               <span className="w-3 h-3 rounded-full bg-destructive animate-pulse-record" />
               <span className="text-xs font-bold text-destructive">REC</span>
             </div>
           )}
-          {/* Eye tracking guide */}
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-success bg-success/20 animate-pulse pointer-events-none" />
         </div>
 
-        {/* AI Avatar — 40% */}
         <div className="w-[40%] flex flex-col items-center justify-center rounded-2xl bg-card border shadow-lg p-6">
           <div
             className={`w-32 h-32 rounded-full bg-primary/10 flex items-center justify-center mb-4 ${
@@ -178,11 +199,9 @@ const VideoInterview = () => {
         </div>
       </div>
 
-      {/* Bottom controls */}
       {!session.isCompleted && !session.isLoading && (
         <div className="border-t border-border bg-card p-4">
           <div className="container mx-auto max-w-5xl space-y-3">
-            {/* Recording controls */}
             <div className="flex items-center justify-center gap-4">
               {!isRecording && (
                 <Button onClick={beginRecording} className="rounded-full gap-2 px-6" disabled={!cameraReady}>
@@ -207,7 +226,6 @@ const VideoInterview = () => {
               </Button>
             </div>
 
-            {/* Transcript input */}
             {showTranscript && (
               <div className="flex gap-3">
                 <Textarea

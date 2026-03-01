@@ -66,17 +66,34 @@ const CandidateDetail = () => {
   const submitNote = async (action: string) => {
     if (!user || !id) return;
     setSubmitting(true);
-    const { error } = await supabase.from("hr_notes").insert({
+
+    // Optimistic: add note immediately
+    const optimisticNote = {
+      id: `temp-${Date.now()}`,
       interview_id: id,
       author_id: user.id,
       note_text: noteText.trim() || null,
       action,
+      created_at: new Date().toISOString(),
+    };
+    setNotes((prev) => [optimisticNote, ...prev]);
+    const savedText = noteText;
+    setNoteText("");
+
+    const { error } = await supabase.from("hr_notes").insert({
+      interview_id: id,
+      author_id: user.id,
+      note_text: savedText.trim() || null,
+      action,
     });
     if (error) {
       toast.error("حدث خطأ في حفظ الملاحظة");
+      // Roll back optimistic update
+      setNotes((prev) => prev.filter((n) => n.id !== optimisticNote.id));
+      setNoteText(savedText);
     } else {
       toast.success("تم حفظ الإجراء بنجاح");
-      setNoteText("");
+      // Refresh from server
       const { data } = await supabase.from("hr_notes").select("*").eq("interview_id", id).order("created_at", { ascending: false });
       setNotes(data || []);
     }

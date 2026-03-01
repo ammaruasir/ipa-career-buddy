@@ -6,11 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { GraduationCap, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const Login = () => {
   const [searchParams] = useSearchParams();
   const [isSignup, setIsSignup] = useState(searchParams.get("tab") === "signup");
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -39,6 +41,66 @@ const Login = () => {
     }
     setLoading(false);
   };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast.error("يرجى إدخال البريد الإلكتروني");
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      toast.error("حدث خطأ في إرسال رابط إعادة التعيين");
+    } else {
+      toast.success("تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني");
+    }
+    setLoading(false);
+  };
+
+  if (isForgotPassword) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-gradient-to-bl from-primary/5 via-transparent to-secondary/5" />
+        <Card className="w-full max-w-md rounded-2xl shadow-xl relative z-10">
+          <CardHeader className="text-center space-y-4 pb-2">
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-primary flex items-center justify-center">
+              <GraduationCap className="w-9 h-9 text-primary-foreground" />
+            </div>
+            <CardTitle className="text-2xl font-bold">نسيت كلمة المرور؟</CardTitle>
+            <CardDescription>أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">البريد الإلكتروني</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="example@ipa.edu.sa"
+                  className="rounded-xl"
+                  dir="ltr"
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full rounded-xl py-6 text-lg" disabled={loading}>
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "إرسال رابط إعادة التعيين"}
+              </Button>
+            </form>
+            <div className="mt-6 text-center">
+              <button type="button" onClick={() => setIsForgotPassword(false)} className="text-sm text-primary hover:underline">
+                العودة لتسجيل الدخول
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -109,7 +171,16 @@ const Login = () => {
               )}
             </Button>
           </form>
-          <div className="mt-6 text-center">
+          <div className="mt-4 text-center space-y-2">
+            {!isSignup && (
+              <button
+                type="button"
+                onClick={() => setIsForgotPassword(true)}
+                className="text-sm text-muted-foreground hover:text-primary hover:underline block w-full"
+              >
+                نسيت كلمة المرور؟
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setIsSignup(!isSignup)}

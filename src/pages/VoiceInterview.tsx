@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useInterviewSession } from "@/hooks/useInterviewSession";
 import { useInterviewTimer } from "@/hooks/useInterviewTimer";
+import { useAntiCheat } from "@/hooks/useAntiCheat";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
 import JobSelector from "@/components/interview/JobSelector";
@@ -12,7 +13,9 @@ import SuccessCheckmark from "@/components/interview/SuccessCheckmark";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Mic, Square, Play, Send, RotateCcw } from "lucide-react";
+import { Mic, Square, Send, RotateCcw, AlertTriangle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const VoiceInterview = () => {
   const { user, loading: authLoading } = useAuth();
@@ -30,6 +33,9 @@ const VoiceInterview = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const audioBlobRef = useRef<Blob | null>(null);
+
+  const { tabSwitchCount, showWarning } = useAntiCheat({ enableTabDetection: true });
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
@@ -55,6 +61,7 @@ const VoiceInterview = () => {
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        audioBlobRef.current = blob;
         setAudioURL(URL.createObjectURL(blob));
         stream.getTracks().forEach((t) => t.stop());
         ctx.close();
@@ -74,13 +81,35 @@ const VoiceInterview = () => {
     setIsRecording(false);
   }, []);
 
+  const uploadRecording = async (blob: Blob): Promise<string | null> => {
+    if (!user || !session.interviewId) return null;
+    const fileName = `${user.id}/${session.interviewId}_q${session.questionCount}_${Date.now()}.webm`;
+    const { error } = await supabase.storage
+      .from("interview-recordings")
+      .upload(fileName, blob, { contentType: "audio/webm" });
+    if (error) {
+      console.error("Upload error:", error);
+      return null;
+    }
+    return fileName;
+  };
+
   const handleSubmit = async () => {
     if (!transcription.trim()) return;
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 1500);
+
+    // Upload audio if available
+    if (audioBlobRef.current) {
+      uploadRecording(audioBlobRef.current).then((path) => {
+        if (path) toast.success("تم رفع التسجيل بنجاح");
+      });
+    }
+
     await session.sendAnswer(transcription);
     setTranscription("");
     setAudioURL(null);
+    audioBlobRef.current = null;
     timer.pause();
   };
 
@@ -105,8 +134,16 @@ const VoiceInterview = () => {
         onBack={handleBack}
       />
 
+      {showWarning && (
+        <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-2 flex items-center justify-center gap-2 animate-fade-in">
+          <AlertTriangle className="w-4 h-4 text-destructive" />
+          <span className="text-sm font-medium text-destructive">
+            تحذير: تم اكتشاف مغادرة النافذة ({tabSwitchCount} مرة)
+          </span>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 gap-6">
-        {/* Current question */}
         {lastAIMessage && (
           <Card className="w-full max-w-xl p-6 rounded-2xl shadow-lg animate-fade-in text-center">
             <p className="text-base leading-relaxed">{lastAIMessage.content}</p>
@@ -116,10 +153,8 @@ const VoiceInterview = () => {
         {session.isLoading && <TypingIndicator />}
         {showSuccess && <SuccessCheckmark />}
 
-        {/* Waveform */}
         {isRecording && <AudioWaveform analyser={analyser} isRecording={isRecording} />}
 
-        {/* Record button */}
         {!session.isCompleted && !session.isLoading && (
           <div className="flex flex-col items-center gap-4">
             {!isRecording && !audioURL && (
@@ -141,17 +176,15 @@ const VoiceInterview = () => {
           </div>
         )}
 
-        {/* Playback */}
         {audioURL && !isRecording && (
           <div className="flex items-center gap-3">
             <audio src={audioURL} controls className="h-10" />
-            <Button variant="ghost" size="icon" onClick={() => { setAudioURL(null); setTranscription(""); }}>
+            <Button variant="ghost" size="icon" onClick={() => { setAudioURL(null); setTranscription(""); audioBlobRef.current = null; }}>
               <RotateCcw className="w-4 h-4" />
             </Button>
           </div>
         )}
 
-        {/* Transcription area */}
         {!session.isCompleted && !session.isLoading && (
           <div className="w-full max-w-xl space-y-3">
             <Textarea
