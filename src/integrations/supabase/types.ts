@@ -260,6 +260,51 @@ export type Database = {
           },
         ]
       }
+      system_settings: {
+        Row: {
+          ai_model: string
+          brand_color: string
+          created_at: string
+          evaluation_thresholds: Json
+          filler_words: Json
+          id: string
+          job_positions: Json
+          maintenance_mode: boolean
+          questions_per_type: Json
+          scoring_weights: Json
+          time_per_question: Json
+          updated_at: string
+        }
+        Insert: {
+          ai_model?: string
+          brand_color?: string
+          created_at?: string
+          evaluation_thresholds?: Json
+          filler_words?: Json
+          id?: string
+          job_positions?: Json
+          maintenance_mode?: boolean
+          questions_per_type?: Json
+          scoring_weights?: Json
+          time_per_question?: Json
+          updated_at?: string
+        }
+        Update: {
+          ai_model?: string
+          brand_color?: string
+          created_at?: string
+          evaluation_thresholds?: Json
+          filler_words?: Json
+          id?: string
+          job_positions?: Json
+          maintenance_mode?: boolean
+          questions_per_type?: Json
+          scoring_weights?: Json
+          time_per_question?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

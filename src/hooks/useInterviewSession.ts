@@ -1,8 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 
 type Msg = { role: "user" | "assistant" | "system"; content: string };
 type InterviewType = "text" | "voice" | "video";
@@ -12,9 +13,10 @@ interface UseInterviewSessionOptions {
   totalQuestions?: number;
 }
 
-export const useInterviewSession = ({ type, totalQuestions = 8 }: UseInterviewSessionOptions) => {
+export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestions }: UseInterviewSessionOptions) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { settings, loading: settingsLoading } = useSystemSettings();
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +24,10 @@ export const useInterviewSession = ({ type, totalQuestions = 8 }: UseInterviewSe
   const [questionCount, setQuestionCount] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
+
+  // Use dynamic question count from settings, with override fallback
+  const totalQuestions = overrideTotalQuestions ?? settings.questions_per_type[type] ?? 8;
+  const timerDuration = settings.time_per_question[type] ?? 300;
 
   const startInterview = useCallback(async (job: string) => {
     if (!user) return;
@@ -57,7 +63,7 @@ export const useInterviewSession = ({ type, totalQuestions = 8 }: UseInterviewSe
 
     try {
       const resp = await supabase.functions.invoke("chat", {
-        body: { messages: [systemMsg] },
+        body: { messages: [systemMsg], job_position: job, interview_type: type },
       });
       if (resp.error) throw resp.error;
       const aiReply = resp.data?.choices?.[0]?.message?.content || "مرحباً! دعنا نبدأ المقابلة.";
@@ -96,7 +102,7 @@ export const useInterviewSession = ({ type, totalQuestions = 8 }: UseInterviewSe
 
     try {
       const resp = await supabase.functions.invoke("chat", {
-        body: { messages: [systemMsg, ...newMessages] },
+        body: { messages: [systemMsg, ...newMessages], job_position: selectedJob, interview_type: type },
       });
       if (resp.error) throw resp.error;
       const aiReply = resp.data?.choices?.[0]?.message?.content || "";
@@ -111,7 +117,6 @@ export const useInterviewSession = ({ type, totalQuestions = 8 }: UseInterviewSe
         setIsCompleted(true);
         toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم...");
         
-        // Auto-trigger evaluation
         setIsEvaluating(true);
         try {
           const evalResp = await supabase.functions.invoke("evaluate-interview", {
@@ -134,7 +139,7 @@ export const useInterviewSession = ({ type, totalQuestions = 8 }: UseInterviewSe
       toast.error("حدث خطأ في الاتصال");
     }
     setIsLoading(false);
-  }, [messages, isLoading, interviewId, selectedJob, questionCount, totalQuestions]);
+  }, [messages, isLoading, interviewId, selectedJob, questionCount, totalQuestions, type]);
 
   return {
     user,
@@ -145,8 +150,10 @@ export const useInterviewSession = ({ type, totalQuestions = 8 }: UseInterviewSe
     interviewId,
     questionCount,
     totalQuestions,
+    timerDuration,
     isCompleted,
     isEvaluating,
+    settingsLoading,
     startInterview,
     sendAnswer,
     setMessages,

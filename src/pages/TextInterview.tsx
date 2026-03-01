@@ -20,9 +20,9 @@ const TextInterview = () => {
   const [showExit, setShowExit] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const session = useInterviewSession({ type: "text", totalQuestions: 5 });
+  const session = useInterviewSession({ type: "text" });
   const timer = useInterviewTimer({
-    durationSeconds: 300,
+    durationSeconds: session.timerDuration || 300,
     onExpire: () => {
       if (input.trim()) session.sendAnswer(input);
     },
