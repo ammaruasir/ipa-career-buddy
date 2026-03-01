@@ -1,66 +1,37 @@
 
 
-# Job Vacancies & Application System
+## خطة: إضافة وظائف شاغرة حقيقية مرتبطة بالمقابلات والذكاء الاصطناعي
 
-## Current State
-- Job positions = flat string array in `system_settings` (no descriptions, no status, no requirements)
-- `JobSelector` shows buttons with just the job title
-- No concept of "applying" — candidates just pick a title and start an interview
+### ما سيتم تنفيذه
 
-## Proposed Changes
+**1. إدراج 6 وظائف شاغرة واقعية في قاعدة البيانات**
 
-### New `job_vacancies` Table
-```sql
-CREATE TABLE job_vacancies (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title TEXT NOT NULL,
-  description TEXT,
-  requirements JSONB DEFAULT '[]',
-  department TEXT,
-  location TEXT,
-  employment_type TEXT DEFAULT 'full_time', -- full_time, part_time, contract
-  is_active BOOLEAN DEFAULT true,
-  created_by UUID NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-```
-- RLS: admins full access, HR read, candidates read active only
+سيتم إضافة الوظائف التالية مع وصف تفصيلي ومتطلبات حقيقية:
 
-### New `job_applications` Table
-```sql
-CREATE TABLE job_applications (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  vacancy_id UUID REFERENCES job_vacancies(id),
-  user_id UUID NOT NULL,
-  status TEXT DEFAULT 'applied', -- applied, interviewing, accepted, rejected
-  interview_id UUID REFERENCES interviews(id),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-- RLS: candidates manage own, admins/HR view all
+| الوظيفة | القسم | الموقع | النوع |
+|---------|-------|--------|-------|
+| مطور برمجيات أول (Full-Stack) | تقنية المعلومات | الرياض | دوام كامل |
+| محلل أعمال | التخطيط الاستراتيجي | جدة | دوام كامل |
+| أخصائي موارد بشرية | الموارد البشرية | الرياض | دوام كامل |
+| مدير مشاريع تقنية | إدارة المشاريع | الرياض | دوام كامل |
+| أخصائي تسويق رقمي | التسويق | عن بُعد | دوام جزئي |
+| محاسب مالي | المالية | الدمام | دوام كامل |
 
-### UI Changes
+كل وظيفة ستتضمن:
+- وصف وظيفي تفصيلي (3-4 جمل)
+- 4-6 متطلبات واقعية (مؤهلات، خبرات، مهارات)
+- القسم والموقع ونوع التوظيف
 
-**Candidate Side — Job Browsing Page (`/jobs`)**
-- Card-based listing of active vacancies with title, description, department, location
-- "Apply" button on each card → creates application + navigates to interview type selection
-- Filter by department/type
+**2. الربط مع المقابلات والذكاء الاصطناعي**
 
-**Admin Side — Vacancy Management (new tab in AdminSettings)**
-- CRUD for job vacancies: title, description, requirements, department, location, employment type
-- Toggle active/inactive status
-- View applicant count per vacancy
+الربط موجود بالفعل في الكود الحالي:
+- عند التقديم على وظيفة من `/jobs`، يتم تمرير `job` و `vacancy_id` عبر URL إلى صفحة المقابلة
+- `useInterviewSession` يبدأ المقابلة تلقائياً باستخدام عنوان الوظيفة
+- الذكاء الاصطناعي في `chat` edge function يستخدم `job_position` لتوليد أسئلة مخصصة للوظيفة
+- يتم تحديث `job_applications` بـ `interview_id` وحالة `interviewing` تلقائياً
 
-**Modified Files**
-- `src/pages/AdminSettings.tsx` — add "Vacancies" tab with CRUD
-- `src/components/interview/JobSelector.tsx` — replace flat buttons with vacancy cards from `job_vacancies` table
-- `src/pages/CandidateDashboard.tsx` — add link to browse vacancies
-- `src/App.tsx` — add `/jobs` route
-- `src/hooks/useInterviewSession.ts` — link interview to application
-- New: `src/pages/JobVacancies.tsx` — candidate-facing vacancy browser
+لا حاجة لتعديل أي كود — فقط إدراج البيانات في جدول `job_vacancies`.
 
-**Data Migration**
-- Existing `system_settings.job_positions` stays for backward compatibility
-- New vacancies are the primary source going forward
+### التنفيذ
+- استخدام أداة إدراج البيانات لإضافة 6 سجلات في `job_vacancies` باستخدام `created_by` = admin user ID
 
