@@ -13,6 +13,9 @@ const DashboardRouter = () => {
       navigate("/login", { replace: true });
       return;
     }
+    // Wait until role is resolved (non-null) before routing
+    if (role === null) return;
+    
     if (role === "admin" || role === "hr") {
       navigate("/dashboard/admin", { replace: true });
     } else {
