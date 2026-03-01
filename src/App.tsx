@@ -19,6 +19,7 @@ const TextInterview = lazy(() => import("./pages/TextInterview"));
 const VoiceInterview = lazy(() => import("./pages/VoiceInterview"));
 const VideoInterview = lazy(() => import("./pages/VideoInterview"));
 const InterviewResults = lazy(() => import("./pages/InterviewResults"));
+const JobVacancies = lazy(() => import("./pages/JobVacancies"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const ProfileSettings = lazy(() => import("./pages/ProfileSettings"));
 const InterviewSettings = lazy(() => import("./pages/InterviewSettings"));
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/dashboard/candidate" element={<CandidateDashboard />} />
               <Route path="/dashboard/admin" element={<AdminDashboard />} />
               <Route path="/dashboard/admin/candidate/:id" element={<CandidateDetail />} />
+              <Route path="/jobs" element={<JobVacancies />} />
               <Route path="/interview/text" element={<TextInterview />} />
               <Route path="/interview/voice" element={<VoiceInterview />} />
               <Route path="/interview/video" element={<VideoInterview />} />
