@@ -42,6 +42,7 @@ const ResetPassword = lazyRetry(() => import("./pages/ResetPassword"));
 const ProfileSettings = lazyRetry(() => import("./pages/ProfileSettings"));
 const InterviewSettings = lazyRetry(() => import("./pages/InterviewSettings"));
 const AdminSettings = lazyRetry(() => import("./pages/AdminSettings"));
+const CompleteProfile = lazyRetry(() => import("./pages/CompleteProfile"));
 
 const queryClient = new QueryClient();
 
@@ -67,6 +68,7 @@ const App = () => (
               <Route path="/dashboard/candidate" element={<CandidateDashboard />} />
               <Route path="/dashboard/admin" element={<AdminDashboard />} />
               <Route path="/dashboard/admin/candidate/:id" element={<CandidateDetail />} />
+              <Route path="/complete-profile" element={<CompleteProfile />} />
               <Route path="/jobs" element={<JobVacancies />} />
               <Route path="/interview/text" element={<TextInterview />} />
               <Route path="/interview/voice" element={<VoiceInterview />} />

@@ -1,11 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
 const DashboardRouter = () => {
   const { user, role, loading } = useAuth();
   const navigate = useNavigate();
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     if (loading) return;
@@ -13,13 +15,26 @@ const DashboardRouter = () => {
       navigate("/login", { replace: true });
       return;
     }
-    // Wait until role is resolved (non-null) before routing
     if (role === null) return;
-    
-    if (role === "admin" || role === "hr") {
-      navigate("/dashboard/admin", { replace: true });
+
+    // For candidates, check if profile is completed
+    if (role === "candidate") {
+      supabase
+        .from("profiles")
+        .select("profile_completed")
+        .eq("user_id", user.id)
+        .single()
+        .then(({ data }) => {
+          if (data && !(data as any).profile_completed) {
+            navigate("/complete-profile", { replace: true });
+          } else {
+            navigate("/dashboard/candidate", { replace: true });
+          }
+          setChecking(false);
+        });
     } else {
-      navigate("/dashboard/candidate", { replace: true });
+      navigate("/dashboard/admin", { replace: true });
+      setChecking(false);
     }
   }, [user, role, loading, navigate]);
 

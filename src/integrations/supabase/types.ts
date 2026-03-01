@@ -241,36 +241,63 @@ export type Database = {
         Row: {
           avatar_url: string | null
           branch_location: string | null
+          city: string | null
           created_at: string
+          date_of_birth: string | null
+          education_level: string | null
+          experience_years: number | null
           full_name: string | null
+          gender: string | null
           gpa: string | null
           id: string
           major: string | null
+          nationality: string | null
           phone: string | null
+          profile_completed: boolean | null
+          resume_skills: Json | null
+          resume_url: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
           branch_location?: string | null
+          city?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          education_level?: string | null
+          experience_years?: number | null
           full_name?: string | null
+          gender?: string | null
           gpa?: string | null
           id?: string
           major?: string | null
+          nationality?: string | null
           phone?: string | null
+          profile_completed?: boolean | null
+          resume_skills?: Json | null
+          resume_url?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           avatar_url?: string | null
           branch_location?: string | null
+          city?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          education_level?: string | null
+          experience_years?: number | null
           full_name?: string | null
+          gender?: string | null
           gpa?: string | null
           id?: string
           major?: string | null
+          nationality?: string | null
           phone?: string | null
+          profile_completed?: boolean | null
+          resume_skills?: Json | null
+          resume_url?: string | null
           updated_at?: string
           user_id?: string
         }
