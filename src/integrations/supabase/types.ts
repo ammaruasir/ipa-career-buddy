@@ -153,6 +153,90 @@ export type Database = {
         }
         Relationships: []
       }
+      job_applications: {
+        Row: {
+          created_at: string | null
+          id: string
+          interview_id: string | null
+          status: string | null
+          user_id: string
+          vacancy_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          interview_id?: string | null
+          status?: string | null
+          user_id: string
+          vacancy_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          interview_id?: string | null
+          status?: string | null
+          user_id?: string
+          vacancy_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_applications_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "interviews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_applications_vacancy_id_fkey"
+            columns: ["vacancy_id"]
+            isOneToOne: false
+            referencedRelation: "job_vacancies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_vacancies: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          department: string | null
+          description: string | null
+          employment_type: string | null
+          id: string
+          is_active: boolean | null
+          location: string | null
+          requirements: Json | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          department?: string | null
+          description?: string | null
+          employment_type?: string | null
+          id?: string
+          is_active?: boolean | null
+          location?: string | null
+          requirements?: Json | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          department?: string | null
+          description?: string | null
+          employment_type?: string | null
+          id?: string
+          is_active?: boolean | null
+          location?: string | null
+          requirements?: Json | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

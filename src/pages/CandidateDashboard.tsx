@@ -167,6 +167,22 @@ const CandidateDashboard = () => {
           </Card>
         </div>
 
+        {/* Browse Jobs */}
+        <Card className="rounded-2xl shadow-lg border-2 border-primary/20 bg-gradient-to-l from-primary/5 to-transparent">
+          <CardContent className="p-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Briefcase className="w-6 h-6 text-primary" />
+              <div>
+                <p className="font-bold text-foreground">استعرض الوظائف المتاحة</p>
+                <p className="text-sm text-muted-foreground">تصفح الوظائف الشاغرة وقدّم على المناسب لك</p>
+              </div>
+            </div>
+            <Button asChild className="rounded-xl">
+              <Link to="/jobs">تصفح الوظائف</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Quick Start */}
         <div>
           <h3 className="text-xl font-bold text-foreground mb-4">ابدأ مقابلة جديدة</h3>

@@ -18,7 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowRight, Palette, BookOpen, SlidersHorizontal, Key, Users, Settings,
-  Plus, Pencil, Trash2, Loader2, Shield, Download, Server, Briefcase, Clock
+  Plus, Pencil, Trash2, Loader2, Shield, Download, Server, Briefcase, Clock,
+  MapPin, Building2, ToggleLeft, ToggleRight
 } from "lucide-react";
 
 interface QuestionTemplate {
@@ -55,6 +56,17 @@ const AdminSettings = () => {
   // Job positions (local edit state)
   const [newJobPosition, setNewJobPosition] = useState("");
 
+  // Vacancies
+  const [vacancies, setVacancies] = useState<any[]>([]);
+  const [loadingVacancies, setLoadingVacancies] = useState(true);
+  const [vacancyDialog, setVacancyDialog] = useState(false);
+  const [editingVacancy, setEditingVacancy] = useState<any>(null);
+  const [vacancyForm, setVacancyForm] = useState({
+    title: "", description: "", department: "", location: "",
+    employment_type: "full_time", requirements: ""
+  });
+  const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
+
   useEffect(() => {
     if (!authLoading && (!user || role !== "admin")) {
       navigate("/dashboard");
@@ -65,6 +77,7 @@ const AdminSettings = () => {
     if (!user || role !== "admin") return;
     loadQuestions();
     loadUsers();
+    loadVacancies();
   }, [user, role]);
 
   const loadQuestions = async () => {
@@ -81,6 +94,57 @@ const AdminSettings = () => {
     const roleMap = new Map((roles || []).map((r) => [r.user_id, r.role]));
     setUsers((profiles || []).map((p) => ({ ...p, role: roleMap.get(p.user_id) || "candidate" })));
     setLoadingUsers(false);
+  };
+
+  const loadVacancies = async () => {
+    setLoadingVacancies(true);
+    const { data } = await supabase.from("job_vacancies").select("*").order("created_at", { ascending: false });
+    setVacancies((data as any) || []);
+    // Load applicant counts
+    const { data: apps } = await supabase.from("job_applications").select("vacancy_id");
+    const counts: Record<string, number> = {};
+    (apps || []).forEach((a: any) => { counts[a.vacancy_id] = (counts[a.vacancy_id] || 0) + 1; });
+    setApplicantCounts(counts);
+    setLoadingVacancies(false);
+  };
+
+  const openAddVacancy = () => {
+    setEditingVacancy(null);
+    setVacancyForm({ title: "", description: "", department: "", location: "", employment_type: "full_time", requirements: "" });
+    setVacancyDialog(true);
+  };
+
+  const openEditVacancy = (v: any) => {
+    setEditingVacancy(v);
+    const reqs = Array.isArray(v.requirements) ? v.requirements.join("، ") : "";
+    setVacancyForm({ title: v.title, description: v.description || "", department: v.department || "", location: v.location || "", employment_type: v.employment_type || "full_time", requirements: reqs });
+    setVacancyDialog(true);
+  };
+
+  const saveVacancy = async () => {
+    if (!user || !vacancyForm.title.trim()) return;
+    const reqs = vacancyForm.requirements.split("،").map((r) => r.trim()).filter(Boolean);
+    const payload = { ...vacancyForm, requirements: reqs, created_by: user.id } as any;
+    if (editingVacancy) {
+      delete payload.created_by;
+      await supabase.from("job_vacancies").update(payload).eq("id", editingVacancy.id);
+    } else {
+      await supabase.from("job_vacancies").insert(payload);
+    }
+    setVacancyDialog(false);
+    loadVacancies();
+    toast({ title: editingVacancy ? "تم تحديث الوظيفة" : "تمت إضافة الوظيفة" });
+  };
+
+  const toggleVacancyActive = async (v: any) => {
+    await supabase.from("job_vacancies").update({ is_active: !v.is_active } as any).eq("id", v.id);
+    loadVacancies();
+  };
+
+  const deleteVacancy = async (id: string) => {
+    await supabase.from("job_vacancies").delete().eq("id", id);
+    loadVacancies();
+    toast({ title: "تم حذف الوظيفة" });
   };
 
   const openAddQ = () => {
@@ -187,6 +251,7 @@ const AdminSettings = () => {
             <TabsTrigger value="scoring" className="font-tajawal"><SlidersHorizontal className="w-4 h-4 ml-1" /> معايير التقييم</TabsTrigger>
             <TabsTrigger value="interview" className="font-tajawal"><Clock className="w-4 h-4 ml-1" /> إعدادات المقابلة</TabsTrigger>
             <TabsTrigger value="jobs" className="font-tajawal"><Briefcase className="w-4 h-4 ml-1" /> الوظائف</TabsTrigger>
+            <TabsTrigger value="vacancies" className="font-tajawal"><Building2 className="w-4 h-4 ml-1" /> الشواغر</TabsTrigger>
             <TabsTrigger value="users" className="font-tajawal"><Users className="w-4 h-4 ml-1" /> المستخدمون</TabsTrigger>
             <TabsTrigger value="branding" className="font-tajawal"><Palette className="w-4 h-4 ml-1" /> الهوية</TabsTrigger>
             <TabsTrigger value="system" className="font-tajawal"><Server className="w-4 h-4 ml-1" /> النظام</TabsTrigger>
@@ -348,6 +413,56 @@ const AdminSettings = () => {
             </Card>
           </TabsContent>
 
+          {/* Vacancies */}
+          <TabsContent value="vacancies" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold font-tajawal">إدارة الشواغر الوظيفية</h2>
+                <p className="text-sm text-muted-foreground font-tajawal">أضف وعدّل الوظائف المتاحة للمرشحين</p>
+              </div>
+              <Button onClick={openAddVacancy} className="font-tajawal"><Plus className="w-4 h-4 ml-1" /> إضافة شاغر</Button>
+            </div>
+            {loadingVacancies ? (
+              <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+            ) : vacancies.length === 0 ? (
+              <Card><CardContent className="p-8 text-center text-muted-foreground font-tajawal">لا توجد شواغر بعد</CardContent></Card>
+            ) : (
+              <div className="space-y-3">
+                {vacancies.map((v) => (
+                  <Card key={v.id} className="rounded-2xl">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-bold font-tajawal text-lg">{v.title}</h3>
+                            <Badge variant={v.is_active ? "default" : "secondary"} className="font-tajawal">
+                              {v.is_active ? "نشط" : "غير نشط"}
+                            </Badge>
+                            <Badge variant="outline" className="font-tajawal">
+                              {applicantCounts[v.id] || 0} متقدم
+                            </Badge>
+                          </div>
+                          {v.description && <p className="text-sm text-muted-foreground font-tajawal">{v.description}</p>}
+                          <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                            {v.department && <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{v.department}</span>}
+                            {v.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{v.location}</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => toggleVacancyActive(v)} title={v.is_active ? "إيقاف" : "تفعيل"}>
+                            {v.is_active ? <ToggleRight className="w-5 h-5 text-primary" /> : <ToggleLeft className="w-5 h-5" />}
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => openEditVacancy(v)}><Pencil className="w-4 h-4" /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => deleteVacancy(v.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
           {/* Users */}
           <TabsContent value="users" className="space-y-4">
             <h2 className="text-xl font-bold font-tajawal">إدارة المستخدمين</h2>
@@ -491,6 +606,53 @@ const AdminSettings = () => {
           </div>
           <DialogFooter>
             <Button onClick={saveQuestion} className="font-tajawal">{editingQ ? "تحديث" : "إضافة"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vacancy Dialog */}
+      <Dialog open={vacancyDialog} onOpenChange={setVacancyDialog}>
+        <DialogContent dir="rtl" className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-tajawal">{editingVacancy ? "تعديل الشاغر" : "إضافة شاغر جديد"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="font-tajawal">عنوان الوظيفة *</Label>
+              <Input value={vacancyForm.title} onChange={(e) => setVacancyForm({ ...vacancyForm, title: e.target.value })} placeholder="مثال: مطور برمجيات" className="font-tajawal" />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-tajawal">الوصف</Label>
+              <Textarea value={vacancyForm.description} onChange={(e) => setVacancyForm({ ...vacancyForm, description: e.target.value })} placeholder="وصف مختصر للوظيفة..." className="font-tajawal" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="font-tajawal">القسم</Label>
+                <Input value={vacancyForm.department} onChange={(e) => setVacancyForm({ ...vacancyForm, department: e.target.value })} placeholder="مثال: تقنية المعلومات" className="font-tajawal" />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-tajawal">الموقع</Label>
+                <Input value={vacancyForm.location} onChange={(e) => setVacancyForm({ ...vacancyForm, location: e.target.value })} placeholder="مثال: الرياض" className="font-tajawal" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-tajawal">نوع التوظيف</Label>
+              <Select value={vacancyForm.employment_type} onValueChange={(v) => setVacancyForm({ ...vacancyForm, employment_type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="full_time">دوام كامل</SelectItem>
+                  <SelectItem value="part_time">دوام جزئي</SelectItem>
+                  <SelectItem value="contract">عقد مؤقت</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-tajawal">المتطلبات (مفصولة بفاصلة ،)</Label>
+              <Input value={vacancyForm.requirements} onChange={(e) => setVacancyForm({ ...vacancyForm, requirements: e.target.value })} placeholder="مثال: خبرة 3 سنوات، بكالوريوس حاسب" className="font-tajawal" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={saveVacancy} className="font-tajawal">{editingVacancy ? "تحديث" : "إضافة"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
