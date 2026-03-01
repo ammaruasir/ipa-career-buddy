@@ -11,6 +11,7 @@ import {
   ArrowRight, Briefcase, MapPin, Building2, Clock, Search, Loader2, Send,
 } from "lucide-react";
 import { toast } from "sonner";
+import InterviewTypeDialog from "@/components/interview/InterviewTypeDialog";
 
 interface Vacancy {
   id: string;
@@ -39,6 +40,8 @@ const JobVacancies = () => {
   const [applying, setApplying] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
+  const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null);
+  const [showTypeDialog, setShowTypeDialog] = useState(false);
 
   useEffect(() => {
     loadVacancies();
@@ -75,7 +78,6 @@ const JobVacancies = () => {
 
   const applyToJob = async (vacancy: Vacancy) => {
     if (!user) {
-      // Redirect to login with return URL including vacancy ID
       navigate(`/login?redirect=${encodeURIComponent(`/jobs?apply=${vacancy.id}`)}`);
       return;
     }
@@ -90,10 +92,16 @@ const JobVacancies = () => {
     } else {
       toast.success("تم التقديم بنجاح! اختر نوع المقابلة للبدء.");
       setApplications((prev) => new Set(prev).add(vacancy.id));
-      // Navigate to interview type selection with vacancy context
-      navigate(`/interview/text?job=${encodeURIComponent(vacancy.title)}&vacancy_id=${vacancy.id}`);
+      setSelectedVacancy(vacancy);
+      setShowTypeDialog(true);
     }
     setApplying(null);
+  };
+
+  const handleInterviewTypeSelect = (type: "text" | "voice" | "video") => {
+    if (!selectedVacancy) return;
+    setShowTypeDialog(false);
+    navigate(`/interview/${type}?job=${encodeURIComponent(selectedVacancy.title)}&vacancy_id=${selectedVacancy.id}`);
   };
 
   const departments = [...new Set(vacancies.map((v) => v.department).filter(Boolean))] as string[];
@@ -221,6 +229,13 @@ const JobVacancies = () => {
           </div>
         )}
       </div>
+
+      <InterviewTypeDialog
+        open={showTypeDialog}
+        onOpenChange={setShowTypeDialog}
+        onSelect={handleInterviewTypeSelect}
+        vacancyTitle={selectedVacancy?.title || ""}
+      />
     </div>
   );
 };
