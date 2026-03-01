@@ -27,9 +27,12 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
     const { data } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", userId)
-      .single();
-    setRole((data?.role as AppRole) || null);
+      .eq("user_id", userId);
+    // Prioritize admin > hr > student
+    const roles = (data || []).map((r) => r.role as AppRole);
+    if (roles.includes("admin")) setRole("admin");
+    else if (roles.includes("hr")) setRole("hr");
+    else setRole(roles[0] || "student");
   };
 
   useEffect(() => {
