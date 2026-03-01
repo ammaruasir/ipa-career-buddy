@@ -6,7 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
+import DashboardRouter from "./pages/DashboardRouter";
+import StudentDashboard from "./pages/StudentDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
+import CandidateDetail from "./pages/CandidateDetail";
 import TextInterview from "./pages/TextInterview";
 import VoiceInterview from "./pages/VoiceInterview";
 import VideoInterview from "./pages/VideoInterview";
@@ -25,7 +28,10 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard" element={<DashboardRouter />} />
+            <Route path="/dashboard/student" element={<StudentDashboard />} />
+            <Route path="/dashboard/admin" element={<AdminDashboard />} />
+            <Route path="/dashboard/admin/candidate/:id" element={<CandidateDetail />} />
             <Route path="/interview/text" element={<TextInterview />} />
             <Route path="/interview/voice" element={<VoiceInterview />} />
             <Route path="/interview/video" element={<VideoInterview />} />
