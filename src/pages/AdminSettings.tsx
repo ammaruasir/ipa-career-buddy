@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowRight, Palette, BookOpen, SlidersHorizontal, Key, Users, Settings,
-  Plus, Pencil, Trash2, Loader2, Shield, Download, Server
+  Plus, Pencil, Trash2, Loader2, Shield, Download, Server, Briefcase, Clock
 } from "lucide-react";
 
 interface QuestionTemplate {
@@ -39,6 +39,7 @@ const AdminSettings = () => {
   const { user, role, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { settings, loading: settingsLoading, updateSettings } = useSystemSettings();
 
   // Question bank
   const [questions, setQuestions] = useState<QuestionTemplate[]>([]);
@@ -51,17 +52,8 @@ const AdminSettings = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
-  // Scoring weights
-  const [weights, setWeights] = useState(() => {
-    const stored = localStorage.getItem("scoring_weights");
-    return stored ? JSON.parse(stored) : { technical: 30, communication: 25, confidence: 25, personality: 20 };
-  });
-
-  // Branding
-  const [primaryColor, setPrimaryColor] = useState(() => localStorage.getItem("brand_color") || "#006C35");
-
-  // System
-  const [maintenance, setMaintenance] = useState(() => localStorage.getItem("maintenance_mode") === "true");
+  // Job positions (local edit state)
+  const [newJobPosition, setNewJobPosition] = useState("");
 
   useEffect(() => {
     if (!authLoading && (!user || role !== "admin")) {
@@ -121,10 +113,19 @@ const AdminSettings = () => {
     toast({ title: "تم حذف السؤال" });
   };
 
-  const updateWeight = (key: string, val: number[]) => {
-    const updated = { ...weights, [key]: val[0] };
-    setWeights(updated);
-    localStorage.setItem("scoring_weights", JSON.stringify(updated));
+  const handleWeightChange = async (key: string, val: number[]) => {
+    const updated = { ...settings.scoring_weights, [key]: val[0] };
+    await updateSettings({ scoring_weights: updated });
+  };
+
+  const handleQuestionsPerTypeChange = async (type: string, val: number[]) => {
+    const updated = { ...settings.questions_per_type, [type]: val[0] };
+    await updateSettings({ questions_per_type: updated });
+  };
+
+  const handleTimePerQuestionChange = async (type: string, val: number[]) => {
+    const updated = { ...settings.time_per_question, [type]: val[0] };
+    await updateSettings({ time_per_question: updated });
   };
 
   const updateUserRole = async (userId: string, newRole: string) => {
@@ -133,12 +134,30 @@ const AdminSettings = () => {
     toast({ title: "تم تحديث الصلاحية" });
   };
 
-  const handleMaintenance = (val: boolean) => {
-    setMaintenance(val);
-    localStorage.setItem("maintenance_mode", String(val));
+  const handleMaintenance = async (val: boolean) => {
+    await updateSettings({ maintenance_mode: val });
+    toast({ title: val ? "تم تفعيل وضع الصيانة" : "تم إيقاف وضع الصيانة" });
   };
 
-  if (authLoading) {
+  const addJobPosition = async () => {
+    if (!newJobPosition.trim()) return;
+    const updated = [...settings.job_positions, newJobPosition.trim()];
+    await updateSettings({ job_positions: updated });
+    setNewJobPosition("");
+    toast({ title: "تمت إضافة الوظيفة" });
+  };
+
+  const removeJobPosition = async (index: number) => {
+    const updated = settings.job_positions.filter((_, i) => i !== index);
+    await updateSettings({ job_positions: updated });
+    toast({ title: "تم حذف الوظيفة" });
+  };
+
+  const handleBrandColor = async (color: string) => {
+    await updateSettings({ brand_color: color });
+  };
+
+  if (authLoading || settingsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -148,6 +167,7 @@ const AdminSettings = () => {
 
   const difficultyMap: Record<string, string> = { easy: "سهل", medium: "متوسط", hard: "صعب" };
   const typeMap: Record<string, string> = { text: "كتابي", voice: "صوتي", video: "فيديو" };
+  const weightTotal = Object.values(settings.scoring_weights).reduce((a: number, b: any) => a + (b as number), 0);
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
@@ -165,6 +185,8 @@ const AdminSettings = () => {
           <TabsList className="w-full flex flex-wrap justify-start gap-1 h-auto p-1 mb-6">
             <TabsTrigger value="questions" className="font-tajawal"><BookOpen className="w-4 h-4 ml-1" /> بنك الأسئلة</TabsTrigger>
             <TabsTrigger value="scoring" className="font-tajawal"><SlidersHorizontal className="w-4 h-4 ml-1" /> معايير التقييم</TabsTrigger>
+            <TabsTrigger value="interview" className="font-tajawal"><Clock className="w-4 h-4 ml-1" /> إعدادات المقابلة</TabsTrigger>
+            <TabsTrigger value="jobs" className="font-tajawal"><Briefcase className="w-4 h-4 ml-1" /> الوظائف</TabsTrigger>
             <TabsTrigger value="users" className="font-tajawal"><Users className="w-4 h-4 ml-1" /> المستخدمون</TabsTrigger>
             <TabsTrigger value="branding" className="font-tajawal"><Palette className="w-4 h-4 ml-1" /> الهوية</TabsTrigger>
             <TabsTrigger value="system" className="font-tajawal"><Server className="w-4 h-4 ml-1" /> النظام</TabsTrigger>
@@ -173,7 +195,10 @@ const AdminSettings = () => {
           {/* Questions */}
           <TabsContent value="questions" className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold font-tajawal">بنك الأسئلة</h2>
+              <div>
+                <h2 className="text-xl font-bold font-tajawal">بنك الأسئلة</h2>
+                <p className="text-sm text-muted-foreground font-tajawal">الأسئلة هنا تُستخدم مباشرة في المقابلات بدلاً من التوليد العشوائي</p>
+              </div>
               <Button onClick={openAddQ} className="font-tajawal"><Plus className="w-4 h-4 ml-1" /> إضافة سؤال</Button>
             </div>
             <Card>
@@ -181,7 +206,7 @@ const AdminSettings = () => {
                 {loadingQ ? (
                   <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
                 ) : questions.length === 0 ? (
-                  <p className="p-8 text-center text-muted-foreground font-tajawal">لا توجد أسئلة بعد</p>
+                  <p className="p-8 text-center text-muted-foreground font-tajawal">لا توجد أسئلة بعد — سيقوم الذكاء الاصطناعي بتوليد الأسئلة تلقائياً</p>
                 ) : (
                   <Table>
                     <TableHeader>
@@ -216,31 +241,109 @@ const AdminSettings = () => {
           {/* Scoring */}
           <TabsContent value="scoring" className="space-y-4">
             <h2 className="text-xl font-bold font-tajawal">أوزان معايير التقييم</h2>
+            <p className="text-sm text-muted-foreground font-tajawal">هذه الأوزان تُستخدم فعلياً في حساب الدرجة النهائية للمرشح</p>
             <Card>
               <CardContent className="space-y-6 pt-6">
                 {[
                   { key: "technical", label: "المهارات التقنية" },
                   { key: "communication", label: "مهارات التواصل" },
-                  { key: "confidence", label: "الثقة بالنفس" },
-                  { key: "personality", label: "الشخصية" },
+                  { key: "cultural_fit", label: "التوافق الثقافي" },
                 ].map((item) => (
                   <div key={item.key} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label className="font-tajawal">{item.label}</Label>
-                      <span className="text-sm font-bold">{weights[item.key]}%</span>
+                      <span className="text-sm font-bold">{settings.scoring_weights[item.key] || 0}%</span>
                     </div>
-                    <Slider value={[weights[item.key]]} onValueChange={(v) => updateWeight(item.key, v)} min={0} max={100} step={5} />
+                    <Slider
+                      value={[settings.scoring_weights[item.key] || 0]}
+                      onValueChange={(v) => handleWeightChange(item.key, v)}
+                      min={0} max={100} step={5}
+                    />
                   </div>
                 ))}
-                {(() => {
-                  const total: number = (Object.values(weights) as number[]).reduce((a, b) => a + b, 0);
-                  return (
-                    <p className="text-sm text-muted-foreground font-tajawal">
-                      المجموع: {total}%
-                      {total !== 100 && <span className="text-destructive mr-2">(يجب أن يكون المجموع ١٠٠٪)</span>}
-                    </p>
-                  );
-                })()}
+                <p className="text-sm text-muted-foreground font-tajawal">
+                  المجموع: {weightTotal}%
+                  {weightTotal !== 100 && <span className="text-destructive mr-2">(يجب أن يكون المجموع ١٠٠٪)</span>}
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Interview Settings */}
+          <TabsContent value="interview" className="space-y-4">
+            <h2 className="text-xl font-bold font-tajawal">إعدادات المقابلة</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base font-tajawal">عدد الأسئلة لكل نوع</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {(["text", "voice", "video"] as const).map((t) => (
+                    <div key={t} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="font-tajawal">{typeMap[t]}</Label>
+                        <span className="text-sm font-bold">{settings.questions_per_type[t]}</span>
+                      </div>
+                      <Slider
+                        value={[settings.questions_per_type[t]]}
+                        onValueChange={(v) => handleQuestionsPerTypeChange(t, v)}
+                        min={3} max={15} step={1}
+                      />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base font-tajawal">المؤقت لكل سؤال (ثانية)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {(["text", "voice", "video"] as const).map((t) => (
+                    <div key={t} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="font-tajawal">{typeMap[t]}</Label>
+                        <span className="text-sm font-bold">
+                          {settings.time_per_question[t] === 0 ? "بدون حد" : `${settings.time_per_question[t]} ثانية`}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[settings.time_per_question[t]]}
+                        onValueChange={(v) => handleTimePerQuestionChange(t, v)}
+                        min={0} max={600} step={30}
+                      />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Job Positions */}
+          <TabsContent value="jobs" className="space-y-4">
+            <h2 className="text-xl font-bold font-tajawal">الوظائف المتاحة</h2>
+            <Card>
+              <CardContent className="space-y-4 pt-6">
+                <div className="flex gap-3">
+                  <Input
+                    value={newJobPosition}
+                    onChange={(e) => setNewJobPosition(e.target.value)}
+                    placeholder="أدخل اسم الوظيفة الجديدة..."
+                    className="font-tajawal"
+                    onKeyDown={(e) => e.key === "Enter" && addJobPosition()}
+                  />
+                  <Button onClick={addJobPosition} className="font-tajawal"><Plus className="w-4 h-4 ml-1" /> إضافة</Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {settings.job_positions.map((job, i) => (
+                    <Badge key={i} variant="secondary" className="font-tajawal text-sm py-2 px-3 gap-2">
+                      {job}
+                      <button onClick={() => removeJobPosition(i)} className="hover:text-destructive">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -299,8 +402,8 @@ const AdminSettings = () => {
                 <div className="space-y-2">
                   <Label className="font-tajawal">اللون الأساسي</Label>
                   <div className="flex items-center gap-3">
-                    <input type="color" value={primaryColor} onChange={(e) => { setPrimaryColor(e.target.value); localStorage.setItem("brand_color", e.target.value); }} className="w-12 h-10 rounded border cursor-pointer" />
-                    <span className="text-sm text-muted-foreground">{primaryColor}</span>
+                    <input type="color" value={settings.brand_color} onChange={(e) => handleBrandColor(e.target.value)} className="w-12 h-10 rounded border cursor-pointer" />
+                    <span className="text-sm text-muted-foreground">{settings.brand_color}</span>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -323,27 +426,13 @@ const AdminSettings = () => {
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="font-tajawal">تفعيل وضع الصيانة</Label>
-                    <Switch checked={maintenance} onCheckedChange={handleMaintenance} />
+                    <Switch checked={settings.maintenance_mode} onCheckedChange={handleMaintenance} />
                   </div>
-                  {maintenance && (
-                    <p className="text-sm text-warning font-tajawal bg-warning/10 p-2 rounded">
+                  {settings.maintenance_mode && (
+                    <p className="text-sm text-destructive font-tajawal bg-destructive/10 p-2 rounded">
                       ⚠️ المنصة في وضع الصيانة حالياً
                     </p>
                   )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base font-tajawal flex items-center gap-2"><Key className="w-4 h-4" /> مفاتيح API</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {["OpenAI", "Twilio"].map((name) => (
-                    <div key={name} className="flex items-center justify-between text-sm">
-                      <span className="font-tajawal">{name}</span>
-                      <span className="text-muted-foreground font-mono">••••••••</span>
-                    </div>
-                  ))}
                 </CardContent>
               </Card>
 
@@ -353,23 +442,6 @@ const AdminSettings = () => {
                 </CardHeader>
                 <CardContent>
                   <Button variant="outline" className="font-tajawal w-full">تصدير البيانات</Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base font-tajawal flex items-center gap-2"><Server className="w-4 h-4" /> التخزين</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-tajawal">المستخدم</span>
-                      <span className="text-muted-foreground">٢.٥ GB / ١٠ GB</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full" style={{ width: "25%" }} />
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
             </div>

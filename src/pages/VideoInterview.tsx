@@ -21,8 +21,8 @@ import { toast } from "sonner";
 const VideoInterview = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const session = useInterviewSession({ type: "video", totalQuestions: 5 });
-  const timer = useInterviewTimer({ durationSeconds: 300 });
+  const session = useInterviewSession({ type: "video" });
+  const timer = useInterviewTimer({ durationSeconds: session.timerDuration || 300 });
 
   const [showExit, setShowExit] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);

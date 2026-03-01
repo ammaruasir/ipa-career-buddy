@@ -20,8 +20,8 @@ import { toast } from "sonner";
 const VoiceInterview = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const session = useInterviewSession({ type: "voice", totalQuestions: 5 });
-  const timer = useInterviewTimer({ durationSeconds: 300 });
+  const session = useInterviewSession({ type: "voice" });
+  const timer = useInterviewTimer({ durationSeconds: session.timerDuration || 300 });
 
   const [showExit, setShowExit] = useState(false);
   const [isRecording, setIsRecording] = useState(false);

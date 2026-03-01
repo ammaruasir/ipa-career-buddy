@@ -10,7 +10,7 @@ import { toArabicNumerals, formatArabicPercent } from "@/lib/arabic-utils";
 import {
   MessageSquare, Mic, Video, LogOut, GraduationCap,
   BarChart3, Clock, CheckCircle2, Loader2, TrendingUp,
-  ChevronDown, ChevronUp, Sparkles,
+  ChevronDown, ChevronUp, Sparkles, Settings,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -100,10 +100,24 @@ const StudentDashboard = () => {
             </div>
             <h2 className="text-lg font-bold text-foreground">لوحة الطالب</h2>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => signOut().then(() => navigate("/"))}>
-            <LogOut className="w-4 h-4 ml-2" />
-            تسجيل الخروج
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/settings/profile">
+                <Settings className="w-4 h-4 ml-1" />
+                الملف الشخصي
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/settings/interview">
+                <Mic className="w-4 h-4 ml-1" />
+                إعدادات المقابلة
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => signOut().then(() => navigate("/"))}>
+              <LogOut className="w-4 h-4 ml-2" />
+              تسجيل الخروج
+            </Button>
+          </div>
         </div>
       </header>
 

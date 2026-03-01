@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toArabicNumerals, formatArabicPercent } from "@/lib/arabic-utils";
 import {
   Users, Calendar, TrendingUp, Award, LogOut, Shield,
-  Search, Eye, Loader2, Radio,
+  Search, Eye, Loader2, Radio, Settings,
 } from "lucide-react";
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
@@ -164,10 +164,18 @@ const AdminDashboard = () => {
             </div>
             <h2 className="text-lg font-bold text-foreground">لوحة الإدارة</h2>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => signOut().then(() => navigate("/"))}>
-            <LogOut className="w-4 h-4 ml-2" />
-            تسجيل الخروج
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/admin/settings">
+                <Settings className="w-4 h-4 ml-1" />
+                إعدادات النظام
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => signOut().then(() => navigate("/"))}>
+              <LogOut className="w-4 h-4 ml-2" />
+              تسجيل الخروج
+            </Button>
+          </div>
         </div>
       </header>
 

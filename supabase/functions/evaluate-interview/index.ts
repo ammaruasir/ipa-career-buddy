@@ -21,54 +21,61 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Fetch interview + responses
-    const { data: interview, error: intErr } = await supabase
-      .from("interviews")
-      .select("*")
-      .eq("id", interview_id)
-      .single();
-    if (intErr || !interview) throw new Error("Interview not found");
+    // Fetch interview, responses, and system settings in parallel
+    const [interviewRes, responsesRes, settingsRes] = await Promise.all([
+      supabase.from("interviews").select("*").eq("id", interview_id).single(),
+      supabase.from("responses").select("*").eq("interview_id", interview_id).order("created_at", { ascending: true }),
+      supabase.from("system_settings").select("*").limit(1).single(),
+    ]);
 
-    const { data: responses, error: respErr } = await supabase
-      .from("responses")
-      .select("*")
-      .eq("interview_id", interview_id)
-      .order("created_at", { ascending: true });
-    if (respErr) throw new Error("Failed to fetch responses");
+    if (interviewRes.error || !interviewRes.data) throw new Error("Interview not found");
+    if (responsesRes.error) throw new Error("Failed to fetch responses");
 
-    // Build transcript for AI evaluation
-    const transcript = (responses || [])
+    const interview = interviewRes.data;
+    const responses = responsesRes.data || [];
+    const settings = settingsRes.data;
+
+    // Read dynamic weights from settings (fallback to defaults)
+    const weights = settings?.scoring_weights as any || { technical: 40, communication: 30, cultural_fit: 30 };
+    const totalWeight = (weights.technical || 40) + (weights.communication || 30) + (weights.cultural_fit || 30);
+    const wTech = (weights.technical || 40) / totalWeight;
+    const wComm = (weights.communication || 30) / totalWeight;
+    const wCult = (weights.cultural_fit || 30) / totalWeight;
+
+    const thresholds = settings?.evaluation_thresholds as any || { highly_recommended: 80, recommended: 60 };
+    const fillerPatterns: string[] = (settings?.filler_words as any) || ["ممم", "يعني", "أحس", "كدا", "طبعاً", "بصراحة", "الله يعطيك العافية"];
+    const aiModel = settings?.ai_model || "google/gemini-3-flash-preview";
+
+    // Build transcript
+    const transcript = responses
       .map((r: any, i: number) => `سؤال ${i + 1}: ${r.question_text}\nإجابة: ${r.answer_text || "(لم يتم الإجابة)"}`)
       .join("\n\n");
 
     // Count filler words
-    const allAnswers = (responses || []).map((r: any) => r.answer_text || "").join(" ");
-    const fillerPatterns = ["ممم", "يعني", "أحس", "كدا", "طبعاً", "بصراحة", "الله يعطيك العافية"];
+    const allAnswers = responses.map((r: any) => r.answer_text || "").join(" ");
     let fillerCount = 0;
     for (const filler of fillerPatterns) {
-      const regex = new RegExp(filler, "g");
-      const matches = allAnswers.match(regex);
+      const matches = allAnswers.match(new RegExp(filler, "g"));
       if (matches) fillerCount += matches.length;
     }
 
-    // Estimate speech pace (words per minute, rough estimate)
+    // Estimate speech pace
     const totalWords = allAnswers.split(/\s+/).filter(Boolean).length;
-    const totalResponses = (responses || []).length;
+    const totalResponses = responses.length;
     const avgWordsPerResponse = totalResponses > 0 ? totalWords / totalResponses : 0;
-    const estimatedPace = Math.round(avgWordsPerResponse * 2); // rough WPM estimate
+    const estimatedPace = Math.round(avgWordsPerResponse * 2);
 
-    // Call Lovable AI with tool calling for structured evaluation
     const systemPrompt = `أنت خبير تقييم مقابلات وظيفية في معهد الإدارة العامة بالمملكة العربية السعودية. 
 قم بتحليل نص المقابلة التالية وتقييم المرشح بشكل شامل.
 
 الوظيفة المطلوبة: ${interview.job_position}
 
 معايير التقييم:
-1. مهارات التواصل (0-100): وضوح الأفكار، التعبير باللغة العربية، تنظيم الإجابات
-2. الكفاءة التقنية (0-100): مطابقة المهارات مع متطلبات الوظيفة، عمق المعرفة
-3. التوافق الثقافي (0-100): التوافق مع قيم معهد الإدارة العامة (التميز، الابتكار، الاحترافية)
+1. مهارات التواصل (0-100): وضوح الأفكار، التعبير باللغة العربية، تنظيم الإجابات — الوزن: ${Math.round(wComm * 100)}%
+2. الكفاءة التقنية (0-100): مطابقة المهارات مع متطلبات الوظيفة، عمق المعرفة — الوزن: ${Math.round(wTech * 100)}%
+3. التوافق الثقافي (0-100): التوافق مع قيم معهد الإدارة العامة — الوزن: ${Math.round(wCult * 100)}%
 4. نوع الشخصية DISC: (D-مسيطر / I-مؤثر / S-ثابت / C-متقن)
-5. التوصية النهائية: "موصى به بشدة" (80+) / "موصى به" (60-79) / "غير موصى به" (<60)
+5. التوصية النهائية: "موصى به بشدة" (${thresholds.highly_recommended}+) / "موصى به" (${thresholds.recommended}-${thresholds.highly_recommended - 1}) / "غير موصى به" (<${thresholds.recommended})
 
 تحليل إضافي:
 - تحليل المشاعر العام: إيجابي / محايد / سلبي
@@ -87,7 +94,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: aiModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `نص المقابلة:\n\n${transcript}` },
@@ -104,12 +111,12 @@ serve(async (req) => {
                   communication_score: { type: "number", description: "Communication skills score 0-100" },
                   technical_score: { type: "number", description: "Technical competency score 0-100" },
                   cultural_fit_score: { type: "number", description: "Cultural fit score 0-100" },
-                  personality_type: { type: "string", enum: ["D", "I", "S", "C"], description: "DISC personality type" },
+                  personality_type: { type: "string", enum: ["D", "I", "S", "C"] },
                   recommendation: { type: "string", enum: ["موصى به بشدة", "موصى به", "غير موصى به"] },
                   sentiment: { type: "string", enum: ["إيجابي", "محايد", "سلبي"] },
                   confidence_score: { type: "number", description: "Confidence level 0-100" },
-                  strengths: { type: "array", items: { type: "string" }, description: "3-5 strengths in Arabic" },
-                  improvements: { type: "array", items: { type: "string" }, description: "2-3 improvements in Arabic" },
+                  strengths: { type: "array", items: { type: "string" } },
+                  improvements: { type: "array", items: { type: "string" } },
                   ai_feedback: { type: "string", description: "Comprehensive Arabic feedback paragraph" },
                 },
                 required: [
@@ -149,12 +156,11 @@ serve(async (req) => {
 
     const evaluation = JSON.parse(toolCall.function.arguments);
     const overallScore = Math.round(
-      (evaluation.communication_score * 0.3) +
-      (evaluation.technical_score * 0.4) +
-      (evaluation.cultural_fit_score * 0.3)
+      (evaluation.communication_score * wComm) +
+      (evaluation.technical_score * wTech) +
+      (evaluation.cultural_fit_score * wCult)
     );
 
-    // Save to database
     const evalRecord = {
       interview_id,
       communication_score: evaluation.communication_score,
@@ -177,6 +183,7 @@ serve(async (req) => {
         confidence: evaluation.confidence_score,
         filler_words: fillerCount,
         speech_pace: estimatedPace,
+        weights: { technical: wTech, communication: wComm, cultural_fit: wCult },
       },
     };
 
