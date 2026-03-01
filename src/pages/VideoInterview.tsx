@@ -14,15 +14,18 @@ import SuccessCheckmark from "@/components/interview/SuccessCheckmark";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Video, Eye, EyeOff, Briefcase, Send, AlertTriangle, Loader2 } from "lucide-react";
+import { Video, Eye, EyeOff, Send, AlertTriangle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import AIAvatarScene from "@/components/interview/AIAvatarScene";
+import useBrowserTTS from "@/hooks/useBrowserTTS";
 
 const VideoInterview = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const session = useInterviewSession({ type: "video" });
   const timer = useInterviewTimer({ durationSeconds: session.timerDuration || 300 });
+  const tts = useBrowserTTS();
 
   const [showExit, setShowExit] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
@@ -48,6 +51,14 @@ const VideoInterview = () => {
   useEffect(() => {
     if (session.questionCount > 0 && !session.isCompleted) timer.restart();
   }, [session.questionCount]);
+
+  // Auto-speak AI messages via TTS
+  useEffect(() => {
+    const lastAI = [...session.messages].reverse().find((m) => m.role === "assistant");
+    if (lastAI && !session.isLoading) {
+      tts.speak(lastAI.content);
+    }
+  }, [session.messages, session.isLoading]);
 
   useEffect(() => {
     if (!session.selectedJob) return;
@@ -226,16 +237,11 @@ const VideoInterview = () => {
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-success bg-success/20 animate-pulse pointer-events-none" />
         </div>
 
-        <div className="w-[40%] flex flex-col items-center justify-center rounded-2xl bg-card border shadow-lg p-6">
-          <div
-            className={`w-32 h-32 rounded-full bg-primary/10 flex items-center justify-center mb-4 ${
-              session.isLoading ? "ring-4 ring-primary/40 animate-pulse" : "ring-2 ring-border"
-            }`}
-          >
-            <Briefcase className="w-16 h-16 text-primary" />
-          </div>
-          <h3 className="font-bold text-foreground">المحاور الذكي</h3>
-          <p className="text-xs text-muted-foreground">منصة المقابلات الذكية</p>
+        <div className="w-[40%] flex flex-col rounded-2xl overflow-hidden border shadow-lg">
+          <AIAvatarScene
+            avatarState={tts.isSpeaking ? "speaking" : session.isLoading ? "idle" : "listening"}
+            audioAnalyser={tts.analyser}
+          />
         </div>
       </div>
 
