@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useInterviewSession } from "@/hooks/useInterviewSession";
 import { useInterviewTimer } from "@/hooks/useInterviewTimer";
+import { useAntiCheat } from "@/hooks/useAntiCheat";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
 import JobSelector from "@/components/interview/JobSelector";
@@ -10,7 +11,7 @@ import TypingIndicator from "@/components/interview/TypingIndicator";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Bot } from "lucide-react";
+import { Send, Bot, AlertTriangle } from "lucide-react";
 
 const TextInterview = () => {
   const { user, loading: authLoading } = useAuth();
@@ -27,6 +28,11 @@ const TextInterview = () => {
     },
   });
 
+  const { tabSwitchCount, showWarning, handlePaste } = useAntiCheat({
+    enableTabDetection: true,
+    enablePasteDetection: true,
+  });
+
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
   }, [user, authLoading, navigate]);
@@ -35,7 +41,6 @@ const TextInterview = () => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [session.messages]);
 
-  // Start timer when a new AI message arrives
   useEffect(() => {
     if (session.messages.length > 0 && !session.isCompleted) {
       timer.restart();
@@ -70,6 +75,16 @@ const TextInterview = () => {
         totalQuestions={session.totalQuestions}
         onBack={handleBack}
       />
+
+      {/* Anti-cheat warning banner */}
+      {showWarning && (
+        <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-2 flex items-center justify-center gap-2 animate-fade-in">
+          <AlertTriangle className="w-4 h-4 text-destructive" />
+          <span className="text-sm font-medium text-destructive">
+            تحذير: تم اكتشاف مغادرة النافذة ({tabSwitchCount} مرة)
+          </span>
+        </div>
+      )}
 
       {/* Chat Area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
@@ -124,6 +139,7 @@ const TextInterview = () => {
                   handleSend();
                 }
               }}
+              onPaste={handlePaste}
               placeholder="اكتب إجابتك هنا..."
               className="rounded-xl flex-1 min-h-[48px] max-h-[120px] resize-none"
               disabled={session.isLoading}

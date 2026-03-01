@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { toArabicNumerals, formatArabicPercent } from "@/lib/arabic-utils";
 import {
   Users, Calendar, TrendingUp, Award, LogOut, Shield,
   Search, Eye, Loader2, Radio,
@@ -174,10 +175,10 @@ const AdminDashboard = () => {
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { icon: Users, label: "إجمالي المرشحين", value: uniqueCandidates, color: "bg-primary/10 text-primary" },
-            { icon: Calendar, label: "مقابلات اليوم", value: interviewsToday, color: "bg-secondary/10 text-secondary" },
-            { icon: Award, label: "نسبة القبول", value: `${acceptRate}%`, color: "bg-success/10 text-success" },
-            { icon: TrendingUp, label: "متوسط الدرجات", value: `${avgScore}%`, color: "bg-warning/10 text-warning" },
+            { icon: Users, label: "إجمالي المرشحين", value: toArabicNumerals(uniqueCandidates), color: "bg-primary/10 text-primary" },
+            { icon: Calendar, label: "مقابلات اليوم", value: toArabicNumerals(interviewsToday), color: "bg-secondary/10 text-secondary" },
+            { icon: Award, label: "نسبة القبول", value: formatArabicPercent(acceptRate), color: "bg-success/10 text-success" },
+            { icon: TrendingUp, label: "متوسط الدرجات", value: formatArabicPercent(avgScore), color: "bg-warning/10 text-warning" },
           ].map((stat, i) => (
             <Card key={i} className="rounded-2xl shadow-lg">
               <CardContent className="p-6 flex items-center gap-4">
