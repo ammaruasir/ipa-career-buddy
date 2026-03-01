@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { lazy, Suspense } from "react";
-import { Loader2 } from "lucide-react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import DashboardRouter from "./pages/DashboardRouter";
@@ -13,17 +12,36 @@ import CandidateDashboard from "./pages/CandidateDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import CandidateDetail from "./pages/CandidateDetail";
 import NotFound from "./pages/NotFound";
+import { Loader2 } from "lucide-react";
+
+// Retry wrapper for lazy imports to handle stale chunk errors
+const lazyRetry = (importFn: () => Promise<any>, retries = 3): ReturnType<typeof lazy> =>
+  lazy(async () => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await importFn();
+      } catch (error) {
+        if (i === retries - 1) {
+          // Last retry failed - force reload to get fresh chunks
+          window.location.reload();
+          throw error;
+        }
+        await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+      }
+    }
+    throw new Error("Failed to load module");
+  });
 
 // Lazy load interview pages (heavy media components)
-const TextInterview = lazy(() => import("./pages/TextInterview"));
-const VoiceInterview = lazy(() => import("./pages/VoiceInterview"));
-const VideoInterview = lazy(() => import("./pages/VideoInterview"));
-const InterviewResults = lazy(() => import("./pages/InterviewResults"));
-const JobVacancies = lazy(() => import("./pages/JobVacancies"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const ProfileSettings = lazy(() => import("./pages/ProfileSettings"));
-const InterviewSettings = lazy(() => import("./pages/InterviewSettings"));
-const AdminSettings = lazy(() => import("./pages/AdminSettings"));
+const TextInterview = lazyRetry(() => import("./pages/TextInterview"));
+const VoiceInterview = lazyRetry(() => import("./pages/VoiceInterview"));
+const VideoInterview = lazyRetry(() => import("./pages/VideoInterview"));
+const InterviewResults = lazyRetry(() => import("./pages/InterviewResults"));
+const JobVacancies = lazyRetry(() => import("./pages/JobVacancies"));
+const ResetPassword = lazyRetry(() => import("./pages/ResetPassword"));
+const ProfileSettings = lazyRetry(() => import("./pages/ProfileSettings"));
+const InterviewSettings = lazyRetry(() => import("./pages/InterviewSettings"));
+const AdminSettings = lazyRetry(() => import("./pages/AdminSettings"));
 
 const queryClient = new QueryClient();
 
