@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -31,19 +32,57 @@ import {
   CheckCircle2,
   LogOut,
   LayoutDashboard,
+  MapPin,
+  Building2,
+  Clock,
+  Loader2,
+  Send,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const navLinks = [
   { label: "الرئيسية", href: "#" },
   { label: "المقابلات", href: "#features" },
+  { label: "الوظائف", href: "#vacancies" },
   { label: "كيف تعمل", href: "#how-it-works" },
   { label: "الدعم", href: "#footer" },
 ];
 
+const employmentTypeMap: Record<string, string> = {
+  full_time: "دوام كامل",
+  part_time: "دوام جزئي",
+  contract: "عقد مؤقت",
+};
+
+interface LandingVacancy {
+  id: string;
+  title: string;
+  description: string | null;
+  department: string | null;
+  location: string | null;
+  employment_type: string;
+  created_at: string;
+}
+
 const Index = () => {
   const { user, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [vacancies, setVacancies] = useState<LandingVacancy[]>([]);
+  const [vacanciesLoading, setVacanciesLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from("job_vacancies")
+      .select("id, title, description, department, location, employment_type, created_at")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(6)
+      .then(({ data }) => {
+        setVacancies((data as LandingVacancy[]) || []);
+        setVacanciesLoading(false);
+      });
+  }, []);
 
   const userInitial = user?.user_metadata?.full_name?.[0] || user?.email?.[0] || "م";
 
@@ -321,6 +360,55 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* ── Job Vacancies Section ── */}
+      {vacancies.length > 0 && (
+        <section id="vacancies" className="py-24 bg-card">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16 space-y-3">
+              <span className="text-sm font-semibold text-secondary tracking-wide">فرص العمل</span>
+              <h2 className="text-3xl md:text-4xl font-bold text-foreground">الوظائف المتاحة</h2>
+              <p className="text-muted-foreground text-lg max-w-xl mx-auto">تصفح أحدث الفرص الوظيفية وقدّم عليها لبدء مقابلتك الذكية</p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {vacancies.map((v) => (
+                <Card key={v.id} className="rounded-2xl shadow-md hover:shadow-xl transition-all border-0 bg-background group">
+                  <CardContent className="p-6 space-y-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">{v.title}</h3>
+                      <Badge variant="secondary" className="shrink-0 text-xs">
+                        {employmentTypeMap[v.employment_type] || v.employment_type}
+                      </Badge>
+                    </div>
+                    {v.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">{v.description}</p>
+                    )}
+                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                      {v.department && (
+                        <span className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5" />{v.department}</span>
+                      )}
+                      {v.location && (
+                        <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{v.location}</span>
+                      )}
+                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{new Date(v.created_at).toLocaleDateString("ar-SA")}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="text-center mt-10">
+              <Button size="lg" className="rounded-2xl px-10" asChild>
+                <Link to="/jobs">
+                  عرض جميع الوظائف
+                  <ChevronLeft className="w-5 h-5 mr-1" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Testimonials ── */}
       <section className="py-24 bg-card">
