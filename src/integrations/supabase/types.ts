@@ -82,6 +82,41 @@ export type Database = {
           },
         ]
       }
+      hr_notes: {
+        Row: {
+          action: string | null
+          author_id: string
+          created_at: string
+          id: string
+          interview_id: string
+          note_text: string | null
+        }
+        Insert: {
+          action?: string | null
+          author_id: string
+          created_at?: string
+          id?: string
+          interview_id: string
+          note_text?: string | null
+        }
+        Update: {
+          action?: string | null
+          author_id?: string
+          created_at?: string
+          id?: string
+          interview_id?: string
+          note_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_notes_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "interviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interviews: {
         Row: {
           created_at: string
