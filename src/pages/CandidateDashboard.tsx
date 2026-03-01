@@ -10,7 +10,8 @@ import { toArabicNumerals, formatArabicPercent } from "@/lib/arabic-utils";
 import {
   MessageSquare, Mic, Video, LogOut, Briefcase,
   BarChart3, Clock, CheckCircle2, Loader2, TrendingUp,
-  ChevronDown, ChevronUp, Sparkles, Settings,
+  ChevronDown, ChevronUp, Sparkles, Settings, FileText,
+  MapPin, Building2, Send,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -36,6 +37,7 @@ const CandidateDashboard = () => {
   const [profile, setProfile] = useState<any>(null);
   const [interviews, setInterviews] = useState<any[]>([]);
   const [evaluations, setEvaluations] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null);
 
@@ -44,13 +46,15 @@ const CandidateDashboard = () => {
     if (!user) return;
 
     const load = async () => {
-      const [profileRes, interviewsRes] = await Promise.all([
+      const [profileRes, interviewsRes, appsRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("user_id", user.id).single(),
         supabase.from("interviews").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("job_applications").select("*, job_vacancies(title, department, location, employment_type)").eq("user_id", user.id).order("created_at", { ascending: false }),
       ]);
       setProfile(profileRes.data);
       const ivs = interviewsRes.data || [];
       setInterviews(ivs);
+      setApplications((appsRes.data as any) || []);
 
       const completedIds = ivs.filter((i: any) => i.status === "completed").map((i: any) => i.id);
       if (completedIds.length > 0) {
@@ -296,6 +300,68 @@ const CandidateDashboard = () => {
             </div>
           </div>
         )}
+
+        {/* My Applications */}
+        <div>
+          <h3 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-primary" /> طلباتي
+          </h3>
+          {applications.length === 0 ? (
+            <Card className="rounded-2xl shadow-lg">
+              <CardContent className="p-8 text-center">
+                <Send className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+                <p className="text-muted-foreground">لم تقدّم على أي وظيفة بعد.</p>
+                <Button asChild variant="outline" className="mt-4 rounded-xl">
+                  <Link to="/jobs">تصفح الوظائف</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {applications.map((app) => {
+                const vacancy = app.job_vacancies;
+                const appStatusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+                  applied: { label: "تم التقديم", variant: "outline" },
+                  interviewing: { label: "قيد المقابلة", variant: "secondary" },
+                  accepted: { label: "مقبول", variant: "default" },
+                  rejected: { label: "مرفوض", variant: "destructive" },
+                };
+                const appStatus = appStatusMap[app.status] || appStatusMap.applied;
+                const empTypeMap: Record<string, string> = { full_time: "دوام كامل", part_time: "دوام جزئي", contract: "عقد مؤقت" };
+                return (
+                  <Card key={app.id} className="rounded-2xl shadow-lg hover:shadow-xl transition-shadow">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                          <Briefcase className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground">{vacancy?.title || "وظيفة"}</p>
+                          <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                            {vacancy?.department && <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{vacancy.department}</span>}
+                            {vacancy?.location && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{vacancy.location}</span>}
+                            {vacancy?.employment_type && <span>{empTypeMap[vacancy.employment_type] || vacancy.employment_type}</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            قُدّم في {new Date(app.created_at).toLocaleDateString("ar-SA")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={appStatus.variant}>{appStatus.label}</Badge>
+                        {app.interview_id && (
+                          <Button size="sm" variant="ghost" className="rounded-xl" asChild>
+                            <Link to={`/interview/${app.interview_id}/results`}>النتائج</Link>
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Interview History */}
         <div>
