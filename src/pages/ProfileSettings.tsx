@@ -7,12 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRight, Camera, Globe, Bell, Lock, User, Loader2 } from "lucide-react";
+import { ArrowRight, Camera, Globe, Bell, Lock, User, Loader2, CalendarIcon, FileText, Upload, CheckCircle2 } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { nationalities, citiesByNationality, educationLevels, genderOptions } from "@/lib/location-data";
 
 const getPasswordStrength = (password: string): { score: number; label: string; color: string } => {
   let score = 0;
@@ -39,6 +45,16 @@ const ProfileSettings = () => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
+  // New fields
+  const [dateOfBirth, setDateOfBirth] = useState<Date>();
+  const [gender, setGender] = useState("");
+  const [nationality, setNationality] = useState("");
+  const [city, setCity] = useState("");
+  const [educationLevel, setEducationLevel] = useState("");
+  const [experienceYears, setExperienceYears] = useState("");
+  const [resumeUrl, setResumeUrl] = useState<string | null>(null);
+  const [uploadingResume, setUploadingResume] = useState(false);
+
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
@@ -59,7 +75,7 @@ const ProfileSettings = () => {
     const load = async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, phone, major, gpa, avatar_url")
+        .select("*")
         .eq("user_id", user.id)
         .single();
       if (data) {
@@ -68,10 +84,21 @@ const ProfileSettings = () => {
         setMajor((data as any).major || "");
         setGpa((data as any).gpa || "");
         setAvatarUrl(data.avatar_url);
+        setNationality((data as any).nationality || "");
+        setCity((data as any).city || "");
+        setGender((data as any).gender || "");
+        setEducationLevel((data as any).education_level || "");
+        setExperienceYears((data as any).experience_years?.toString() || "");
+        setResumeUrl((data as any).resume_url || null);
+        if ((data as any).date_of_birth) {
+          setDateOfBirth(new Date((data as any).date_of_birth));
+        }
       }
     };
     load();
   }, [user]);
+
+  const cities = nationality ? citiesByNationality[nationality] || [] : [];
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -97,7 +124,18 @@ const ProfileSettings = () => {
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name: fullName, phone, major, gpa } as any)
+      .update({
+        full_name: fullName,
+        phone,
+        major,
+        gpa: gpa || null,
+        date_of_birth: dateOfBirth ? format(dateOfBirth, "yyyy-MM-dd") : null,
+        gender: gender || null,
+        nationality: nationality || null,
+        city: city || null,
+        education_level: educationLevel || null,
+        experience_years: experienceYears ? parseInt(experienceYears) : 0,
+      } as any)
       .eq("user_id", user.id);
     if (error) {
       toast({ title: "خطأ", description: error.message, variant: "destructive" });
@@ -105,6 +143,28 @@ const ProfileSettings = () => {
       toast({ title: "تم حفظ البيانات بنجاح" });
     }
     setSaving(false);
+  };
+
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    if (file.type !== "application/pdf") {
+      toast({ title: "يرجى رفع ملف PDF فقط", variant: "destructive" });
+      return;
+    }
+    setUploadingResume(true);
+    const path = `${user.id}/resume.pdf`;
+    const { error } = await supabase.storage.from("resumes").upload(path, file, { upsert: true });
+    if (error) {
+      toast({ title: "خطأ في رفع الملف", description: error.message, variant: "destructive" });
+    } else {
+      const { data: urlData } = supabase.storage.from("resumes").getPublicUrl(path);
+      const url = urlData.publicUrl;
+      setResumeUrl(url);
+      await supabase.from("profiles").update({ resume_url: url } as any).eq("user_id", user.id);
+      toast({ title: "تم رفع السيرة الذاتية بنجاح" });
+    }
+    setUploadingResume(false);
   };
 
   const handleChangePassword = async () => {
@@ -197,8 +257,73 @@ const ProfileSettings = () => {
                 <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="أدخل اسمك" />
               </div>
               <div className="space-y-2">
+                <Label className="font-tajawal">تاريخ الميلاد</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-right font-normal", !dateOfBirth && "text-muted-foreground")}>
+                      <CalendarIcon className="ml-2 h-4 w-4" />
+                      {dateOfBirth ? format(dateOfBirth, "yyyy/MM/dd") : "اختر التاريخ"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateOfBirth}
+                      onSelect={setDateOfBirth}
+                      disabled={(date) => date > new Date() || date < new Date("1950-01-01")}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label className="font-tajawal">الجنس</Label>
+                <Select value={gender} onValueChange={setGender}>
+                  <SelectTrigger><SelectValue placeholder="اختر الجنس" /></SelectTrigger>
+                  <SelectContent>
+                    {genderOptions.map((g) => (
+                      <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="font-tajawal">الجنسية</Label>
+                <Select value={nationality} onValueChange={(v) => { setNationality(v); setCity(""); }}>
+                  <SelectTrigger><SelectValue placeholder="اختر الجنسية" /></SelectTrigger>
+                  <SelectContent>
+                    {nationalities.map((n) => (
+                      <SelectItem key={n} value={n}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="font-tajawal">المدينة</Label>
+                <Select value={city} onValueChange={setCity} disabled={!nationality}>
+                  <SelectTrigger><SelectValue placeholder={nationality ? "اختر المدينة" : "اختر الجنسية أولاً"} /></SelectTrigger>
+                  <SelectContent>
+                    {cities.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label className="font-tajawal">رقم الهاتف</Label>
                 <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+966 5XX XXX XXXX" dir="ltr" />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-tajawal">المستوى التعليمي</Label>
+                <Select value={educationLevel} onValueChange={setEducationLevel}>
+                  <SelectTrigger><SelectValue placeholder="اختر المستوى" /></SelectTrigger>
+                  <SelectContent>
+                    {educationLevels.map((l) => (
+                      <SelectItem key={l} value={l}>{l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label className="font-tajawal">التخصص</Label>
@@ -208,12 +333,55 @@ const ProfileSettings = () => {
                 <Label className="font-tajawal">المعدل التراكمي</Label>
                 <Input value={gpa} onChange={(e) => setGpa(e.target.value)} placeholder="مثال: 4.5" dir="ltr" />
               </div>
+              <div className="space-y-2">
+                <Label className="font-tajawal">سنوات الخبرة</Label>
+                <Input type="number" min="0" max="50" value={experienceYears} onChange={(e) => setExperienceYears(e.target.value)} placeholder="0" dir="ltr" />
+              </div>
             </div>
             <div className="flex justify-end">
               <Button onClick={handleSaveProfile} disabled={saving} className="font-tajawal">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
                 حفظ التغييرات
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Resume */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 font-tajawal"><FileText className="w-5 h-5" /> السيرة الذاتية</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={cn(
+              "border-2 border-dashed rounded-xl p-6 text-center transition-colors",
+              resumeUrl ? "border-success bg-success/5" : "border-border hover:border-primary/50"
+            )}>
+              {resumeUrl ? (
+                <div className="space-y-3">
+                  <CheckCircle2 className="w-10 h-10 text-success mx-auto" />
+                  <p className="font-tajawal font-bold text-success">السيرة الذاتية مرفوعة</p>
+                  <div className="flex items-center justify-center gap-2">
+                    <Label htmlFor="resume-settings-upload" className="cursor-pointer">
+                      <Button variant="outline" size="sm" asChild>
+                        <span className="font-tajawal">تغيير الملف</span>
+                      </Button>
+                    </Label>
+                  </div>
+                  <input id="resume-settings-upload" type="file" accept=".pdf" className="hidden" onChange={handleResumeUpload} />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Upload className="w-10 h-10 text-muted-foreground mx-auto" />
+                  <p className="font-tajawal">ارفع سيرتك الذاتية (PDF)</p>
+                  <Label htmlFor="resume-settings-upload2" className="cursor-pointer">
+                    <Button variant="outline" asChild disabled={uploadingResume}>
+                      <span className="font-tajawal">{uploadingResume ? "جاري الرفع..." : "اختر ملف"}</span>
+                    </Button>
+                  </Label>
+                  <input id="resume-settings-upload2" type="file" accept=".pdf" className="hidden" onChange={handleResumeUpload} />
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -279,19 +447,8 @@ const ProfileSettings = () => {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4">
-              <Button
-                variant={lang === "ar" ? "default" : "outline"}
-                onClick={() => handleLangSwitch("ar")}
-                className="font-tajawal"
-              >
-                العربية
-              </Button>
-              <Button
-                variant={lang === "en" ? "default" : "outline"}
-                onClick={() => handleLangSwitch("en")}
-              >
-                English
-              </Button>
+              <Button variant={lang === "ar" ? "default" : "outline"} onClick={() => handleLangSwitch("ar")} className="font-tajawal">العربية</Button>
+              <Button variant={lang === "en" ? "default" : "outline"} onClick={() => handleLangSwitch("en")}>English</Button>
             </div>
           </CardContent>
         </Card>
