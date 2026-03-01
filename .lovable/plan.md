@@ -1,105 +1,107 @@
 
 
-# AI Interview Engine — Implementation Plan
+# Comprehensive Role-Based Dashboards
 
-## What We're Building
-
-A complete AI-powered interview engine with: structured question generation, real-time transcript analysis, post-interview evaluation with detailed scoring, and a results page. All powered by Lovable AI via edge functions.
-
----
-
-## 1. New Edge Function: `evaluate-interview`
-
-A dedicated backend function that:
-- Takes an interview's responses + job position
-- Uses Lovable AI (tool calling / structured output) to generate a comprehensive evaluation
-- Scores: Communication (0-100), Technical (0-100), Cultural Fit (0-100), Personality (DISC)
-- Generates Arabic feedback with filler word detection, sentiment, and recommendation
-- Saves results to the `evaluations` table
-- Returns the evaluation data
-
-**Key AI prompt features:**
-- Keyword extraction from answers
-- Filler word counting (ممم، يعني، أحس، كدا)
-- Time-based scoring logic (answers 90-180s get bonus)
-- DISC personality mapping
-- Recommendation: "موصى به بشدة" / "موصى به" / "غير موصى به"
-
-## 2. Enhance `chat` Edge Function
-
-Update the existing chat function's system prompt to generate structured questions:
-- 8 questions per interview (2 behavioral, 3 technical, 2 situational, 1 culture-fit)
-- Difficulty scaling based on question number
-- Arabic-first with proper formatting
-
-No separate edge function needed — the system prompt in `useInterviewSession` already controls question generation. We'll update `totalQuestions` to 8 and refine the system prompt to specify question categories.
-
-## 3. Database Changes
-
-Add columns to `evaluations` table:
-- `recommendation` (text) — "موصى به بشدة" / "موصى به" / "غير موصى به"
-- `personality_type` (text) — DISC type
-- `filler_words_count` (integer)
-- `sentiment` (text) — Positive/Neutral/Negative
-- `speech_pace` (numeric) — words per minute estimate
-- `confidence_score` (numeric) — 0-100
-- `detailed_scores` (jsonb) — full breakdown
-
-Add RLS policy for service role to insert evaluations (edge function uses service role).
-
-## 4. Results Page (`/interview/:id/results`)
-
-New page showing:
-- Overall score with circular progress indicator
-- Score breakdown cards (Communication, Technical, Cultural Fit)
-- DISC personality badge
-- Recommendation badge with color coding
-- Strengths list (Arabic)
-- Improvements list (Arabic)
-- AI feedback text
-- Filler words count, sentiment, confidence metrics
-- "Back to Dashboard" button
-
-## 5. Update `useInterviewSession` Hook
-
-- Change `totalQuestions` default to 8
-- Enhance the system prompt to specify question categories (2 behavioral, 3 technical, 2 situational, 1 culture-fit)
-- After interview completion, automatically call `evaluate-interview` edge function
-- Store evaluation result for navigation to results page
-
-## 6. Update Dashboard
-
-- Link completed interviews to `/interview/:id/results`
-- Show overall score badge on completed interview cards
-
-## 7. Update Routes
-
-Add `/interview/:id/results` route to `App.tsx`
+## Overview
+Replace the single `/dashboard` with role-routed dashboards: Student, Admin/HR. The existing `/dashboard` will become a router that redirects based on role. Add analytics charts (Recharts already installed), candidate management for Admin/HR, and a notification system.
 
 ---
 
-## File Changes Summary
+## Database Changes
+
+**No new tables needed.** The existing schema (profiles, interviews, evaluations, responses, user_roles) covers all data needs. The RLS policies already support admin/HR access patterns. Admin/HR queries use existing RESTRICTIVE policies that check `has_role()`.
+
+However, we need one addition for HR notes on candidates:
+- Add `hr_notes` table: `id`, `interview_id`, `author_id`, `note_text`, `action` (enum: accepted/rejected/retry/waiting), `created_at`
+- RLS: admin/HR can CRUD, students cannot access
+
+---
+
+## Routes
+
+| Route | Component | Access |
+|---|---|---|
+| `/dashboard` | `DashboardRouter` | Redirects based on role |
+| `/dashboard/student` | `StudentDashboard` | Students |
+| `/dashboard/admin` | `AdminDashboard` | Admin + HR |
+| `/dashboard/admin/candidate/:id` | `CandidateDetail` | Admin + HR |
+
+---
+
+## File Structure
 
 ```text
-NEW FILES:
-  supabase/functions/evaluate-interview/index.ts  — AI evaluation engine
-  src/pages/InterviewResults.tsx                    — Results display page
-
-MODIFIED FILES:
-  src/hooks/useInterviewSession.ts  — 8 questions, categorized prompts, auto-evaluate
-  src/pages/Dashboard.tsx           — Show scores on completed interviews
-  src/App.tsx                       — Add results route
-  supabase/config.toml              — Add evaluate-interview function config
-
-DATABASE MIGRATION:
-  Add recommendation, personality_type, filler_words_count, sentiment,
-  speech_pace, confidence_score, detailed_scores columns to evaluations
+src/pages/
+  DashboardRouter.tsx         — role-based redirect
+  StudentDashboard.tsx        — full student dashboard
+  AdminDashboard.tsx          — admin/HR dashboard with analytics
+  CandidateDetail.tsx         — detailed candidate view
 ```
 
+---
+
+## 1. DashboardRouter (`/dashboard`)
+- Check `role` from `useAuth()`
+- Redirect: student → `/dashboard/student`, admin/hr → `/dashboard/admin`
+- Replaces current `Dashboard.tsx`
+
+## 2. StudentDashboard (`/dashboard/student`)
+- **Hero**: Personalized greeting with name from profiles table
+- **Stats cards**: Total interviews, average overall_score, in-progress count
+- **Quick start buttons**: Text/Voice/Video interview links
+- **Progress chart**: Line chart (Recharts) showing overall_score over time from evaluations
+- **Recent feedback**: Expandable cards showing latest evaluation summaries (strengths, recommendation)
+- **Practice mode button**: Links to `/interview/text` with a "practice" flag
+- **Interview history list**: Existing card list with status badges and results links
+
+## 3. AdminDashboard (`/dashboard/admin`)
+- **Overview stats**: Total candidates (distinct user_ids in interviews), interviews today, acceptance rate (from hr_notes actions), average score
+- **Filterable candidates table**: Fetches all interviews + evaluations + profiles (admin/HR RLS allows this). Columns: Name, Position, Type, Score, Status, Actions (view details)
+- **Search + filters**: By status, type, score range, date range
+- **Analytics section** (Recharts):
+  - Bar chart: Score distribution (buckets 0-20, 20-40, etc.)
+  - Pie chart: Interview types breakdown
+  - Line chart: Daily interview volume over last 30 days
+  - Radar chart: Average skills breakdown (communication, technical, cultural fit)
+- **Live monitoring section**: Show interviews with status `in_progress` with real-time indicator
+
+## 4. CandidateDetail (`/dashboard/admin/candidate/:interviewId`)
+- **Profile card**: Name, email (from user metadata), branch, avatar
+- **Interview info**: Type, position, date, duration
+- **AI analysis breakdown**: Colored progress bars for each score category
+- **Strengths/improvements lists**
+- **DISC personality badge**
+- **HR notes section**: Add/view notes with action buttons (قبول/رفض/إعادة/انتظار)
+- **Action buttons**: Update interview status, add notes
+
+## 5. Notifications
+- Use existing Sonner toast system (already configured) positioned for RTL
+- Toast on interview completion (triggered in useInterviewSession — already done)
+- No SMS/email integration in this phase (placeholders only)
+
+## 6. Migration
+```sql
+CREATE TABLE public.hr_notes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  interview_id uuid NOT NULL REFERENCES interviews(id) ON DELETE CASCADE,
+  author_id uuid NOT NULL,
+  note_text text,
+  action text, -- 'accepted', 'rejected', 'retry', 'waiting'
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.hr_notes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admin/HR can manage notes" ON public.hr_notes
+  FOR ALL USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'hr'));
+```
+
+## 7. App.tsx Route Updates
+Add routes for `/dashboard/student`, `/dashboard/admin`, `/dashboard/admin/candidate/:id`. Keep `/dashboard` as the router.
+
 ## Implementation Order
-1. Database migration (add columns)
-2. `evaluate-interview` edge function
-3. Update `useInterviewSession` (8 questions + auto-evaluate)
-4. `InterviewResults` page
-5. Update Dashboard + routes
+1. Database migration (hr_notes table)
+2. DashboardRouter + StudentDashboard
+3. AdminDashboard with charts
+4. CandidateDetail page
+5. Update App.tsx routes
 
