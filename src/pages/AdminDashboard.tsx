@@ -50,7 +50,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     if (!authLoading && !user) { navigate("/login"); return; }
-    if (!authLoading && role && role !== "admin" && role !== "hr") { navigate("/dashboard/student"); return; }
+    if (!authLoading && role && role !== "admin" && role !== "hr") { navigate("/dashboard/candidate"); return; }
     if (!user || !role) return;
 
     const load = async () => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, ArrowRight, Loader2 } from "lucide-react";
+import { Briefcase, ArrowRight, Loader2 } from "lucide-react";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
 
 interface JobSelectorProps {
@@ -20,7 +20,7 @@ const JobSelector = ({ title, onSelect, onBack }: JobSelectorProps) => {
             <ArrowRight className="w-5 h-5" />
           </Button>
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <GraduationCap className="w-6 h-6 text-primary-foreground" />
+            <Briefcase className="w-6 h-6 text-primary-foreground" />
           </div>
           <h2 className="text-lg font-bold">{title}</h2>
         </div>

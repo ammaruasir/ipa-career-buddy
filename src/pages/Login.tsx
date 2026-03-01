@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { GraduationCap, Loader2 } from "lucide-react";
+import { Briefcase, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -67,7 +67,7 @@ const Login = () => {
         <Card className="w-full max-w-md rounded-2xl shadow-xl relative z-10">
           <CardHeader className="text-center space-y-4 pb-2">
             <div className="mx-auto w-16 h-16 rounded-2xl bg-primary flex items-center justify-center">
-              <GraduationCap className="w-9 h-9 text-primary-foreground" />
+              <Briefcase className="w-9 h-9 text-primary-foreground" />
             </div>
             <CardTitle className="text-2xl font-bold">نسيت كلمة المرور؟</CardTitle>
             <CardDescription>أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين</CardDescription>
@@ -81,7 +81,7 @@ const Login = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="example@ipa.edu.sa"
+                  placeholder="example@email.com"
                   className="rounded-xl"
                   dir="ltr"
                   required
@@ -108,7 +108,7 @@ const Login = () => {
       <Card className="w-full max-w-md rounded-2xl shadow-xl relative z-10">
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-primary flex items-center justify-center">
-            <GraduationCap className="w-9 h-9 text-primary-foreground" />
+            <Briefcase className="w-9 h-9 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl font-bold">
             {isSignup ? "إنشاء حساب جديد" : "تسجيل الدخول"}
@@ -141,7 +141,7 @@ const Login = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="example@ipa.edu.sa"
+                placeholder="example@email.com"
                 className="rounded-xl"
                 dir="ltr"
                 required

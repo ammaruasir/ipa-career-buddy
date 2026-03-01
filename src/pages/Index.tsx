@@ -14,7 +14,7 @@ import {
   MessageSquare,
   Mic,
   Video,
-  GraduationCap,
+  Briefcase,
   BarChart3,
   Shield,
   Brain,
@@ -55,11 +55,11 @@ const Index = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
             <div className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
-              <GraduationCap className="w-6 h-6 text-primary-foreground" />
+              <Briefcase className="w-6 h-6 text-primary-foreground" />
             </div>
             <div className="hidden sm:block">
-              <h2 className="text-base font-bold text-foreground leading-tight">معهد الإدارة العامة</h2>
-              <p className="text-[11px] text-muted-foreground">منصة المقابلات الذكية</p>
+              <h2 className="text-base font-bold text-foreground leading-tight">منصة المقابلات الذكية</h2>
+              <p className="text-[11px] text-muted-foreground">مدعومة بالذكاء الاصطناعي</p>
             </div>
           </Link>
 
@@ -179,7 +179,7 @@ const Index = () => {
             </h1>
 
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              منصة متطورة باستخدام الذكاء الاصطناعي لإعداد طلاب معهد الإدارة العامة لسوق العمل
+              منصة متطورة باستخدام الذكاء الاصطناعي لإعداد المرشحين وتقييمهم في المقابلات الوظيفية
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
@@ -300,7 +300,7 @@ const Index = () => {
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-5xl mx-auto">
             {[
-              { step: "١", icon: LogIn, title: "سجل الدخول", desc: "سجل الدخول بحسابك في معهد الإدارة العامة" },
+              { step: "١", icon: LogIn, title: "سجل الدخول", desc: "أنشئ حسابك أو سجل الدخول للبدء" },
               { step: "٢", icon: MessageSquare, title: "اختر نوع المقابلة", desc: "اختر بين المقابلة الكتابية أو الصوتية أو الفيديو" },
               { step: "٣", icon: Mic, title: "أجب على الأسئلة", desc: "أجب على أسئلة الذكاء الاصطناعي المخصصة لمجالك" },
               { step: "٤", icon: Award, title: "احصل على تقييمك", desc: "استلم تقييماً مفصلاً مع شهادة إتمام المقابلة" },
@@ -326,26 +326,26 @@ const Index = () => {
       <section className="py-24 bg-card">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16 space-y-3">
-            <span className="text-sm font-semibold text-secondary tracking-wide">آراء المتدربين</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground">ماذا يقول طلابنا؟</h2>
+            <span className="text-sm font-semibold text-secondary tracking-wide">آراء المستخدمين</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">ماذا يقول مستخدمونا؟</h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {[
               {
                 name: "أحمد الغامدي",
-                role: "خريج إدارة أعمال",
+                role: "مرشح - إدارة أعمال",
                 quote: "المنصة ساعدتني على اجتياز مقابلتي الأولى بثقة. التقييم الفوري من الذكاء الاصطناعي أظهر لي نقاط ضعفي قبل المقابلة الحقيقية.",
               },
               {
                 name: "نورة القحطاني",
-                role: "خريجة موارد بشرية",
+                role: "مرشحة - موارد بشرية",
                 quote: "تحليل الشخصية وفق نموذج DISC كان مفيداً جداً. فهمت نقاط قوتي وكيف أقدمها في المقابلات بشكل أفضل.",
               },
               {
                 name: "محمد العتيبي",
-                role: "خريج تقنية معلومات",
-                quote: "أنصح كل طالب في المعهد باستخدام هذه المنصة. التدريب على المقابلة الصوتية كان كأنه مقابلة حقيقية.",
+                role: "مرشح - تقنية معلومات",
+                quote: "أنصح كل مرشح باستخدام هذه المنصة. التدريب على المقابلة الصوتية كان كأنه مقابلة حقيقية.",
               },
             ].map((t, i) => (
               <Card key={i} className="rounded-2xl shadow-md hover:shadow-lg transition-shadow border-0 bg-background">
@@ -409,15 +409,15 @@ const Index = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                  <GraduationCap className="w-5 h-5 text-primary-foreground" />
+                  <Briefcase className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-foreground">معهد الإدارة العامة</h3>
-                  <p className="text-xs text-muted-foreground">منصة المقابلات الذكية</p>
+                  <h3 className="font-bold text-foreground">منصة المقابلات الذكية</h3>
+                  <p className="text-xs text-muted-foreground">مدعومة بالذكاء الاصطناعي</p>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                منصة رائدة في التدريب على المقابلات الوظيفية باستخدام الذكاء الاصطناعي، مصممة خصيصاً لطلاب معهد الإدارة العامة.
+                منصة رائدة في التدريب على المقابلات الوظيفية باستخدام الذكاء الاصطناعي، مصممة لمساعدة المرشحين على التحضير والنجاح.
               </p>
             </div>
 
@@ -437,8 +437,7 @@ const Index = () => {
             <div className="space-y-4">
               <h3 className="font-bold text-foreground">تواصل معنا</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>البريد: info@ipa.edu.sa</li>
-                <li>الهاتف: ٩٢٠٠٠٤٩٥٦</li>
+                <li>البريد: info@smartinterview.sa</li>
                 <li>الرياض، المملكة العربية السعودية</li>
               </ul>
             </div>
@@ -446,7 +445,7 @@ const Index = () => {
 
           <div className="border-t border-border pt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} معهد الإدارة العامة - جميع الحقوق محفوظة
+              © {new Date().getFullYear()} منصة المقابلات الذكية - جميع الحقوق محفوظة
             </p>
           </div>
         </div>
