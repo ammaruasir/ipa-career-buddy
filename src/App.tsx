@@ -8,6 +8,8 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import TextInterview from "./pages/TextInterview";
+import VoiceInterview from "./pages/VoiceInterview";
+import VideoInterview from "./pages/VideoInterview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +26,8 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/interview/text" element={<TextInterview />} />
+            <Route path="/interview/voice" element={<VoiceInterview />} />
+            <Route path="/interview/video" element={<VideoInterview />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
