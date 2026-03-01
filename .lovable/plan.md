@@ -1,143 +1,105 @@
 
 
-# Interview Interface — Three Modes
+# AI Interview Engine — Implementation Plan
 
-## Overview
-Rebuild the text interview page and create two new pages (voice, video) with shared components, per-question timer, progress tracking, exit confirmation, and animations. No new dependencies needed beyond what's installed — CSS animations replace Framer Motion.
+## What We're Building
 
----
-
-## Shared Components (new `src/components/interview/`)
-
-### InterviewHeader
-- IPA logo + "المقابلة الذكية - معهد الإدارة العامة"
-- Timer display (countdown per question, configurable)
-- Progress bar (`Progress` component): "السؤال 3 من 8"
-- Connection quality indicator (green/yellow/red dot)
-- Help button (opens help dialog)
-
-### ExitConfirmationDialog
-- AlertDialog with Arabic text: "هل أنت متأكد من الخروج؟ سيتم فقدان تقدمك"
-- Confirm/Cancel buttons
-
-### JobSelector
-- Extract the existing job selection grid from TextInterview into a reusable component
-- Used by all three interview modes
-
-### useInterviewTimer hook
-- Countdown timer (5 min default per question)
-- Auto-submit or warning when time expires
-- Pause/resume capability
-
-### useInterview hook
-- Shared logic: create interview record, save responses, track question count, end interview
-- Reduces duplication across three pages
-
-### TypingIndicator
-- Animated three-dot bouncing indicator for AI "thinking" state
-
-### SuccessCheckmark
-- CSS keyframe animation shown after answer submission
+A complete AI-powered interview engine with: structured question generation, real-time transcript analysis, post-interview evaluation with detailed scoring, and a results page. All powered by Lovable AI via edge functions.
 
 ---
 
-## Mode 1: Text Interview (`/interview/text`) — Enhanced
+## 1. New Edge Function: `evaluate-interview`
 
-### Changes from current
-- Replace simple `Input` with `Textarea` for richer answers
-- Add per-question 5-minute countdown timer
-- Add AI avatar icon next to assistant messages
-- Add typing indicator (animated dots) instead of spinner
-- Add progress bar at top
-- Add exit confirmation when navigating away
-- Fade-in animation on new messages (CSS `animate-fade-in`)
-- WhatsApp-style bubble layout with timestamps
+A dedicated backend function that:
+- Takes an interview's responses + job position
+- Uses Lovable AI (tool calling / structured output) to generate a comprehensive evaluation
+- Scores: Communication (0-100), Technical (0-100), Cultural Fit (0-100), Personality (DISC)
+- Generates Arabic feedback with filler word detection, sentiment, and recommendation
+- Saves results to the `evaluations` table
+- Returns the evaluation data
 
----
+**Key AI prompt features:**
+- Keyword extraction from answers
+- Filler word counting (ممم، يعني، أحس، كدا)
+- Time-based scoring logic (answers 90-180s get bonus)
+- DISC personality mapping
+- Recommendation: "موصى به بشدة" / "موصى به" / "غير موصى به"
 
-## Mode 2: Voice Interview (`/interview/voice`) — New Page
+## 2. Enhance `chat` Edge Function
 
-### UI Layout
-- Header with timer + progress
-- Current question displayed in a card at top
-- Center: Large circular record button (red pulse animation when recording)
-- Audio waveform visualization (canvas-based, analyser node from Web Audio API)
-- Real-time transcription display area (text appears as MediaRecorder captures)
-- Playback controls: listen to recording before submitting
-- Submit button sends audio transcription to AI for next question
+Update the existing chat function's system prompt to generate structured questions:
+- 8 questions per interview (2 behavioral, 3 technical, 2 situational, 1 culture-fit)
+- Difficulty scaling based on question number
+- Arabic-first with proper formatting
 
-### Technical approach
-- `MediaRecorder` API for audio capture
-- `AudioContext` + `AnalyserNode` for waveform visualization (animated bars)
-- Audio sent to backend function that calls Lovable AI with transcribed text
-- For MVP: student types/reviews transcription manually; future: integrate speech-to-text
-- Responses saved with `answer_text` (transcribed) to `responses` table
+No separate edge function needed — the system prompt in `useInterviewSession` already controls question generation. We'll update `totalQuestions` to 8 and refine the system prompt to specify question categories.
 
----
+## 3. Database Changes
 
-## Mode 3: Video Interview (`/interview/video`) — New Page
+Add columns to `evaluations` table:
+- `recommendation` (text) — "موصى به بشدة" / "موصى به" / "غير موصى به"
+- `personality_type` (text) — DISC type
+- `filler_words_count` (integer)
+- `sentiment` (text) — Positive/Neutral/Negative
+- `speech_pace` (numeric) — words per minute estimate
+- `confidence_score` (numeric) — 0-100
+- `detailed_scores` (jsonb) — full breakdown
 
-### UI Layout
-- Split screen: Student camera (large, left 60%), AI avatar area (right 40%)
-- AI avatar: Professional placeholder with IPA branding, animated border glow when "speaking"
-- Countdown overlay before recording (3, 2, 1 with scale animation)
-- Recording controls bar: Pause, Resume, Stop (bottom center)
-- Current question in elegant card overlay at top
-- Optional live transcript toggle
-- Recording indicator (red dot + "REC" pulsing)
+Add RLS policy for service role to insert evaluations (edge function uses service role).
 
-### Technical approach
-- `navigator.mediaDevices.getUserMedia({ video: true, audio: true })` for camera
-- `MediaRecorder` for video recording
-- Video preview in `<video>` element
-- Countdown timer component with CSS scale animations
-- On stop: create blob, save response text, store reference
-- Virtual background blur: CSS `backdrop-filter` on video element (simple approach)
+## 4. Results Page (`/interview/:id/results`)
 
----
+New page showing:
+- Overall score with circular progress indicator
+- Score breakdown cards (Communication, Technical, Cultural Fit)
+- DISC personality badge
+- Recommendation badge with color coding
+- Strengths list (Arabic)
+- Improvements list (Arabic)
+- AI feedback text
+- Filler words count, sentiment, confidence metrics
+- "Back to Dashboard" button
 
-## Routes to Add
-- `/interview/voice` → VoiceInterview page
-- `/interview/video` → VideoInterview page
+## 5. Update `useInterviewSession` Hook
 
-Update `App.tsx` with the two new routes.
+- Change `totalQuestions` default to 8
+- Enhance the system prompt to specify question categories (2 behavioral, 3 technical, 2 situational, 1 culture-fit)
+- After interview completion, automatically call `evaluate-interview` edge function
+- Store evaluation result for navigation to results page
 
----
+## 6. Update Dashboard
 
-## Animations (CSS-only, no new deps)
-- Message fade-in: existing `animate-fade-in` keyframe
-- Recording pulse: new `@keyframes pulse-record` in `index.css`
-- Countdown scale: new `@keyframes countdown-pop`
-- Success checkmark: new `@keyframes checkmark-draw`
-- Typing dots bounce: new `@keyframes bounce-dot`
+- Link completed interviews to `/interview/:id/results`
+- Show overall score badge on completed interview cards
+
+## 7. Update Routes
+
+Add `/interview/:id/results` route to `App.tsx`
 
 ---
 
-## File Structure
+## File Changes Summary
 
 ```text
-src/components/interview/
-  InterviewHeader.tsx
-  ExitConfirmationDialog.tsx
-  JobSelector.tsx
-  TypingIndicator.tsx
-  SuccessCheckmark.tsx
-  AudioWaveform.tsx
-  CountdownOverlay.tsx
-  RecordingControls.tsx
-src/hooks/
-  useInterviewTimer.ts
-  useInterviewSession.ts
-src/pages/
-  TextInterview.tsx  (enhanced)
-  VoiceInterview.tsx (new)
-  VideoInterview.tsx (new)
+NEW FILES:
+  supabase/functions/evaluate-interview/index.ts  — AI evaluation engine
+  src/pages/InterviewResults.tsx                    — Results display page
+
+MODIFIED FILES:
+  src/hooks/useInterviewSession.ts  — 8 questions, categorized prompts, auto-evaluate
+  src/pages/Dashboard.tsx           — Show scores on completed interviews
+  src/App.tsx                       — Add results route
+  supabase/config.toml              — Add evaluate-interview function config
+
+DATABASE MIGRATION:
+  Add recommendation, personality_type, filler_words_count, sentiment,
+  speech_pace, confidence_score, detailed_scores columns to evaluations
 ```
 
 ## Implementation Order
-1. Shared components + hooks
-2. Enhanced TextInterview
-3. VoiceInterview
-4. VideoInterview
-5. Update App.tsx routes
+1. Database migration (add columns)
+2. `evaluate-interview` edge function
+3. Update `useInterviewSession` (8 questions + auto-evaluate)
+4. `InterviewResults` page
+5. Update Dashboard + routes
 
