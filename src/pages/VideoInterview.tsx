@@ -14,7 +14,7 @@ import SuccessCheckmark from "@/components/interview/SuccessCheckmark";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Video, Eye, EyeOff, GraduationCap, Send, AlertTriangle } from "lucide-react";
+import { Video, Eye, EyeOff, Briefcase, Send, AlertTriangle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -32,6 +32,7 @@ const VideoInterview = () => {
   const [transcription, setTranscription] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -68,6 +69,43 @@ const VideoInterview = () => {
     };
   }, [session.selectedJob]);
 
+  const transcribeAudio = useCallback(async (blob: Blob) => {
+    setIsTranscribing(true);
+    try {
+      const formData = new FormData();
+      formData.append("audio", blob, "recording.webm");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || "فشل في تحويل الصوت");
+      }
+
+      const data = await response.json();
+      if (data.transcription) {
+        setTranscription(data.transcription);
+        toast.success("تم تحويل الصوت إلى نص بنجاح");
+      } else {
+        toast.warning("لم يتم التعرف على كلام في التسجيل");
+      }
+    } catch (error) {
+      console.error("Transcription error:", error);
+      toast.error("فشل في تحويل الصوت إلى نص، يمكنك كتابة إجابتك يدوياً");
+    } finally {
+      setIsTranscribing(false);
+    }
+  }, []);
+
   const beginRecording = useCallback(() => {
     setShowCountdown(true);
   }, []);
@@ -88,12 +126,14 @@ const VideoInterview = () => {
           .upload(fileName, blob, { contentType: "video/webm" });
         if (!error) toast.success("تم رفع التسجيل بنجاح");
       }
+      // Auto-transcribe
+      transcribeAudio(blob);
     };
     recorder.start();
     recorderRef.current = recorder;
     setIsRecording(true);
     setIsPaused(false);
-  }, [user, session.interviewId, session.questionCount]);
+  }, [user, session.interviewId, session.questionCount, transcribeAudio]);
 
   const pauseRecording = useCallback(() => {
     recorderRef.current?.pause();
@@ -192,12 +232,19 @@ const VideoInterview = () => {
               session.isLoading ? "ring-4 ring-primary/40 animate-pulse" : "ring-2 ring-border"
             }`}
           >
-            <GraduationCap className="w-16 h-16 text-primary" />
+            <Briefcase className="w-16 h-16 text-primary" />
           </div>
           <h3 className="font-bold text-foreground">المحاور الذكي</h3>
-          <p className="text-xs text-muted-foreground">معهد الإدارة العامة</p>
+          <p className="text-xs text-muted-foreground">منصة المقابلات الذكية</p>
         </div>
       </div>
+
+      {isTranscribing && (
+        <div className="flex items-center justify-center gap-3 py-3 text-muted-foreground animate-fade-in">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-sm font-medium">جارٍ تحويل الصوت إلى نص...</span>
+        </div>
+      )}
 
       {!session.isCompleted && !session.isLoading && (
         <div className="border-t border-border bg-card p-4">
@@ -231,11 +278,12 @@ const VideoInterview = () => {
                 <Textarea
                   value={transcription}
                   onChange={(e) => setTranscription(e.target.value)}
-                  placeholder="اكتب إجابتك هنا..."
+                  placeholder={isTranscribing ? "جارٍ تحويل الصوت إلى نص..." : "اكتب إجابتك هنا..."}
                   className="rounded-xl flex-1 min-h-[48px] max-h-[100px] resize-none"
                   rows={2}
+                  disabled={isTranscribing}
                 />
-                <Button onClick={handleSubmit} disabled={!transcription.trim()} className="rounded-xl self-end" size="icon">
+                <Button onClick={handleSubmit} disabled={!transcription.trim() || isTranscribing} className="rounded-xl self-end" size="icon">
                   <Send className="w-5 h-5" />
                 </Button>
               </div>
