@@ -156,7 +156,10 @@ export type Database = {
           branch_location: string | null
           created_at: string
           full_name: string | null
+          gpa: string | null
           id: string
+          major: string | null
+          phone: string | null
           updated_at: string
           user_id: string
         }
@@ -165,7 +168,10 @@ export type Database = {
           branch_location?: string | null
           created_at?: string
           full_name?: string | null
+          gpa?: string | null
           id?: string
+          major?: string | null
+          phone?: string | null
           updated_at?: string
           user_id: string
         }
@@ -174,9 +180,42 @@ export type Database = {
           branch_location?: string | null
           created_at?: string
           full_name?: string | null
+          gpa?: string | null
           id?: string
+          major?: string | null
+          phone?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      question_templates: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string
+          difficulty: string | null
+          id: string
+          interview_type: Database["public"]["Enums"]["interview_type"]
+          question_text: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by: string
+          difficulty?: string | null
+          id?: string
+          interview_type: Database["public"]["Enums"]["interview_type"]
+          question_text: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string
+          difficulty?: string | null
+          id?: string
+          interview_type?: Database["public"]["Enums"]["interview_type"]
+          question_text?: string
         }
         Relationships: []
       }

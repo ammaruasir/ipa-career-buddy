@@ -20,6 +20,9 @@ const VoiceInterview = lazy(() => import("./pages/VoiceInterview"));
 const VideoInterview = lazy(() => import("./pages/VideoInterview"));
 const InterviewResults = lazy(() => import("./pages/InterviewResults"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const ProfileSettings = lazy(() => import("./pages/ProfileSettings"));
+const InterviewSettings = lazy(() => import("./pages/InterviewSettings"));
+const AdminSettings = lazy(() => import("./pages/AdminSettings"));
 
 const queryClient = new QueryClient();
 
@@ -49,6 +52,9 @@ const App = () => (
               <Route path="/interview/voice" element={<VoiceInterview />} />
               <Route path="/interview/video" element={<VideoInterview />} />
               <Route path="/interview/:id/results" element={<InterviewResults />} />
+              <Route path="/settings/profile" element={<ProfileSettings />} />
+              <Route path="/settings/interview" element={<InterviewSettings />} />
+              <Route path="/admin/settings" element={<AdminSettings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
