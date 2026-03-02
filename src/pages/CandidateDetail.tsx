@@ -7,8 +7,9 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, Loader2, User, Briefcase, Calendar, MessageSquare, Mic, Video, FileDown, CheckCircle, XCircle, AlertTriangle, Shield, Eye, Phone, UserPlus } from "lucide-react";
+import { ArrowRight, Loader2, User, Briefcase, Calendar, MessageSquare, Mic, Video, FileDown, CheckCircle, XCircle, AlertTriangle, Shield, Eye, Phone, UserPlus, Camera } from "lucide-react";
 import VideoPlayback from "@/components/interview/VideoPlayback";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 const discLabels: Record<string, { label: string; desc: string; color: string }> = {
@@ -42,6 +43,7 @@ const CandidateDetail = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [selectedCheatFrame, setSelectedCheatFrame] = useState<string | null>(null);
 
   const exportPDF = async () => {
     if (!id) return;
@@ -419,7 +421,11 @@ const CandidateDetail = () => {
                     : event.event_type;
 
                   return (
-                    <div key={event.id} className="flex items-start gap-3 p-3 rounded-xl bg-destructive/5 border border-destructive/10">
+                    <div
+                      key={event.id}
+                      className={`flex items-start gap-3 p-3 rounded-xl bg-destructive/5 border border-destructive/10 ${event.frame_url ? "cursor-pointer hover:bg-destructive/10 transition-colors" : ""}`}
+                      onClick={() => event.frame_url && setSelectedCheatFrame(event.frame_url)}
+                    >
                       <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center shrink-0 mt-0.5">
                         <Icon className="w-4 h-4 text-destructive" />
                       </div>
@@ -429,6 +435,7 @@ const CandidateDetail = () => {
                           <span className="text-xs text-muted-foreground">
                             {new Date(event.created_at).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                           </span>
+                          {event.frame_url && <Camera className="w-3.5 h-3.5 text-destructive" />}
                         </div>
                         {event.details && <p className="text-sm text-foreground">{event.details}</p>}
                       </div>
@@ -439,6 +446,23 @@ const CandidateDetail = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Cheat Frame Dialog */}
+        <Dialog open={!!selectedCheatFrame} onOpenChange={() => setSelectedCheatFrame(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-destructive" />
+                لقطة كشف الغش
+              </DialogTitle>
+            </DialogHeader>
+            {selectedCheatFrame && (
+              <div className="rounded-xl overflow-hidden border border-border">
+                <img src={selectedCheatFrame} alt="لقطة غش" className="w-full h-auto" />
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* HR Notes */}
         <Card className="rounded-2xl shadow-lg">
