@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, Loader2, User, Briefcase, Calendar, MessageSquare, Mic, Video, FileDown, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { ArrowRight, Loader2, User, Briefcase, Calendar, MessageSquare, Mic, Video, FileDown, CheckCircle, XCircle, AlertTriangle, Shield, Eye, Phone, UserPlus } from "lucide-react";
 import VideoPlayback from "@/components/interview/VideoPlayback";
 import { toast } from "sonner";
 
@@ -37,6 +37,7 @@ const CandidateDetail = () => {
   const [profile, setProfile] = useState<any>(null);
   const [responses, setResponses] = useState<any[]>([]);
   const [notes, setNotes] = useState<any[]>([]);
+  const [cheatEvents, setCheatEvents] = useState<any[]>([]);
   const [noteText, setNoteText] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -67,16 +68,18 @@ const CandidateDetail = () => {
     if (!user || !id) return;
 
     const load = async () => {
-      const [ivRes, evRes, notesRes, respRes] = await Promise.all([
+      const [ivRes, evRes, notesRes, respRes, cheatRes] = await Promise.all([
         supabase.from("interviews").select("*").eq("id", id).single(),
         supabase.from("evaluations").select("*").eq("interview_id", id).single(),
         supabase.from("hr_notes").select("*").eq("interview_id", id).order("created_at", { ascending: false }),
         supabase.from("responses").select("*").eq("interview_id", id).order("created_at", { ascending: true }),
+        supabase.from("cheat_events").select("*").eq("interview_id", id).order("created_at", { ascending: true }),
       ]);
       setInterview(ivRes.data);
       setEvaluation(evRes.data);
       setNotes(notesRes.data || []);
       setResponses(respRes.data || []);
+      setCheatEvents(cheatRes.data || []);
 
       if (ivRes.data) {
         const { data: prof } = await supabase.from("profiles").select("*").eq("user_id", ivRes.data.user_id).single();
@@ -387,9 +390,54 @@ const CandidateDetail = () => {
           </>
         )}
 
-        {/* Video Playback */}
-        {interview.type === "video" && interview.user_id && (
+        {/* Video/Audio Playback — for all interview types */}
+        {interview.user_id && (
           <VideoPlayback interviewId={interview.id} userId={interview.user_id} recordingUrl={(interview as any).recording_url} />
+        )}
+
+        {/* Cheat Events Log */}
+        {cheatEvents.length > 0 && (
+          <Card className="rounded-2xl shadow-lg border-destructive/20">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Shield className="w-5 h-5 text-destructive" />
+                سجل أحداث المراقبة ({cheatEvents.length} حدث)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {cheatEvents.map((event) => {
+                  const icon = event.event_type === "phone_detected" ? Phone
+                    : event.event_type === "person_detected" ? UserPlus
+                    : event.event_type === "looking_away" ? Eye
+                    : AlertTriangle;
+                  const Icon = icon;
+                  const label = event.event_type === "phone_detected" ? "كشف هاتف"
+                    : event.event_type === "person_detected" ? "شخص إضافي"
+                    : event.event_type === "looking_away" ? "نظر بعيد"
+                    : event.event_type === "tab_switch" ? "تبديل نافذة"
+                    : event.event_type;
+
+                  return (
+                    <div key={event.id} className="flex items-start gap-3 p-3 rounded-xl bg-destructive/5 border border-destructive/10">
+                      <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <Icon className="w-4 h-4 text-destructive" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="destructive" className="text-xs">{label}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(event.created_at).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                          </span>
+                        </div>
+                        {event.details && <p className="text-sm text-foreground">{event.details}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* HR Notes */}

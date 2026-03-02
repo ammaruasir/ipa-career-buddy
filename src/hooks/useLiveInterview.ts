@@ -54,6 +54,10 @@ export const useLiveInterview = ({
   const rafRef = useRef<number>(0);
   const activeRef = useRef(false);
   const stoppedManuallyRef = useRef(false);
+  
+  // Session recording refs
+  const sessionRecorderRef = useRef<MediaRecorder | null>(null);
+  const sessionChunksRef = useRef<Blob[]>([]);
 
   // Sync refs
   useEffect(() => { interviewIdRef.current = interviewId; }, [interviewId]);
@@ -425,6 +429,37 @@ export const useLiveInterview = ({
     const currentId = interviewIdRef.current;
     if (!currentId) return;
 
+    // Stop session recorder and upload
+    if (sessionRecorderRef.current?.state === "recording") {
+      sessionRecorderRef.current.stop();
+    }
+    
+    // Wait for chunks to finalize
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const sessionBlob = new Blob(sessionChunksRef.current, { type: "video/webm" });
+    if (sessionBlob.size > 0 && user) {
+      try {
+        const fileName = `${user.id}/${currentId}_full.webm`;
+        const { error: uploadErr } = await supabase.storage
+          .from("interview-recordings")
+          .upload(fileName, sessionBlob, { contentType: "video/webm", upsert: true });
+        
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage
+            .from("interview-recordings")
+            .getPublicUrl(fileName);
+          
+          await supabase
+            .from("interviews")
+            .update({ recording_url: urlData.publicUrl } as any)
+            .eq("id", currentId);
+        }
+      } catch (err) {
+        console.error("Failed to upload session recording:", err);
+      }
+    }
+
     await supabase
       .from("interviews")
       .update({ status: "completed" as any })
@@ -448,7 +483,7 @@ export const useLiveInterview = ({
       toast.error("حدث خطأ في التقييم");
     }
     setIsEvaluating(false);
-  }, [navigate]);
+  }, [navigate, user]);
 
   // Get closing response from AI before ending
   const getClosingResponse = useCallback(async () => {
@@ -533,6 +568,27 @@ export const useLiveInterview = ({
 
       setInterviewId(interview.id);
       interviewIdRef.current = interview.id;
+
+      // Start session recording
+      const recordingStream = type === "video" && videoStreamRef.current
+        ? videoStreamRef.current
+        : await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
+      
+      if (recordingStream) {
+        try {
+          const sessionRecorder = new MediaRecorder(recordingStream, { 
+            mimeType: type === "video" ? "video/webm" : "audio/webm" 
+          });
+          sessionChunksRef.current = [];
+          sessionRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) sessionChunksRef.current.push(e.data);
+          };
+          sessionRecorder.start(5000);
+          sessionRecorderRef.current = sessionRecorder;
+        } catch (err) {
+          console.error("Failed to start session recorder:", err);
+        }
+      }
 
       // Link to job application if vacancy_id present
       if (vacancyId) {

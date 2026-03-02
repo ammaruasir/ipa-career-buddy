@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Video, Play, Download } from "lucide-react";
+import { Video, Play, Download, Mic } from "lucide-react";
 
 interface VideoPlaybackProps {
   interviewId: string;

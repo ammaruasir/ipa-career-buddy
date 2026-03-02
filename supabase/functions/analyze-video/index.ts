@@ -11,9 +11,12 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { response_id, frames, answer_text, question_text } = await req.json();
-    if (!response_id || !frames || !Array.isArray(frames) || frames.length === 0) {
-      throw new Error("response_id and frames[] are required");
+    const { response_id, frames, answer_text, question_text, interview_id } = await req.json();
+    if (!frames || !Array.isArray(frames) || frames.length === 0) {
+      throw new Error("frames[] are required");
+    }
+    if (!response_id && !interview_id) {
+      throw new Error("response_id or interview_id is required");
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -26,7 +29,7 @@ serve(async (req) => {
     // Build multimodal content with frames as inline images
     const imageContent = frames.map((frame: string) => ({
       type: "image_url" as const,
-      image_url: { url: frame }, // base64 data URL
+      image_url: { url: frame },
     }));
 
     const systemPrompt = `أنت خبير تحليل لغة الجسد وتعبيرات الوجه في مقابلات العمل.
@@ -40,7 +43,9 @@ serve(async (req) => {
 2. الثقة بالنفس - تعبيرات الوجه، الوضعية
 3. الانخراط والاهتمام - هل يبدو منتبهًا ومشاركًا؟
 4. لغة الجسد العامة - الوضعية، الحركات، المظهر المهني
-5. كشف الهاتف المحمول - هل يوجد هاتف محمول مرئي في الإطار؟ هل يمسك المرشح بهاتف أو يوجد هاتف على الطاولة أو بالقرب منه؟`;
+5. كشف الهاتف المحمول - هل يوجد هاتف محمول مرئي في الإطار؟
+6. كشف شخص إضافي - هل يوجد شخص آخر غير المرشح في الإطار؟
+7. اتجاه النظر - هل المرشح ينظر بعيداً عن الشاشة بشكل متكرر؟`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -76,12 +81,16 @@ serve(async (req) => {
                   professional_appearance: { type: "number", description: "Professional appearance score 0-100" },
                   overall_impression: { type: "string", description: "Overall impression summary in Arabic" },
                   phone_detected: { type: "boolean", description: "Whether a mobile phone is visible in the frame" },
-                  phone_detection_notes: { type: "string", description: "Notes about phone location and usage in Arabic, empty string if no phone detected" },
+                  phone_detection_notes: { type: "string", description: "Notes about phone in Arabic, empty if none" },
+                  extra_person_detected: { type: "boolean", description: "Whether an extra person is visible" },
+                  looking_away: { type: "boolean", description: "Whether candidate is frequently looking away" },
+                  looking_away_notes: { type: "string", description: "Notes about gaze direction in Arabic" },
                 },
                 required: [
                   "eye_contact_score", "confidence_score", "engagement_score",
                   "body_language_assessment", "professional_appearance", "overall_impression",
                   "phone_detected", "phone_detection_notes",
+                  "extra_person_detected", "looking_away", "looking_away_notes",
                 ],
                 additionalProperties: false,
               },
@@ -95,12 +104,12 @@ serve(async (req) => {
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "تم تجاوز الحد المسموح، يرجى المحاولة لاحقاً" }), {
+        return new Response(JSON.stringify({ error: "تم تجاوز الحد المسموح" }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "يرجى إضافة رصيد لاستخدام الذكاء الاصطناعي" }), {
+        return new Response(JSON.stringify({ error: "يرجى إضافة رصيد" }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -115,18 +124,62 @@ serve(async (req) => {
 
     const analysis = JSON.parse(toolCall.function.arguments);
 
-    // Save analysis to the response record
-    const { error: updateErr } = await supabase
-      .from("responses")
-      .update({ ai_analysis: analysis })
-      .eq("id", response_id);
+    // Save analysis to the response record if response_id provided
+    if (response_id) {
+      const { error: updateErr } = await supabase
+        .from("responses")
+        .update({ ai_analysis: analysis })
+        .eq("id", response_id);
 
-    if (updateErr) {
-      console.error("Failed to save video analysis:", updateErr);
-      throw new Error("Failed to save video analysis");
+      if (updateErr) {
+        console.error("Failed to save video analysis:", updateErr);
+      }
     }
 
-    return new Response(JSON.stringify(analysis), {
+    // Log cheat events to cheat_events table
+    const targetInterviewId = interview_id || response_id;
+    // We need the actual interview_id — if only response_id, look it up
+    let actualInterviewId = interview_id;
+    if (!actualInterviewId && response_id) {
+      const { data: respRow } = await supabase
+        .from("responses")
+        .select("interview_id")
+        .eq("id", response_id)
+        .single();
+      actualInterviewId = respRow?.interview_id;
+    }
+
+    if (actualInterviewId) {
+      const events: { event_type: string; details: string }[] = [];
+
+      if (analysis.phone_detected) {
+        events.push({ event_type: "phone_detected", details: analysis.phone_detection_notes || "تم كشف هاتف محمول" });
+      }
+      if (analysis.extra_person_detected) {
+        events.push({ event_type: "person_detected", details: "تم كشف شخص إضافي في الإطار" });
+      }
+      if (analysis.looking_away) {
+        events.push({ event_type: "looking_away", details: analysis.looking_away_notes || "المرشح ينظر بعيداً بشكل متكرر" });
+      }
+
+      if (events.length > 0) {
+        const rows = events.map(e => ({
+          interview_id: actualInterviewId,
+          event_type: e.event_type,
+          details: e.details,
+        }));
+
+        const { error: insertErr } = await supabase
+          .from("cheat_events")
+          .insert(rows);
+
+        if (insertErr) {
+          console.error("Failed to insert cheat events:", insertErr);
+        }
+      }
+    }
+
+    return new Response(JSON.stringify({ ...analysis, events: [] }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
