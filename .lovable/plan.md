@@ -1,22 +1,39 @@
 
 
-## خطة: إضافة كشف الهاتف المحمول في تحليل الفيديو
+## خطة: تنفيذ المناقشة التفاعلية + كاميرا الغش في جميع الأوضاع
 
-### التغييرات
+### الجزء 1: الأسئلة التتبعية والمناقشة
 
-**1. تحديث البرومبت في `supabase/functions/analyze-video/index.ts`**
+**`supabase/functions/chat/index.ts`** — إضافة تعليمات للبرومبت:
+- إضافة قواعد المتابعة: "إذا كانت الإجابة غامضة أو مثيرة، اسأل سؤال تتبعي واحد قبل الانتقال"
+- طلب بدء الرد بـ `[NEW_Q]` أو `[FOLLOW_UP]`
 
-إضافة تعليمات لكشف وجود هاتف محمول في الصورة ضمن تحليل لغة الجسد:
-- إضافة نقطة تحليل جديدة: "هل يوجد هاتف محمول مرئي في الإطار؟"
-- إضافة حقلين جديدين في الـ tool schema:
-  - `phone_detected` (boolean): هل تم رصد هاتف
-  - `phone_detection_notes` (string): ملاحظات عن موقع الهاتف واستخدامه
+**`src/hooks/useLiveInterview.ts`** — تعديل `handleRecordingComplete`:
+- فحص رد الـ AI: إذا بدأ بـ `[FOLLOW_UP]` لا نزيد العداد
+- إذا بدأ بـ `[NEW_Q]` نزيد العداد
+- إزالة العلامة من النص قبل العرض والنطق
 
-**2. عرض نتيجة كشف الهاتف في `src/pages/InterviewResults.tsx`**
+**`src/hooks/useInterviewSession.ts`** — تعديل `sendAnswer`:
+- نفس المنطق: فحص `[NEW_Q]`/`[FOLLOW_UP]` في رد الـ AI
+- `setQuestionCount(c => c + 1)` فقط عند `[NEW_Q]`
 
-إضافة مؤشر في قسم تحليل الفيديو يوضح إذا تم كشف هاتف أثناء المقابلة (أيقونة تحذير + نص).
+### الجزء 2: كاميرا مراقبة الغش في النص والصوت
+
+**`src/pages/TextInterview.tsx`**:
+- فتح الكاميرا عند بدء المقابلة (عرض مصغّر PiP في زاوية الشاشة)
+- التقاط صورة كل 30 ثانية وإرسالها لـ `analyze-video` مع `response_id`
+
+**`src/hooks/useLiveInterview.ts`** (وضع الصوت):
+- فتح كاميرا تلقائياً حتى في وضع الصوت
+- التقاط صور دورية كل 30 ثانية وإرسالها للتحليل
+
+**`src/components/interview/LiveInterview.tsx`**:
+- عرض كاميرا PiP حتى في وضع الصوت (موجودة فقط للفيديو حالياً)
 
 ### الملفات المعدلة
-- `supabase/functions/analyze-video/index.ts` — إضافة كشف الهاتف في البرومبت والـ schema
-- `src/pages/InterviewResults.tsx` — عرض نتيجة كشف الهاتف
+- `supabase/functions/chat/index.ts`
+- `src/hooks/useLiveInterview.ts`
+- `src/hooks/useInterviewSession.ts`
+- `src/pages/TextInterview.tsx`
+- `src/components/interview/LiveInterview.tsx`
 
