@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useVapiInterview } from "@/hooks/useVapiInterview";
+import { useLiveInterview } from "@/hooks/useLiveInterview";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
@@ -9,29 +9,29 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Phone, PhoneOff, AlertTriangle, Loader2, Mic, Volume2 } from "lucide-react";
+import { Phone, PhoneOff, AlertTriangle, Loader2, Mic, Volume2, Brain, FileText } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-interface VapiLiveInterviewProps {
+interface LiveInterviewProps {
   type: "voice" | "video";
   jobPosition: string;
   totalQuestions: number;
   onBack: () => void;
 }
 
-const VapiLiveInterview = ({ type, jobPosition, totalQuestions, onBack }: VapiLiveInterviewProps) => {
+const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterviewProps) => {
   const navigate = useNavigate();
   const [showExit, setShowExit] = useState(false);
   const { tabSwitchCount, showWarning } = useAntiCheat({ enableTabDetection: true });
 
-  const vapi = useVapiInterview({
+  const live = useLiveInterview({
     type,
     jobPosition,
     totalQuestions,
   });
 
   const handleBack = () => {
-    if (vapi.isCallActive) {
+    if (live.isCallActive) {
       setShowExit(true);
     } else {
       onBack();
@@ -39,18 +39,74 @@ const VapiLiveInterview = ({ type, jobPosition, totalQuestions, onBack }: VapiLi
   };
 
   const handleExitConfirm = () => {
-    vapi.endCall();
+    live.endCall();
     navigate("/dashboard");
   };
 
-  const progress = Math.min((vapi.questionCount / totalQuestions) * 100, 100);
+  const progress = Math.min((live.questionCount / totalQuestions) * 100, 100);
+
+  // Determine avatar state
+  const avatarState = live.isSpeaking ? "speaking" : live.isListening ? "listening" : "idle";
+
+  // Determine current status label
+  const getStatusBadge = () => {
+    if (live.isSpeaking) {
+      return (
+        <Badge variant="default" className="gap-2 px-4 py-2 text-sm animate-fade-in">
+          <Volume2 className="w-4 h-4 animate-pulse" />
+          المحاور يتحدث...
+        </Badge>
+      );
+    }
+    if (live.isListening) {
+      return (
+        <Badge variant="secondary" className="gap-2 px-4 py-2 text-sm animate-fade-in">
+          <Mic className="w-4 h-4 animate-pulse" />
+          يستمع إليك...
+        </Badge>
+      );
+    }
+    if (live.isTranscribing) {
+      return (
+        <Badge variant="outline" className="gap-2 px-4 py-2 text-sm">
+          <FileText className="w-4 h-4 animate-pulse" />
+          جارٍ تحويل الصوت...
+        </Badge>
+      );
+    }
+    if (live.isProcessing) {
+      return (
+        <Badge variant="outline" className="gap-2 px-4 py-2 text-sm">
+          <Brain className="w-4 h-4 animate-pulse" />
+          جارٍ التفكير...
+        </Badge>
+      );
+    }
+    if (live.isConnecting) {
+      return (
+        <Badge variant="outline" className="gap-2 px-4 py-2 text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          جارٍ بدء المقابلة...
+        </Badge>
+      );
+    }
+    if (live.isEvaluating) {
+      return (
+        <Badge variant="outline" className="gap-2 px-4 py-2 text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          جارٍ تقييم المقابلة...
+        </Badge>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col" dir="rtl">
       <InterviewHeader
         timerFormatted="مباشر"
         isWarning={false}
-        questionCount={vapi.questionCount}
+        questionCount={live.questionCount}
         totalQuestions={totalQuestions}
         onBack={handleBack}
       />
@@ -67,62 +123,31 @@ const VapiLiveInterview = ({ type, jobPosition, totalQuestions, onBack }: VapiLi
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 gap-6">
         {/* AI Avatar */}
         <div className="w-full max-w-md h-64 rounded-2xl overflow-hidden shadow-xl border">
-          <AIAvatarScene
-            avatarState={vapi.isSpeaking ? "speaking" : vapi.isCallActive ? "listening" : "idle"}
-          />
+          <AIAvatarScene avatarState={avatarState} />
         </div>
 
         {/* Status indicator */}
         <div className="flex items-center gap-3">
-          {vapi.isCallActive && (
-            <Badge
-              variant={vapi.isSpeaking ? "default" : "secondary"}
-              className="gap-2 px-4 py-2 text-sm animate-fade-in"
-            >
-              {vapi.isSpeaking ? (
-                <>
-                  <Volume2 className="w-4 h-4 animate-pulse" />
-                  المحاور يتحدث...
-                </>
-              ) : (
-                <>
-                  <Mic className="w-4 h-4 animate-pulse" />
-                  يستمع إليك...
-                </>
-              )}
-            </Badge>
-          )}
-          {vapi.isConnecting && (
-            <Badge variant="outline" className="gap-2 px-4 py-2 text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              جارٍ الاتصال...
-            </Badge>
-          )}
-          {vapi.isEvaluating && (
-            <Badge variant="outline" className="gap-2 px-4 py-2 text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              جارٍ تقييم المقابلة...
-            </Badge>
-          )}
+          {getStatusBadge()}
         </div>
 
         {/* Progress */}
-        {vapi.isCallActive && (
+        {live.isCallActive && (
           <div className="w-full max-w-md space-y-2">
             <Progress value={progress} className="h-2" />
             <p className="text-xs text-muted-foreground text-center">
-              السؤال {Math.min(vapi.questionCount, totalQuestions)} من {totalQuestions}
+              السؤال {Math.min(live.questionCount, totalQuestions)} من {totalQuestions}
             </p>
           </div>
         )}
 
         {/* Live transcript */}
-        {vapi.transcript.length > 0 && (
+        {live.transcript.length > 0 && (
           <Card className="w-full max-w-xl p-4 rounded-2xl shadow-lg">
             <p className="text-xs font-semibold text-muted-foreground mb-3">النص المباشر</p>
             <ScrollArea className="max-h-48">
               <div className="space-y-2">
-                {vapi.transcript.slice(-6).map((entry, i) => (
+                {live.transcript.slice(-6).map((entry, i) => (
                   <div
                     key={i}
                     className={`text-sm p-2 rounded-lg ${
@@ -144,9 +169,9 @@ const VapiLiveInterview = ({ type, jobPosition, totalQuestions, onBack }: VapiLi
 
         {/* Call controls */}
         <div className="flex items-center gap-4">
-          {!vapi.isCallActive && !vapi.isConnecting && !vapi.isCompleted && (
+          {!live.isCallActive && !live.isConnecting && !live.isCompleted && (
             <Button
-              onClick={vapi.startCall}
+              onClick={live.startCall}
               size="lg"
               className="rounded-full gap-2 px-8 bg-emerald-600 hover:bg-emerald-700"
             >
@@ -154,9 +179,9 @@ const VapiLiveInterview = ({ type, jobPosition, totalQuestions, onBack }: VapiLi
               بدء المقابلة المباشرة
             </Button>
           )}
-          {vapi.isCallActive && (
+          {live.isCallActive && (
             <Button
-              onClick={vapi.endCall}
+              onClick={live.endCall}
               size="lg"
               variant="destructive"
               className="rounded-full gap-2 px-8"
@@ -168,12 +193,14 @@ const VapiLiveInterview = ({ type, jobPosition, totalQuestions, onBack }: VapiLi
         </div>
 
         {/* Instructions before call */}
-        {!vapi.isCallActive && !vapi.isConnecting && !vapi.isCompleted && (
+        {!live.isCallActive && !live.isConnecting && !live.isCompleted && (
           <Card className="w-full max-w-md p-4 rounded-2xl text-center">
             <p className="text-sm text-muted-foreground leading-relaxed">
               ستتحدث مباشرة مع المحاور الآلي عبر الصوت.
               <br />
               تأكد من تفعيل الميكروفون والسماعات قبل البدء.
+              <br />
+              <span className="text-xs mt-2 block">سيتم تسجيل إجابتك تلقائياً والتوقف عند الصمت.</span>
             </p>
           </Card>
         )}
@@ -188,4 +215,4 @@ const VapiLiveInterview = ({ type, jobPosition, totalQuestions, onBack }: VapiLi
   );
 };
 
-export default VapiLiveInterview;
+export default LiveInterview;
