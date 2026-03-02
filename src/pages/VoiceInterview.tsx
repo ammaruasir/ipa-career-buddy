@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
 import JobSelector from "@/components/interview/JobSelector";
@@ -10,7 +10,8 @@ const VoiceInterview = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { settings, loading: settingsLoading } = useSystemSettings();
-  const [selectedJob, setSelectedJob] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [selectedJob, setSelectedJob] = useState<string | null>(searchParams.get("job"));
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
