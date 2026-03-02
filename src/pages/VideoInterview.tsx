@@ -11,8 +11,9 @@ const VideoInterview = () => {
   const navigate = useNavigate();
   const { settings, loading: settingsLoading } = useSystemSettings();
   const [searchParams] = useSearchParams();
-  const [selectedJob, setSelectedJob] = useState<string | null>(searchParams.get("job"));
+  const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState<number | null>(null);
+  const preSelectedJob = searchParams.get("job") || undefined;
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
@@ -24,11 +25,6 @@ const VideoInterview = () => {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
-  }
-
-  // If job came from URL params, skip JobSelector but use default count
-  if (selectedJob && questionCount === null) {
-    setQuestionCount(settings.questions_per_type.video);
   }
 
   const isPractice = searchParams.get("practice") === "true";
@@ -43,6 +39,7 @@ const VideoInterview = () => {
         }}
         onBack={() => navigate("/dashboard")}
         isPractice={isPractice}
+        preSelectedJob={preSelectedJob}
       />
     );
   }
