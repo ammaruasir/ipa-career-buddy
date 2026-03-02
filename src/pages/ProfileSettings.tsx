@@ -5,20 +5,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowRight, Camera, Globe, Bell, Lock, User, Loader2, CalendarIcon, FileText, Upload, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Camera, Globe, Bell, Lock, User, Loader2, FileText, Upload, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { nationalities, citiesByNationality, educationLevels, genderOptions } from "@/lib/location-data";
+import { nationalities, citiesByNationality, educationLevels, genderOptions, commonMajors } from "@/lib/location-data";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DatePickerWithYears } from "@/components/ui/date-picker-with-years";
 
 const getPasswordStrength = (password: string): { score: number; label: string; color: string } => {
   let score = 0;
@@ -45,7 +45,6 @@ const ProfileSettings = () => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // New fields
   const [dateOfBirth, setDateOfBirth] = useState<Date>();
   const [gender, setGender] = useState("");
   const [nationality, setNationality] = useState("");
@@ -60,6 +59,9 @@ const ProfileSettings = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+
+  const [phoneError, setPhoneError] = useState("");
+  const [gpaError, setGpaError] = useState("");
 
   const [notifications, setNotifications] = useState(() => {
     const stored = localStorage.getItem("notification_prefs");
@@ -105,6 +107,29 @@ const ProfileSettings = () => {
 
   const cities = nationality ? citiesByNationality[nationality] || [] : [];
 
+  const validatePhone = (val: string) => {
+    setPhone(val);
+    if (val && !/^\+?[\d\s-]{7,15}$/.test(val.replace(/\s/g, ""))) {
+      setPhoneError("رقم الهاتف غير صحيح");
+    } else {
+      setPhoneError("");
+    }
+  };
+
+  const validateGpa = (val: string) => {
+    setGpa(val);
+    if (val) {
+      const num = parseFloat(val);
+      if (isNaN(num) || num < 0 || num > 100) {
+        setGpaError("المعدل يجب أن يكون بين 0 و 100");
+      } else {
+        setGpaError("");
+      }
+    } else {
+      setGpaError("");
+    }
+  };
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -126,6 +151,10 @@ const ProfileSettings = () => {
 
   const handleSaveProfile = async () => {
     if (!user) return;
+    if (phoneError || gpaError) {
+      toast({ title: "يرجى تصحيح الأخطاء أولاً", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
@@ -170,7 +199,6 @@ const ProfileSettings = () => {
       await supabase.from("profiles").update({ resume_url: url } as any).eq("user_id", user.id);
       toast({ title: "تم رفع السيرة الذاتية، جاري التحليل..." });
 
-      // Auto-analyze
       setAnalyzingResume(true);
       try {
         const { data: fnData, error: fnError } = await supabase.functions.invoke("analyze-resume", {
@@ -283,24 +311,13 @@ const ProfileSettings = () => {
               </div>
               <div className="space-y-2">
                 <Label className="font-tajawal">تاريخ الميلاد</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn("w-full justify-start text-right font-normal", !dateOfBirth && "text-muted-foreground")}>
-                      <CalendarIcon className="ml-2 h-4 w-4" />
-                      {dateOfBirth ? format(dateOfBirth, "yyyy/MM/dd") : "اختر التاريخ"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateOfBirth}
-                      onSelect={setDateOfBirth}
-                      disabled={(date) => date > new Date() || date < new Date("1950-01-01")}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DatePickerWithYears
+                  value={dateOfBirth}
+                  onChange={setDateOfBirth}
+                  minAge={16}
+                  maxAge={80}
+                  placeholder="اختر تاريخ الميلاد"
+                />
               </div>
               <div className="space-y-2">
                 <Label className="font-tajawal">الجنس</Label>
@@ -315,29 +332,36 @@ const ProfileSettings = () => {
               </div>
               <div className="space-y-2">
                 <Label className="font-tajawal">الجنسية</Label>
-                <Select value={nationality} onValueChange={(v) => { setNationality(v); setCity(""); }}>
-                  <SelectTrigger><SelectValue placeholder="اختر الجنسية" /></SelectTrigger>
-                  <SelectContent>
-                    {nationalities.map((n) => (
-                      <SelectItem key={n} value={n}>{n}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={nationalities}
+                  value={nationality}
+                  onValueChange={(v) => { setNationality(v); setCity(""); }}
+                  placeholder="اختر الجنسية"
+                  searchPlaceholder="ابحث عن الجنسية..."
+                />
               </div>
               <div className="space-y-2">
                 <Label className="font-tajawal">المدينة</Label>
-                <Select value={city} onValueChange={setCity} disabled={!nationality}>
-                  <SelectTrigger><SelectValue placeholder={nationality ? "اختر المدينة" : "اختر الجنسية أولاً"} /></SelectTrigger>
-                  <SelectContent>
-                    {cities.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={cities}
+                  value={city}
+                  onValueChange={setCity}
+                  placeholder={nationality ? "اختر المدينة" : "اختر الجنسية أولاً"}
+                  searchPlaceholder="ابحث عن المدينة..."
+                  disabled={!nationality}
+                  allowCustom
+                />
               </div>
               <div className="space-y-2">
                 <Label className="font-tajawal">رقم الهاتف</Label>
-                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+966 5XX XXX XXXX" dir="ltr" />
+                <Input
+                  value={phone}
+                  onChange={(e) => validatePhone(e.target.value)}
+                  placeholder="+966 5XX XXX XXXX"
+                  dir="ltr"
+                  className={phoneError ? "border-destructive" : ""}
+                />
+                {phoneError && <p className="text-xs text-destructive font-tajawal">{phoneError}</p>}
               </div>
               <div className="space-y-2">
                 <Label className="font-tajawal">المستوى التعليمي</Label>
@@ -352,11 +376,25 @@ const ProfileSettings = () => {
               </div>
               <div className="space-y-2">
                 <Label className="font-tajawal">التخصص</Label>
-                <Input value={major} onChange={(e) => setMajor(e.target.value)} placeholder="مثال: إدارة أعمال" />
+                <SearchableSelect
+                  options={commonMajors}
+                  value={major}
+                  onValueChange={setMajor}
+                  placeholder="اختر التخصص"
+                  searchPlaceholder="ابحث عن التخصص..."
+                  allowCustom
+                />
               </div>
               <div className="space-y-2">
                 <Label className="font-tajawal">المعدل التراكمي</Label>
-                <Input value={gpa} onChange={(e) => setGpa(e.target.value)} placeholder="مثال: 4.5" dir="ltr" />
+                <Input
+                  value={gpa}
+                  onChange={(e) => validateGpa(e.target.value)}
+                  placeholder="مثال: 4.5"
+                  dir="ltr"
+                  className={gpaError ? "border-destructive" : ""}
+                />
+                {gpaError && <p className="text-xs text-destructive font-tajawal">{gpaError}</p>}
               </div>
               <div className="space-y-2">
                 <Label className="font-tajawal">سنوات الخبرة</Label>
