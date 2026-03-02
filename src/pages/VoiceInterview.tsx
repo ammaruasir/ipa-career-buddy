@@ -11,8 +11,9 @@ const VoiceInterview = () => {
   const navigate = useNavigate();
   const { settings, loading: settingsLoading } = useSystemSettings();
   const [searchParams] = useSearchParams();
-  const [selectedJob, setSelectedJob] = useState<string | null>(searchParams.get("job"));
+  const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState<number | null>(null);
+  const preSelectedJob = searchParams.get("job") || undefined;
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
@@ -24,10 +25,6 @@ const VoiceInterview = () => {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
-  }
-
-  if (selectedJob && questionCount === null) {
-    setQuestionCount(settings.questions_per_type.voice);
   }
 
   const isPractice = searchParams.get("practice") === "true";
@@ -42,6 +39,7 @@ const VoiceInterview = () => {
         }}
         onBack={() => navigate("/dashboard")}
         isPractice={isPractice}
+        preSelectedJob={preSelectedJob}
       />
     );
   }

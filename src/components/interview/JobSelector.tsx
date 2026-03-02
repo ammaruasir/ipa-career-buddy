@@ -13,6 +13,7 @@ interface JobSelectorProps {
   onSelect: (job: string, questionCount?: number) => void;
   onBack: () => void;
   isPractice?: boolean;
+  preSelectedJob?: string;
 }
 
 interface MatchedJob {
@@ -24,10 +25,10 @@ interface MatchedJob {
 
 const QUICK_COUNTS = [3, 5, 8, 10];
 
-const JobSelector = ({ title, onSelect, onBack, isPractice = false }: JobSelectorProps) => {
+const JobSelector = ({ title, onSelect, onBack, isPractice = false, preSelectedJob }: JobSelectorProps) => {
   const { settings, loading } = useSystemSettings();
   const { user } = useAuth();
-  const [selectedJob, setSelectedJob] = useState<string | null>(null);
+  const [selectedJob, setSelectedJob] = useState<string | null>(preSelectedJob || null);
   const [questionCount, setQuestionCount] = useState(5);
   const [matchedJobs, setMatchedJobs] = useState<MatchedJob[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
