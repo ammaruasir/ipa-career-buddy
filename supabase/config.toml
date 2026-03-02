@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.analyze-resume]
 verify_jwt = false
+
+[functions.generate-report]
+verify_jwt = false
+
+[functions.career-guidance]
+verify_jwt = false

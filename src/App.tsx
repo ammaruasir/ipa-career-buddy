@@ -44,6 +44,9 @@ const ProfileSettings = lazyRetry(() => import("./pages/ProfileSettings"));
 const InterviewSettings = lazyRetry(() => import("./pages/InterviewSettings"));
 const AdminSettings = lazyRetry(() => import("./pages/AdminSettings"));
 const CompleteProfile = lazyRetry(() => import("./pages/CompleteProfile"));
+const HiringPipeline = lazyRetry(() => import("./pages/HiringPipeline"));
+const CandidateCompare = lazyRetry(() => import("./pages/CandidateCompare"));
+const CareerGuidance = lazyRetry(() => import("./pages/CareerGuidance"));
 
 const queryClient = new QueryClient();
 
@@ -69,7 +72,10 @@ const App = () => (
               <Route path="/dashboard/candidate" element={<CandidateDashboard />} />
               <Route path="/dashboard/admin" element={<AdminDashboard />} />
               <Route path="/dashboard/hr" element={<HRDashboard />} />
+              <Route path="/dashboard/hr/pipeline" element={<HiringPipeline />} />
+              <Route path="/dashboard/hr/compare" element={<CandidateCompare />} />
               <Route path="/dashboard/admin/candidate/:id" element={<CandidateDetail />} />
+              <Route path="/career-guidance" element={<CareerGuidance />} />
               <Route path="/complete-profile" element={<CompleteProfile />} />
               <Route path="/jobs" element={<JobVacancies />} />
               <Route path="/interview/text" element={<TextInterview />} />

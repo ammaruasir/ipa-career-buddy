@@ -11,8 +11,9 @@ import {
   MessageSquare, Mic, Video, LogOut, Briefcase,
   BarChart3, Clock, CheckCircle2, Loader2, TrendingUp,
   ChevronDown, ChevronUp, Sparkles, Settings, FileText,
-  MapPin, Building2, Send,
+  MapPin, Building2, Send, GraduationCap,
 } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
@@ -106,6 +107,12 @@ const CandidateDashboard = () => {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
+              <Link to="/career-guidance">
+                <GraduationCap className="w-4 h-4 ml-1" />
+                الإرشاد المهني
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
               <Link to="/settings/profile">
                 <Settings className="w-4 h-4 ml-1" />
                 الملف الشخصي
@@ -117,6 +124,7 @@ const CandidateDashboard = () => {
                 إعدادات المقابلة
               </Link>
             </Button>
+            <NotificationBell />
             <Button variant="ghost" size="sm" onClick={() => signOut().then(() => navigate("/"))}>
               <LogOut className="w-4 h-4 ml-2" />
               تسجيل الخروج

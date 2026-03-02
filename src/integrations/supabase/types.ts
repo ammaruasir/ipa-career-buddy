@@ -158,6 +158,7 @@ export type Database = {
           created_at: string | null
           id: string
           interview_id: string | null
+          pipeline_stage: string
           status: string | null
           user_id: string
           vacancy_id: string
@@ -166,6 +167,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           interview_id?: string | null
+          pipeline_stage?: string
           status?: string | null
           user_id: string
           vacancy_id: string
@@ -174,6 +176,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           interview_id?: string | null
+          pipeline_stage?: string
           status?: string | null
           user_id?: string
           vacancy_id?: string
@@ -234,6 +237,39 @@ export type Database = {
           requirements?: Json | null
           title?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string | null
+          read: boolean
+          related_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          read?: boolean
+          related_id?: string | null
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          read?: boolean
+          related_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
         }
         Relationships: []
       }
