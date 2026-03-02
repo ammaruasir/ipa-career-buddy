@@ -1,54 +1,28 @@
 
 
-## خطة: تحسين فورم التسجيل وإكمال الملف الشخصي
+## Fix: Auto-scroll transcript in LiveInterview
 
-### المشاكل الحالية
-1. التقويم لا يدعم التنقل السريع بين السنوات — يجب النقر شهر بشهر
-2. لا يوجد حد أدنى للعمر (16 سنة مثلاً)
-3. القوائم المنسدلة (الجنسية/المدينة) لا تدعم البحث — مع قوائم طويلة يصعب الاختيار
-4. الجنسيات تشمل فقط 18 دولة عربية — يجب تغطية جميع دول العالم
-5. لا يوجد validation على رقم الهاتف أو المعدل التراكمي
-6. حقل التخصص نص حر — الأفضل combobox مع خيارات شائعة + إمكانية الكتابة
+The transcript `ScrollArea` (line 201) never scrolls to show new messages. The fix is simple:
 
-### التغييرات المطلوبة
+**`src/components/interview/LiveInterview.tsx`**:
+- Add a ref to a dummy div at the bottom of the transcript list
+- Add a `useEffect` that triggers `scrollIntoView` whenever `live.transcript` changes
 
-**1. `src/lib/location-data.ts` — توسيع بيانات الجنسيات والمدن**
-- إضافة جميع جنسيات العالم (~195 دولة) بالعربية
-- إضافة مدن رئيسية لكل دولة
-- إضافة قائمة تخصصات شائعة
+This is the same pattern already used in `TextInterview.tsx` (line with `scrollRef`).
 
-**2. إنشاء `src/components/ui/searchable-select.tsx` — قائمة منسدلة مع بحث**
-- مكون يستخدم `Command` (cmdk) داخل `Popover`
-- يدعم البحث/الفلترة بالكتابة
-- يُستخدم بدلاً من `Select` العادي للجنسية والمدينة والتخصص
+### Changes
+```tsx
+// Add a ref for the bottom of transcript
+const transcriptEndRef = useRef<HTMLDivElement>(null);
 
-**3. إنشاء `src/components/ui/date-picker-with-years.tsx` — منتقي تاريخ مع اختيار سنة وشهر**
-- عرض dropdown للسنة (من السنة الحالية - 70 إلى السنة الحالية - 16)
-- عرض dropdown للشهر
-- عند الاختيار، يعرض التقويم الشهر/السنة المحددة مباشرة
-- هذا يحل مشكلة التنقل البطيء
+// Auto-scroll when transcript updates
+useEffect(() => {
+  transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [live.transcript]);
 
-**4. تحديث `src/pages/CompleteProfile.tsx`**
-- استبدال `Select` بـ `SearchableSelect` للجنسية والمدينة
-- استبدال `Calendar` بـ `DatePickerWithYears`
-- إضافة حد أدنى للعمر: 16 سنة (تعطيل تواريخ أقل من 16 سنة)
-- إضافة validation لرقم الهاتف (أرقام فقط، طول مناسب)
-- إضافة validation للمعدل (0-5 أو 0-100)
-- استخدام `SearchableSelect` أو combobox للتخصص مع خيارات شائعة + كتابة حرة
+// Inside the ScrollArea, after the transcript map:
+<div ref={transcriptEndRef} />
+```
 
-**5. تحديث `src/pages/ProfileSettings.tsx`**
-- نفس التحسينات أعلاه (SearchableSelect + DatePickerWithYears + validations)
-
-### التفاصيل التقنية
-
-- **SearchableSelect**: يستخدم `cmdk` (مُثبّت بالفعل) داخل `Popover` — يعرض حقل بحث في الأعلى ويُفلتر الخيارات
-- **DatePickerWithYears**: يضيف select للسنة والشهر فوق التقويم، مع تقييد النطاق من 1955 إلى (اليوم - 16 سنة)
-- **بيانات الدول**: ~195 جنسية مع 3-10 مدن رئيسية لكل دولة
-
-### الملفات المعدلة
-- `src/lib/location-data.ts` — بيانات شاملة لجميع الدول
-- `src/components/ui/searchable-select.tsx` — مكون جديد
-- `src/components/ui/date-picker-with-years.tsx` — مكون جديد
-- `src/pages/CompleteProfile.tsx` — تطبيق التحسينات
-- `src/pages/ProfileSettings.tsx` — تطبيق نفس التحسينات
+**File modified**: `src/components/interview/LiveInterview.tsx` only.
 
