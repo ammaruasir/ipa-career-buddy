@@ -305,7 +305,7 @@ export const useLiveInterview = ({
       questionCountRef.current = newCount;
 
       if (newCount >= totalQuestions) {
-        await endInterview();
+        await getClosingResponse();
         return;
       }
 
@@ -442,6 +442,46 @@ export const useLiveInterview = ({
     }
     setIsEvaluating(false);
   }, [navigate]);
+
+  // Get closing response from AI before ending
+  const getClosingResponse = useCallback(async () => {
+    if (!activeRef.current || stoppedManuallyRef.current) return;
+    
+    setIsProcessing(true);
+    try {
+      const closingPrompt = "هذا كان آخر سؤال. اشكر المرشح على وقته وإجاباته، أخبره إن التقييم بيوصله قريب، وتمنّى له التوفيق. خلّها جملة ودية قصيرة.";
+      
+      conversationRef.current.push({ role: "user", content: closingPrompt });
+
+      const { data, error } = await supabase.functions.invoke("chat", {
+        body: {
+          job_position: jobPosition,
+          interview_type: type,
+          messages: conversationRef.current,
+        },
+      });
+
+      if (error) throw error;
+
+      const closingText = data?.choices?.[0]?.message?.content || data?.content || "شكراً لك على وقتك وإجاباتك الرائعة! بيوصلك التقييم قريب إن شاء الله. بالتوفيق!";
+      
+      setIsProcessing(false);
+
+      const closingEntry: TranscriptEntry = { role: "assistant", text: closingText };
+      setTranscript(prev => [...prev, closingEntry]);
+
+      await speakText(closingText);
+      await endInterview();
+    } catch (error) {
+      console.error("Closing response error:", error);
+      setIsProcessing(false);
+      const fallback = "شكراً لك على وقتك! بيوصلك التقييم قريب إن شاء الله. بالتوفيق!";
+      const fallbackEntry: TranscriptEntry = { role: "assistant", text: fallback };
+      setTranscript(prev => [...prev, fallbackEntry]);
+      await speakText(fallback);
+      await endInterview();
+    }
+  }, [jobPosition, type, speakText, endInterview]);
 
   // Start the live interview
   const startCall = useCallback(async () => {
