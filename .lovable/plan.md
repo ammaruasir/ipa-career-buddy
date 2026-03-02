@@ -1,25 +1,22 @@
 
 
-## التعديلات المطلوبة
+## الخطة — إضافة زر "إرسال الرد" اليدوي
 
-### 1. نافذة النص المباشر قابلة للتمرير (ScrollArea)
-في `LiveInterview.tsx`، نافذة الترانسكريبت حالياً تعرض آخر 6 رسائل فقط (`slice(-6)`) داخل `ScrollArea` بارتفاع محدود. التعديل:
-- إزالة `slice(-6)` لعرض كل الرسائل
-- جعل `ScrollArea` بارتفاع مناسب مع تمرير كامل من فوق لتحت
+### الفكرة
+إضافة زر يظهر أثناء استماع الذكاء الاصطناعي (`isListening`) يتيح للمرشح إرسال رده فوراً بدون انتظار كشف الصمت التلقائي. الزر يوقف التسجيل يدوياً مما يُطلق نفس تدفق المعالجة التلقائي.
 
-### 2. كتابة النص تدريجياً أثناء نطق الذكاء الاصطناعي (Streaming Effect)
-حالياً: يُضاف النص كاملاً للترانسكريبت ثم يبدأ الصوت. التعديل:
-- في `useLiveInterview.ts`: عند وصول رد الذكاء الاصطناعي، إضافة entry فارغة للترانسكريبت ثم كتابة الحروف تدريجياً (typewriter effect) بالتزامن مع بدء الصوت
-- إضافة دالة `streamTextToTranscript` تكتب النص حرفاً حرفاً بسرعة مناسبة (~30ms لكل حرف)
-- تشغيل `speakText` و `streamTextToTranscript` بالتوازي باستخدام `Promise.all`
+### التعديلات
 
-### التدفق الجديد:
-```text
-قبل: رد AI → إضافة النص كامل → بدء الصوت
-بعد: رد AI → إضافة entry فارغ → (كتابة تدريجية + صوت) معاً
-```
+#### 1. `src/hooks/useLiveInterview.ts`
+- إضافة دالة `submitAnswer` تقوم بإيقاف `mediaRecorder` يدوياً (`recorder.stop()`) — هذا يُطلق حدث `onstop` الموجود أصلاً الذي يعالج الصوت تلقائياً
+- تصدير `submitAnswer` من الـ hook
+
+#### 2. `src/components/interview/LiveInterview.tsx`
+- إضافة زر "إرسال الرد" (أيقونة Send) يظهر فقط عندما `isListening === true`
+- الزر يستدعي `live.submitAnswer()`
+- يوضع بجانب زر "إنهاء المقابلة" في منطقة التحكم
 
 ### الملفات المعدّلة
-- `src/components/interview/LiveInterview.tsx` — إزالة slice، تحسين ScrollArea
-- `src/hooks/useLiveInterview.ts` — إضافة streaming text effect متزامن مع TTS
+- `src/hooks/useLiveInterview.ts`
+- `src/components/interview/LiveInterview.tsx`
 
