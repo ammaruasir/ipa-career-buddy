@@ -121,8 +121,9 @@ export const useVapiInterview = ({
           };
           setTranscript((prev) => [...prev, entry]);
 
-          // Count questions from assistant messages
-          if (msg.role === "assistant") {
+          // Count questions by tracking Q&A pairs — only increment
+          // when user answers (meaning a new question cycle completed)
+          if (msg.role === "user") {
             setQuestionCount((prev) => {
               const newCount = prev + 1;
               questionCountRef.current = newCount;
@@ -137,35 +138,44 @@ export const useVapiInterview = ({
         toast.error("حدث خطأ في الاتصال");
       });
 
-      // Build system prompt
-      const systemPrompt = `أنت محاور ذكي متخصص في إجراء مقابلات وظيفية احترافية باللغة العربية.
-الوظيفة المطلوبة: ${jobPosition}.
-اسأل المرشح ${totalQuestions} أسئلة بالترتيب التالي:
-- السؤال 1-2: أسئلة سلوكية
-- السؤال 3-5: أسئلة تقنية متعلقة بـ ${jobPosition}
-- السؤال 6-7: أسئلة موقفية
-- السؤال 8: سؤال توافق ثقافي
+      // Build system prompt — strict Arabic-only
+      const systemPrompt = `أنت محاور ذكي متخصص في إجراء مقابلات وظيفية احترافية.
 
-اطرح سؤالاً واحداً في كل مرة. انتظر إجابة المرشح قبل طرح السؤال التالي.
-بعد آخر سؤال، اشكر المرشح وأخبره أن التقييم سيكون جاهزاً قريباً.
-تحدث بلهجة مهنية ودودة. علّق بإيجاز على كل إجابة قبل طرح السؤال التالي.`;
+## تعليمات صارمة:
+- تحدث باللغة العربية الفصحى فقط. لا تستخدم أي كلمة إنجليزية أبداً.
+- أنت تجري مقابلة وظيفية لمنصب: ${jobPosition}.
+- اطرح ${totalQuestions} أسئلة بالترتيب التالي:
+  • السؤال 1-2: أسئلة سلوكية عن خبرات سابقة
+  • السؤال 3-5: أسئلة تقنية متعلقة بـ ${jobPosition}
+  • السؤال 6-7: أسئلة موقفية (ماذا ستفعل لو...)
+  • السؤال 8: سؤال عن التوافق الثقافي والعمل الجماعي
+- اطرح سؤالاً واحداً فقط في كل مرة.
+- انتظر إجابة المرشح الكاملة قبل طرح السؤال التالي.
+- علّق بإيجاز (جملة أو جملتين) على كل إجابة قبل الانتقال للسؤال التالي.
+- حافظ على لهجة مهنية ودودة طوال المقابلة.
+- بعد آخر سؤال، اشكر المرشح وأخبره أن التقييم سيكون جاهزاً قريباً.
+- لا تكرر الأسئلة ولا تطرح أسئلة خارج نطاق الوظيفة.`;
 
-      // Start the call with assistant overrides
+      // Start the call with proper Arabic assistant config
       await vapi.start({
+        name: "المحاور الآلي",
         model: {
           provider: "openai",
-          model: "gpt-4o-mini",
+          model: "gpt-4o",
           messages: [{ role: "system", content: systemPrompt }],
         },
         voice: {
-          provider: "11labs",
-          voiceId: "pNInz6obpgDQGcFmaJgB", // Arabic-compatible voice
+          provider: "azure",
+          voiceId: "ar-SA-HamedNeural",
         },
-        firstMessage: `مرحباً! أنا المحاور الآلي، وسأجري معك مقابلة لوظيفة ${jobPosition}. هل أنت مستعد للبدء؟`,
+        firstMessage: `مرحباً بك! أنا المحاور الآلي وسأجري معك مقابلة لوظيفة ${jobPosition}. سأطرح عليك ${totalQuestions} أسئلة متنوعة. هل أنت مستعد للبدء؟`,
         transcriber: {
           provider: "deepgram",
+          model: "nova-2",
           language: "ar",
         },
+        silenceTimeoutSeconds: 30,
+        maxDurationSeconds: 1800,
       } as any);
     } catch (error) {
       console.error("Failed to start Vapi call:", error);
