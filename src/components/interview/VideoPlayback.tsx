@@ -8,6 +8,7 @@ interface VideoPlaybackProps {
   interviewId: string;
   userId: string;
   recordingUrl?: string | null;
+  interviewType?: string;
 }
 
 interface RecordingFile {
@@ -16,7 +17,7 @@ interface RecordingFile {
   label: string;
 }
 
-const VideoPlayback = ({ interviewId, userId, recordingUrl }: VideoPlaybackProps) => {
+const VideoPlayback = ({ interviewId, userId, recordingUrl, interviewType }: VideoPlaybackProps) => {
   const [recordings, setRecordings] = useState<RecordingFile[]>([]);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,24 +50,47 @@ const VideoPlayback = ({ interviewId, userId, recordingUrl }: VideoPlaybackProps
         }
       }
 
-      // List per-question recordings from storage
+      // List per-question recordings from storage (list all files then filter)
       try {
         const { data: storageFiles } = await supabase.storage
           .from("interview-recordings")
-          .list(`${userId}`, { search: interviewId });
+          .list(userId);
 
         if (storageFiles) {
+          // Also check for full recording if not found via recordingUrl
           for (const file of storageFiles) {
-            if (file.name.includes(interviewId) && !file.name.includes("_full")) {
+            if (!file.name.includes(interviewId)) continue;
+
+            // Full recording fallback
+            if (file.name.includes("_full") && files.length === 0) {
               const { data: signedData } = await supabase.storage
                 .from("interview-recordings")
                 .createSignedUrl(`${userId}/${file.name}`, 3600);
+              if (signedData?.signedUrl) {
+                files.push({ name: file.name, url: signedData.signedUrl, label: "التسجيل الكامل" });
+              }
+              continue;
+            }
 
+            // Cheat cam recording
+            if (file.name.includes("_cheat_cam")) {
+              const { data: signedData } = await supabase.storage
+                .from("interview-recordings")
+                .createSignedUrl(`${userId}/${file.name}`, 3600);
+              if (signedData?.signedUrl) {
+                files.push({ name: file.name, url: signedData.signedUrl, label: "كاميرا المراقبة" });
+              }
+              continue;
+            }
+
+            // Per-question recordings
+            if (!file.name.includes("_full")) {
+              const { data: signedData } = await supabase.storage
+                .from("interview-recordings")
+                .createSignedUrl(`${userId}/${file.name}`, 3600);
               if (!signedData?.signedUrl) continue;
-
               const qMatch = file.name.match(/_q(\d+)_/);
               const label = qMatch ? `تسجيل السؤال ${qMatch[1]}` : file.name;
-
               files.push({ name: file.name, url: signedData.signedUrl, label });
             }
           }
@@ -84,7 +108,26 @@ const VideoPlayback = ({ interviewId, userId, recordingUrl }: VideoPlaybackProps
   }, [interviewId, userId, recordingUrl]);
 
   if (loading) return null;
-  if (recordings.length === 0) return null;
+  if (recordings.length === 0) {
+    if (interviewType === "video" || interviewType === "voice") {
+      return (
+        <Card className="rounded-2xl shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Video className="w-5 h-5 text-primary" />
+              تسجيلات المقابلة
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground text-center py-4">
+              لا يوجد تسجيل فيديو متاح لهذه المقابلة
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
+    return null;
+  }
 
   return (
     <Card className="rounded-2xl shadow-lg">
