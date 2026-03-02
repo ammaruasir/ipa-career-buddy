@@ -54,32 +54,49 @@ export const useLiveInterview = ({
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
   useEffect(() => { questionCountRef.current = questionCount; }, [questionCount]);
 
-  // Speak text using browser TTS and resolve when done
+  // Speak text using ElevenLabs TTS and resolve when done
   const speakText = useCallback((text: string): Promise<void> => {
-    return new Promise((resolve) => {
-      if (!window.speechSynthesis) { resolve(); return; }
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "ar-SA";
-      utterance.rate = 0.95;
-      utterance.pitch = 1.0;
-
-      // Try to find an Arabic voice
-      const voices = window.speechSynthesis.getVoices();
-      const arabicVoice = voices.find(v => v.lang.startsWith("ar"));
-      if (arabicVoice) utterance.voice = arabicVoice;
-
-      utterance.onend = () => {
-        setIsSpeaking(false);
-        resolve();
-      };
-      utterance.onerror = () => {
-        setIsSpeaking(false);
-        resolve();
-      };
-
+    return new Promise(async (resolve) => {
       setIsSpeaking(true);
-      window.speechSynthesis.speak(utterance);
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({ text }),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`TTS request failed: ${response.status}`);
+        }
+
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          setIsSpeaking(false);
+          resolve();
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioUrl);
+          setIsSpeaking(false);
+          resolve();
+        };
+
+        await audio.play();
+      } catch (error) {
+        console.error("ElevenLabs TTS error:", error);
+        setIsSpeaking(false);
+        resolve();
+      }
     });
   }, []);
 
@@ -276,8 +293,6 @@ export const useLiveInterview = ({
     setIsActive(false);
     setIsListening(false);
     setIsSpeaking(false);
-    window.speechSynthesis?.cancel();
-    
     // Stop any active recording
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop();
@@ -403,7 +418,6 @@ REMEMBER: Every word must be in Arabic. No English at all.`;
     return () => {
       activeRef.current = false;
       stoppedManuallyRef.current = true;
-      window.speechSynthesis?.cancel();
       mediaRecorderRef.current?.state === "recording" && mediaRecorderRef.current.stop();
       streamRef.current?.getTracks().forEach(t => t.stop());
       audioContextRef.current?.close().catch(() => {});
