@@ -38,6 +38,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
   });
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   // Bind video stream to video element
   useEffect(() => {
@@ -45,6 +46,11 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
       localVideoRef.current.srcObject = live.videoStream;
     }
   }, [type, live.videoStream]);
+
+  // Auto-scroll transcript
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [live.transcript]);
 
   // Also connect videoElementRef for frame capture
   useEffect(() => {
@@ -215,6 +221,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
                     {entry.text}
                   </div>
                 ))}
+                <div ref={transcriptEndRef} />
               </div>
             </ScrollArea>
           </Card>
