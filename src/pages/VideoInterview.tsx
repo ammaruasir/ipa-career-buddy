@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInterviewSession } from "@/hooks/useInterviewSession";
 import { useInterviewTimer } from "@/hooks/useInterviewTimer";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
 import JobSelector from "@/components/interview/JobSelector";
@@ -11,6 +12,7 @@ import CountdownOverlay from "@/components/interview/CountdownOverlay";
 import RecordingControls from "@/components/interview/RecordingControls";
 import TypingIndicator from "@/components/interview/TypingIndicator";
 import SuccessCheckmark from "@/components/interview/SuccessCheckmark";
+import VapiLiveInterview from "@/components/interview/VapiLiveInterview";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,9 +25,11 @@ import useBrowserTTS from "@/hooks/useBrowserTTS";
 const VideoInterview = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { settings } = useSystemSettings();
   const session = useInterviewSession({ type: "video" });
   const timer = useInterviewTimer({ durationSeconds: session.timerDuration || 300 });
   const tts = useBrowserTTS();
+  const [vapiJobSelected, setVapiJobSelected] = useState<string | null>(null);
 
   const [showExit, setShowExit] = useState(false);
   const [showCountdown, setShowCountdown] = useState(false);
@@ -328,8 +332,25 @@ const VideoInterview = () => {
     else navigate("/dashboard");
   };
 
-  if (!session.selectedJob) {
-    return <JobSelector title="مقابلة الفيديو" onSelect={session.startInterview} onBack={() => navigate("/dashboard")} />;
+  if (!session.selectedJob && !vapiJobSelected) {
+    return <JobSelector title="مقابلة الفيديو" onSelect={(job) => {
+      setVapiJobSelected(job);
+      if (settings.interview_engine !== "vapi") {
+        session.startInterview(job);
+      }
+    }} onBack={() => navigate("/dashboard")} />;
+  }
+
+  // If Vapi engine is selected, render VapiLiveInterview
+  if (settings.interview_engine === "vapi" && vapiJobSelected) {
+    return (
+      <VapiLiveInterview
+        type="video"
+        jobPosition={vapiJobSelected}
+        totalQuestions={settings.questions_per_type.video}
+        onBack={() => navigate("/dashboard")}
+      />
+    );
   }
 
   const lastAIMessage = [...session.messages].reverse().find((m) => m.role === "assistant");
