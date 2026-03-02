@@ -215,9 +215,9 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
         {live.transcript.length > 0 && (
           <Card className="w-full max-w-xl p-4 rounded-2xl shadow-lg">
             <p className="text-xs font-semibold text-muted-foreground mb-3">النص المباشر</p>
-            <ScrollArea className="max-h-48">
-              <div className="space-y-2">
-                {live.transcript.slice(-6).map((entry, i) => (
+            <ScrollArea className="h-48">
+              <div className="space-y-2 pr-3">
+                {live.transcript.map((entry, i) => (
                   <div
                     key={i}
                     className={`text-sm p-2 rounded-lg ${
