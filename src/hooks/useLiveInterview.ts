@@ -43,6 +43,7 @@ export const useLiveInterview = ({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rafRef = useRef<number>(0);
@@ -79,21 +80,47 @@ export const useLiveInterview = ({
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
+        currentAudioRef.current = audio;
+
+        const cleanup = () => {
+          URL.revokeObjectURL(audioUrl);
+          currentAudioRef.current = null;
+          setIsSpeaking(false);
+          document.removeEventListener("visibilitychange", handleVisibility);
+        };
+
+        // Auto-resume if browser pauses audio (e.g. on scroll in iframe)
+        audio.addEventListener("pause", () => {
+          if (activeRef.current && !stoppedManuallyRef.current && !audio.ended) {
+            console.log("[LiveInterview] Audio paused unexpectedly, resuming...");
+            audio.play().catch(() => {});
+          }
+        });
+
+        // Resume audio + AudioContext when tab becomes visible again
+        const handleVisibility = () => {
+          if (!document.hidden && activeRef.current && !stoppedManuallyRef.current) {
+            if (audio.paused && !audio.ended) {
+              console.log("[LiveInterview] Page visible again, resuming audio");
+              audio.play().catch(() => {});
+            }
+          }
+        };
+        document.addEventListener("visibilitychange", handleVisibility);
 
         audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          setIsSpeaking(false);
+          cleanup();
           resolve();
         };
         audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          setIsSpeaking(false);
+          cleanup();
           resolve();
         };
 
         await audio.play();
       } catch (error) {
         console.error("ElevenLabs TTS error:", error);
+        currentAudioRef.current = null;
         setIsSpeaking(false);
         resolve();
       }

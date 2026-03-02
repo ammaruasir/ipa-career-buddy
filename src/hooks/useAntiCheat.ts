@@ -30,20 +30,10 @@ export const useAntiCheat = ({
       }
     };
 
-    const handleBlur = () => {
-      setTabSwitchCount((c) => c + 1);
-      setShowWarning(true);
-      toast.warning("⚠️ تحذير: لا تغادر نافذة المقابلة", { duration: 3000 });
-      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
-      warningTimeoutRef.current = setTimeout(() => setShowWarning(false), 8000);
-    };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("blur", handleBlur);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("blur", handleBlur);
       if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
     };
   }, [enableTabDetection]);
