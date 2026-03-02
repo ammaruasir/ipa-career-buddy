@@ -1,13 +1,34 @@
-## Plan: Switch to OpenAI GPT-4 + Job DB Integration + Result Visibility
 
-**Status: ✅ COMPLETED**
 
-All changes implemented:
-- ✅ OPENAI_API_KEY secret added
-- ✅ DB migration: new columns on evaluations (problem_solving, leadership, culture_alignment, red_flags, confidence_level, final_recommendation, review_status)
-- ✅ chat edge function: OpenAI gpt-4.1, job DB integration, Saudi Arabic prompt, latency optimization
-- ✅ evaluate-interview edge function: OpenAI gpt-4.1, new scoring schema, review_status=pending_review
-- ✅ useLiveInterview: context_summary optimization, vacancy_id passthrough
-- ✅ useInterviewSession: context_summary optimization
-- ✅ InterviewResults: pending_review shows "awaiting HR review" message
-- ✅ CandidateDetail: approve/reject buttons, full transcript, red flags, new scores
+## Plan: Switch TTS from ElevenLabs to OpenAI
+
+The chat and evaluation already use OpenAI GPT-4. The TTS (text-to-speech) still calls ElevenLabs. This plan replaces it with OpenAI's TTS API, which uses the same `OPENAI_API_KEY` already configured — no new secrets needed.
+
+### Changes
+
+**1. `supabase/functions/elevenlabs-tts/index.ts`** — Rewrite to call OpenAI TTS:
+- Use `https://api.openai.com/v1/audio/speech` with model `gpt-4o-mini-tts`
+- Use voice `ash` (good for Arabic)
+- Use `OPENAI_API_KEY` (already configured) instead of `ELEVENLABS_API_KEY`
+- Return MP3 audio binary as before — no client changes needed
+- Keep the same endpoint name so `useLiveInterview.ts` works without modification
+
+**2. `src/hooks/useLiveInterview.ts`** — No changes needed (already calls the same edge function URL and handles the audio blob response identically).
+
+### Technical Detail
+OpenAI TTS API request:
+```
+POST https://api.openai.com/v1/audio/speech
+{
+  "model": "gpt-4o-mini-tts",
+  "input": text,
+  "voice": "ash",
+  "response_format": "mp3",
+  "speed": 0.95
+}
+```
+Returns raw MP3 binary — same format as ElevenLabs, so the client code stays the same.
+
+### Files Modified
+- `supabase/functions/elevenlabs-tts/index.ts` (rewrite internals, keep endpoint name)
+
