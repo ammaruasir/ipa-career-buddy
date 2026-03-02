@@ -130,9 +130,9 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4.1",
+        model: "gpt-4o-mini",
         messages: chatMessages,
-        max_tokens: 300,
+        max_tokens: 150,
         stream: false,
       }),
     });

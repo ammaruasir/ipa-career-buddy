@@ -33,7 +33,7 @@ serve(async (req) => {
         input: text,
         voice: "ash",
         response_format: "mp3",
-        speed: 0.95,
+        speed: 1.0,
       }),
     });
 
