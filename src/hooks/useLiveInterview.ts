@@ -46,6 +46,8 @@ export const useLiveInterview = ({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const videoStreamRef = useRef<MediaStream | null>(null);
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -145,7 +147,18 @@ export const useLiveInterview = ({
     if (!activeRef.current || stoppedManuallyRef.current) return;
     
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // For video interviews, reuse existing video stream's audio track
+      let stream: MediaStream;
+      if (type === "video" && videoStreamRef.current) {
+        const audioTrack = videoStreamRef.current.getAudioTracks()[0];
+        if (audioTrack) {
+          stream = new MediaStream([audioTrack]);
+        } else {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+      } else {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
       streamRef.current = stream;
 
       const ctx = new AudioContext();
@@ -163,7 +176,10 @@ export const useLiveInterview = ({
       };
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        stream.getTracks().forEach(t => t.stop());
+        // Don't stop video tracks, only stop audio-only streams
+        if (type !== "video") {
+          stream.getTracks().forEach(t => t.stop());
+        }
         ctx.close().catch(() => {});
         setIsListening(false);
         cancelAnimationFrame(rafRef.current);
@@ -264,13 +280,20 @@ export const useLiveInterview = ({
       conversationRef.current.push({ role: "user", content: userText });
 
       // Save response to DB
+      let responseId: string | null = null;
       if (interviewIdRef.current) {
         const lastAssistant = conversationRef.current.filter(m => m.role === "assistant").pop();
-        await supabase.from("responses").insert({
+        const { data: respData } = await supabase.from("responses").insert({
           interview_id: interviewIdRef.current,
           question_text: lastAssistant?.content || "",
           answer_text: userText,
-        });
+        }).select("id").single();
+        responseId = respData?.id || null;
+      }
+
+      // Capture and analyze video frames for video interviews
+      if (type === "video" && responseId && videoElementRef.current) {
+        captureAndAnalyzeFrames(responseId, userText, conversationRef.current.filter(m => m.role === "assistant").pop()?.content || "");
       }
 
       // Update context summary with key points
@@ -298,6 +321,41 @@ export const useLiveInterview = ({
       }
     }
   }, [totalQuestions]);
+
+  // Capture frames from video and send to analyze-video (fire and forget)
+  const captureAndAnalyzeFrames = useCallback((responseId: string, answerText: string, questionText: string) => {
+    try {
+      const video = videoElementRef.current;
+      if (!video || video.videoWidth === 0) return;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Capture single frame (the end of the answer)
+      ctx.drawImage(video, 0, 0);
+      const frame = canvas.toDataURL("image/jpeg", 0.6);
+
+      // Fire and forget - don't block interview flow
+      fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-video`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          response_id: responseId,
+          frames: [frame],
+          answer_text: answerText,
+          question_text: questionText,
+        }),
+      }).catch(err => console.error("Video analysis failed:", err));
+    } catch (err) {
+      console.error("Frame capture error:", err);
+    }
+  }, []);
 
   // Get next question from AI - latency optimized
   const getNextAIResponse = useCallback(async (lastAnswer?: string) => {
@@ -397,6 +455,18 @@ export const useLiveInterview = ({
     vacancyIdRef.current = vacancyId;
 
     try {
+      // For video interviews, request camera + mic upfront
+      if (type === "video") {
+        try {
+          const videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          videoStreamRef.current = videoStream;
+        } catch {
+          toast.error("لم يتم السماح بالوصول إلى الكاميرا");
+          setIsStarting(false);
+          return;
+        }
+      }
+
       const { data: interview, error } = await supabase
         .from("interviews")
         .insert({
@@ -473,6 +543,7 @@ export const useLiveInterview = ({
       stoppedManuallyRef.current = true;
       mediaRecorderRef.current?.state === "recording" && mediaRecorderRef.current.stop();
       streamRef.current?.getTracks().forEach(t => t.stop());
+      videoStreamRef.current?.getTracks().forEach(t => t.stop());
       audioContextRef.current?.close().catch(() => {});
       cancelAnimationFrame(rafRef.current);
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
@@ -493,5 +564,7 @@ export const useLiveInterview = ({
     questionCount,
     startCall,
     endCall,
+    videoStream: videoStreamRef.current,
+    videoElementRef,
   };
 };
