@@ -25,7 +25,7 @@ import useBrowserTTS from "@/hooks/useBrowserTTS";
 const VideoInterview = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const { settings } = useSystemSettings();
+  const { settings, loading: settingsLoading } = useSystemSettings();
   const session = useInterviewSession({ type: "video" });
   const timer = useInterviewTimer({ durationSeconds: session.timerDuration || 300 });
   const tts = useBrowserTTS();
@@ -331,6 +331,14 @@ const VideoInterview = () => {
     if (session.interviewId) setShowExit(true);
     else navigate("/dashboard");
   };
+
+  if (settingsLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!session.selectedJob && !vapiJobSelected) {
     return <JobSelector title="مقابلة الفيديو" onSelect={(job) => {
