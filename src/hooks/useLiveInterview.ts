@@ -652,7 +652,7 @@ export const useLiveInterview = ({
 
   const endCall = useCallback(() => { endInterview(); }, [endInterview]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount — mark interview as completed if still in progress
   useEffect(() => {
     return () => {
       activeRef.current = false;
@@ -663,8 +663,18 @@ export const useLiveInterview = ({
       audioContextRef.current?.close().catch(() => {});
       cancelAnimationFrame(rafRef.current);
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+      // Mark interview as completed if still in progress (user left or navigated away)
+      const id = interviewIdRef.current;
+      if (id && !isCompleted) {
+        supabase
+          .from("interviews")
+          .update({ status: "completed" as any })
+          .eq("id", id)
+          .then(() => {});
+      }
     };
-  }, []);
+  }, [isCompleted]);
 
   return {
     isCallActive: isActive,
