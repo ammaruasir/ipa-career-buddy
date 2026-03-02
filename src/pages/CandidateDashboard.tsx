@@ -10,7 +10,7 @@ import { toArabicNumerals, formatArabicPercent } from "@/lib/arabic-utils";
 import {
   MessageSquare, Mic, Video, LogOut, Briefcase,
   BarChart3, Clock, CheckCircle2, Loader2, TrendingUp,
-  ChevronDown, ChevronUp, Sparkles, Settings, FileText,
+  ChevronDown, ChevronUp, Settings, FileText,
   MapPin, Building2, Send, GraduationCap,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
@@ -18,6 +18,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import TrainingSection from "@/components/training/TrainingSection";
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "قيد الانتظار", variant: "outline" },
@@ -196,30 +197,7 @@ const CandidateDashboard = () => {
         </Card>
 
         {/* Practice Mode */}
-        <Card className="rounded-2xl shadow-lg border-dashed border-2 border-secondary/40">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Sparkles className="w-6 h-6 text-secondary" />
-              <div>
-                <p className="font-bold text-foreground">وضع التدريب</p>
-                <p className="text-sm text-muted-foreground">تدرب على مقابلات وهمية مع الذكاء الاصطناعي</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {(["text", "voice", "video"] as const).map((t) => {
-                const { label, icon: Icon } = typeMap[t];
-                return (
-                  <Button key={t} variant="outline" className="rounded-2xl h-auto py-5 flex flex-col gap-2 hover:border-secondary/50 transition-all" asChild>
-                    <Link to={`/interview/${t}?practice=true`}>
-                      <Icon className="w-7 h-7 text-secondary" />
-                      <span className="text-base font-semibold">تدريب {label}</span>
-                    </Link>
-                  </Button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <TrainingSection interviews={interviews} evaluations={evaluations} />
 
         {/* Progress Chart */}
         {chartData.length > 1 && (
