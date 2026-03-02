@@ -136,8 +136,10 @@ const TextInterview = () => {
     }
   };
 
+  const isPractice = new URLSearchParams(window.location.search).get("practice") === "true";
+
   if (!session.selectedJob) {
-    return <JobSelector title="المقابلة النصية" onSelect={(job, count) => { setCustomQuestionCount(count); session.startInterview(job); }} onBack={() => navigate("/dashboard")} />;
+    return <JobSelector title="المقابلة النصية" onSelect={(job, count) => { setCustomQuestionCount(count); session.startInterview(job); }} onBack={() => navigate("/dashboard")} isPractice={isPractice} />;
   }
 
   return (

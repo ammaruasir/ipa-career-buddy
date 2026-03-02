@@ -30,6 +30,8 @@ const VoiceInterview = () => {
     setQuestionCount(settings.questions_per_type.voice);
   }
 
+  const isPractice = searchParams.get("practice") === "true";
+
   if (!selectedJob || questionCount === null) {
     return (
       <JobSelector
@@ -39,6 +41,7 @@ const VoiceInterview = () => {
           setQuestionCount(count ?? settings.questions_per_type.voice);
         }}
         onBack={() => navigate("/dashboard")}
+        isPractice={isPractice}
       />
     );
   }
