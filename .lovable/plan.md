@@ -1,36 +1,40 @@
 
 
-## Fix: تنقل الإشعارات حسب نوعها
+## المشكلة
 
-حالياً `handleClick` يتعامل فقط مع نوع `evaluation_complete`. الأنواع الأخرى (`new_application`, `status_update`) لا تنقل لأي مكان.
+عند بدء مقابلة، يتم تحديث حالة طلب التوظيف (`job_applications.status`) إلى `"interviewing"`. لكن عند **انتهاء** المقابلة، الكود يحدّث فقط `interviews.status = "completed"` ولا يرجع يحدّث `job_applications.status`.
 
-### التغيير في `src/components/NotificationBell.tsx`
+النتيجة: تبقى الطلبات عالقة بحالة "قيد المقابلة" حتى بعد اكتمال المقابلة.
 
-تحديث دالة `handleClick` لتشمل جميع أنواع الإشعارات:
+**البيانات الحالية:**
+- 8 طلبات بحالة `interviewing` في عمود `status`
+- لا يوجد كود يحدّث هذه الحالة بعد إنهاء المقابلة
 
+## الحل
+
+تحديث `job_applications.status` إلى `"interviewed"` عند اكتمال المقابلة في ملفين:
+
+### 1. `src/hooks/useLiveInterview.ts` (المقابلات الصوتية والمرئية)
+بعد السطر الذي يحدّث `interviews.status = "completed"` (سطر ~463-466)، نضيف:
 ```typescript
-const handleClick = (n: Notification) => {
-  markAsRead(n.id);
-  if (n.related_id) {
-    switch (n.type) {
-      case "evaluation_complete":
-        navigate(`/interview/${n.related_id}/results`);
-        break;
-      case "new_application":
-        navigate(`/dashboard/admin/candidate/${n.related_id}`);
-        break;
-      case "status_update":
-        navigate(`/interview/${n.related_id}/results`);
-        break;
-    }
-  }
-  setOpen(false);
-};
+// Update job application status
+if (vacancyId) {
+  await supabase
+    .from("job_applications")
+    .update({ status: "interviewed" } as any)
+    .eq("vacancy_id", vacancyId)
+    .eq("user_id", user.id);
+}
 ```
 
-- `evaluation_complete` → صفحة نتائج المقابلة (كما هو)
-- `new_application` → صفحة تفاصيل المرشح
-- `status_update` → صفحة نتائج المقابلة
+### 2. `src/hooks/useInterviewSession.ts` (المقابلات النصية)
+بعد السطر الذي يحدّث `interviews.status = "completed"` (سطر ~135-138)، نضيف نفس الكود.
 
-**ملف واحد فقط**: `src/components/NotificationBell.tsx`
+### 3. إصلاح البيانات الحالية
+تحديث الطلبات العالقة حالياً بحالة `interviewing` التي مقابلاتها مكتملة إلى `interviewed`.
+
+### 4. تحديث عرض الحالة
+التأكد أن `CandidateDashboard` و `HRDashboard` يعرضان حالة `interviewed` بشكل صحيح.
+
+**الملفات المعدّلة:** `useLiveInterview.ts`، `useInterviewSession.ts`، وربما `CandidateDashboard.tsx`
 
