@@ -61,6 +61,8 @@ export const useLiveInterview = ({
   // Session recording refs
   const sessionRecorderRef = useRef<MediaRecorder | null>(null);
   const sessionChunksRef = useRef<Blob[]>([]);
+  const partialUploadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastUploadedChunkIndexRef = useRef(0);
 
   // Sync refs
   useEffect(() => { interviewIdRef.current = interviewId; }, [interviewId]);
@@ -468,6 +470,11 @@ export const useLiveInterview = ({
       mediaRecorderRef.current.stop();
     }
     cancelAnimationFrame(rafRef.current);
+    // Stop partial upload interval
+    if (partialUploadIntervalRef.current) {
+      clearInterval(partialUploadIntervalRef.current);
+      partialUploadIntervalRef.current = null;
+    }
 
     const currentId = interviewIdRef.current;
     if (!currentId) return;
@@ -503,13 +510,32 @@ export const useLiveInterview = ({
               .update({ recording_url: fileName } as any)
               .eq("id", currentId);
             uploaded = true;
+            // Delete partial file since full is uploaded
+            await supabase.storage
+              .from("interview-recordings")
+              .remove([`${user.id}/${currentId}_partial.webm`]);
           }
         } catch (err) {
           console.error(`[Recording] Upload attempt ${attempt + 1} error:`, err);
         }
       }
+      
+      // If full upload failed, set recording_url to partial
+      if (!uploaded) {
+        await supabase
+          .from("interviews")
+          .update({ recording_url: `${user.id}/${currentId}_partial.webm` } as any)
+          .eq("id", currentId);
+      }
     } else {
       console.warn("[Recording] No recording data to upload — blob size:", sessionBlob.size);
+      // Try to set partial as fallback
+      if (user) {
+        await supabase
+          .from("interviews")
+          .update({ recording_url: `${user.id}/${currentId}_partial.webm` } as any)
+          .eq("id", currentId);
+      }
     }
 
     // Now stop streams after upload is complete
@@ -655,6 +681,25 @@ export const useLiveInterview = ({
         }
       }
 
+      // Start periodic partial upload every 60 seconds
+      lastUploadedChunkIndexRef.current = 0;
+      const partialUploadFn = async () => {
+        const chunks = sessionChunksRef.current;
+        if (chunks.length === 0 || !interviewIdRef.current || !user) return;
+        try {
+          const blob = new Blob(chunks, { type: type === "video" ? "video/webm" : "audio/webm" });
+          if (blob.size < 1000) return; // skip tiny blobs
+          const partialPath = `${user.id}/${interviewIdRef.current}_partial.webm`;
+          await supabase.storage
+            .from("interview-recordings")
+            .upload(partialPath, blob, { contentType: blob.type, upsert: true });
+          console.log("[Recording] Partial upload OK:", partialPath, blob.size, "bytes");
+        } catch (err) {
+          console.error("[Recording] Partial upload error:", err);
+        }
+      };
+      partialUploadIntervalRef.current = setInterval(partialUploadFn, 60000);
+
       // Link to job application if vacancy_id present
       if (vacancyId) {
         await supabase
@@ -741,6 +786,10 @@ export const useLiveInterview = ({
 
       activeRef.current = false;
       stoppedManuallyRef.current = true;
+      if (partialUploadIntervalRef.current) {
+        clearInterval(partialUploadIntervalRef.current);
+        partialUploadIntervalRef.current = null;
+      }
       mediaRecorderRef.current?.state === "recording" && mediaRecorderRef.current.stop();
       streamRef.current?.getTracks().forEach(t => t.stop());
       videoStreamRef.current?.getTracks().forEach(t => t.stop());
@@ -750,12 +799,16 @@ export const useLiveInterview = ({
 
       const id = interviewIdRef.current;
       if (id && !isCompleted) {
+        // Set recording_url to partial before abandoning
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/complete-interview`;
-        const body = JSON.stringify({ interview_id: id });
+        const body = JSON.stringify({ 
+          interview_id: id,
+          recording_url: user ? `${user.id}/${id}_partial.webm` : undefined,
+        });
         navigator.sendBeacon(url, body);
       }
     };
-  }, [isCompleted]);
+  }, [isCompleted, user]);
 
   const submitAnswer = () => {
     if (mediaRecorderRef.current?.state === "recording") {
