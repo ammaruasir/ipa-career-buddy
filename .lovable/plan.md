@@ -1,35 +1,30 @@
 
 
-## خطة: إصلاح مشكلة عدم انتظار إجابة السؤال الأخير + الانتقال التلقائي بعد المقابلة
+## خطة: إصلاح عدم ظهور تسجيل الفيديو للمدير في ملف المرشح
 
 ### المشكلة
-في `useLiveInterview.ts` (سطر 427-433)، عندما يصل عدد الأسئلة للحد الأقصى، الكود يتكلم السؤال الأخير ثم **يستدعي `getClosingResponse()` مباشرة بدون الاستماع لإجابة المرشح**.
+بعد فحص البيانات، معظم المقابلات الحديثة بالفيديو لديها `recording_url: null` رغم أنها مكتملة. فقط مقابلة واحدة من أربع مقابلات فيديو لديها تسجيل فعلي في التخزين. هذا يعني أن التسجيل لا يُرفع بنجاح في أغلب الحالات.
 
-```text
-المسار الحالي (خطأ):
-السؤال الأخير → يُنطق → getClosingResponse() → توديع → endInterview()
-
-المسار الصحيح:
-السؤال الأخير → يُنطق → يستمع للإجابة → المرشح يجيب → getClosingResponse() → توديع → endInterview() → انتقال تلقائي
-```
+### الأسباب المحتملة
+1. **عند انتهاء المقابلة بعد إصلاح السؤال الأخير**, قد يتم إيقاف streams قبل إكمال رفع التسجيل
+2. **`endInterview` قد لا يُستدعى في بعض المسارات** — خاصة إذا أغلق المستخدم الصفحة أو حصل خطأ
 
 ### التعديلات
 
 | الملف | التعديل |
 |-------|---------|
-| `src/hooks/useLiveInterview.ts` | **سطر 427-433**: بدلاً من استدعاء `getClosingResponse()` مباشرة بعد نطق السؤال الأخير، يتم إضافة علامة `lastQuestionRef` ونطق السؤال ثم `startListening()`. بعد استلام الإجابة في `handleRecordingComplete`، يتم التحقق من العلامة واستدعاء `getClosingResponse()` بدلاً من `getNextAIResponse()` |
-| `src/hooks/useLiveInterview.ts` | التأكد أن `endInterview()` ينتقل للصفحة الرئيسية (موجود بالفعل سطر 538) |
-| `src/hooks/useInterviewSession.ts` | **سطر 151**: نفس المشكلة — يتحقق من `questionCount >= totalQuestions` **قبل** أن يستمع للإجابة الأخيرة. الإصلاح: بعد استلام رد الـ AI على السؤال الأخير، ننتظر إجابة المرشح ثم نُنهي |
+| `src/hooks/useLiveInterview.ts` | إضافة `console.log` أفضل لتتبع حالة الـ session recorder عند بدء المقابلة وعند الإنهاء + التأكد أن `endInterview` ينتظر رفع التسجيل قبل أي navigation |
+| `src/components/interview/VideoPlayback.tsx` | تحسين منطق البحث — استخدام `list` بدون `search` parameter (لأنه قد لا يعمل بشكل صحيح) ثم فلترة النتائج يدوياً بـ `interviewId` |
+| `src/components/interview/VideoPlayback.tsx` | إضافة رسالة "لا يوجد تسجيل" بدلاً من عدم إظهار أي شيء عندما يكون نوع المقابلة فيديو |
+| `src/pages/CandidateDetail.tsx` | تمرير `interviewType` إلى `VideoPlayback` لعرض رسالة مناسبة عند عدم وجود تسجيل |
 
 ### التفاصيل التقنية
 
-**`useLiveInterview.ts`** — إضافة `lastQuestionRef`:
-- إضافة `const lastQuestionRef = useRef(false)`
-- في `getNextAIResponse`: عند `newCount >= totalQuestions`، نضع `lastQuestionRef.current = true` ثم ننطق السؤال ونستمع عادياً (بدلاً من الإغلاق الفوري)
-- في `handleRecordingComplete`: بعد حفظ إجابة المرشح، نتحقق `if (lastQuestionRef.current)` → نستدعي `getClosingResponse()` بدلاً من `getNextAIResponse()`
+**VideoPlayback.tsx:**
+- تغيير `list(userId, { search: interviewId })` إلى `list(userId)` ثم فلترة الملفات بـ `file.name.includes(interviewId)` لضمان العثور على الملفات
+- إضافة prop `interviewType` لعرض رسالة "لا يوجد تسجيل فيديو متاح" للمقابلات من نوع video/voice بدلاً من إخفاء المكون بالكامل
 
-**`useInterviewSession.ts`** — إصلاح مماثل:
-- إضافة `lastQuestionRef` للتتبع
-- عند `questionCount + 1 >= totalQuestions` في `sendAnswer`: نعلّم أن السؤال التالي هو الأخير
-- بعد رد الـ AI على السؤال الأخير وإجابة المرشح عليه → ننهي المقابلة وننتقل تلقائياً
+**useLiveInterview.ts:**
+- التأكد أن `endInterview` ينتظر اكتمال الرفع بالكامل قبل الانتقال
+- إضافة fallback: إذا فشل الرفع، إعادة المحاولة مرة واحدة
 
