@@ -12,6 +12,7 @@ const VoiceInterview = () => {
   const { settings, loading: settingsLoading } = useSystemSettings();
   const [searchParams] = useSearchParams();
   const [selectedJob, setSelectedJob] = useState<string | null>(searchParams.get("job"));
+  const [questionCount, setQuestionCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
@@ -25,11 +26,18 @@ const VoiceInterview = () => {
     );
   }
 
-  if (!selectedJob) {
+  if (selectedJob && questionCount === null) {
+    setQuestionCount(settings.questions_per_type.voice);
+  }
+
+  if (!selectedJob || questionCount === null) {
     return (
       <JobSelector
         title="المقابلة الصوتية"
-        onSelect={(job) => setSelectedJob(job)}
+        onSelect={(job, count) => {
+          setSelectedJob(job);
+          setQuestionCount(count ?? settings.questions_per_type.voice);
+        }}
         onBack={() => navigate("/dashboard")}
       />
     );
@@ -39,7 +47,7 @@ const VoiceInterview = () => {
     <LiveInterview
       type="voice"
       jobPosition={selectedJob}
-      totalQuestions={settings.questions_per_type.voice}
+      totalQuestions={questionCount}
       onBack={() => navigate("/dashboard")}
     />
   );

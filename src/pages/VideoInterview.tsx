@@ -12,6 +12,7 @@ const VideoInterview = () => {
   const { settings, loading: settingsLoading } = useSystemSettings();
   const [searchParams] = useSearchParams();
   const [selectedJob, setSelectedJob] = useState<string | null>(searchParams.get("job"));
+  const [questionCount, setQuestionCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
@@ -25,11 +26,19 @@ const VideoInterview = () => {
     );
   }
 
-  if (!selectedJob) {
+  // If job came from URL params, skip JobSelector but use default count
+  if (selectedJob && questionCount === null) {
+    setQuestionCount(settings.questions_per_type.video);
+  }
+
+  if (!selectedJob || questionCount === null) {
     return (
       <JobSelector
         title="مقابلة الفيديو"
-        onSelect={(job) => setSelectedJob(job)}
+        onSelect={(job, count) => {
+          setSelectedJob(job);
+          setQuestionCount(count ?? settings.questions_per_type.video);
+        }}
         onBack={() => navigate("/dashboard")}
       />
     );
@@ -39,7 +48,7 @@ const VideoInterview = () => {
     <LiveInterview
       type="video"
       jobPosition={selectedJob}
-      totalQuestions={settings.questions_per_type.video}
+      totalQuestions={questionCount}
       onBack={() => navigate("/dashboard")}
     />
   );

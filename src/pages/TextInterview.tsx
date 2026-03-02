@@ -20,11 +20,12 @@ const TextInterview = () => {
   const navigate = useNavigate();
   const [input, setInput] = useState("");
   const [showExit, setShowExit] = useState(false);
+  const [customQuestionCount, setCustomQuestionCount] = useState<number | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sessionRecorderRef = useRef<MediaRecorder | null>(null);
   const sessionChunksRef = useRef<Blob[]>([]);
 
-  const session = useInterviewSession({ type: "text" });
+  const session = useInterviewSession({ type: "text", totalQuestions: customQuestionCount });
   const timer = useInterviewTimer({
     durationSeconds: session.timerDuration || 300,
     onExpire: () => {
@@ -136,7 +137,7 @@ const TextInterview = () => {
   };
 
   if (!session.selectedJob) {
-    return <JobSelector title="المقابلة النصية" onSelect={session.startInterview} onBack={() => navigate("/dashboard")} />;
+    return <JobSelector title="المقابلة النصية" onSelect={(job, count) => { setCustomQuestionCount(count); session.startInterview(job); }} onBack={() => navigate("/dashboard")} />;
   }
 
   return (
