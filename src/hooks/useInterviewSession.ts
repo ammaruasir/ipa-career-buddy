@@ -27,6 +27,8 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
   const [isEvaluating, setIsEvaluating] = useState(false);
 
   const contextSummaryRef = useRef<string>("");
+  const interviewIdRef = useRef<string | null>(null);
+  const completedRef = useRef(false);
 
   const totalQuestions = overrideTotalQuestions ?? settings.questions_per_type[type] ?? 8;
   const timerDuration = settings.time_per_question[type] ?? 300;
@@ -50,6 +52,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     }
 
     setInterviewId(interview.id);
+    interviewIdRef.current = interview.id;
 
     const vacancyId = searchParams.get("vacancy_id");
     if (vacancyId) {
@@ -91,6 +94,20 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
       startInterview(jobParam);
     }
   }, [user, settingsLoading]);
+
+  // Cleanup on unmount — mark interview as completed if still in progress
+  useEffect(() => {
+    return () => {
+      const id = interviewIdRef.current;
+      if (id && !completedRef.current) {
+        supabase
+          .from("interviews")
+          .update({ status: "completed" as any })
+          .eq("id", id)
+          .then(() => {});
+      }
+    };
+  }, []);
 
   const sendAnswer = useCallback(async (answerText: string) => {
     if (!answerText.trim() || isLoading || !interviewId) return;
@@ -148,6 +165,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
         }
 
         setIsCompleted(true);
+        completedRef.current = true;
         toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم...");
         
         setIsEvaluating(true);
