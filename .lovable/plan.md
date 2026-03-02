@@ -1,39 +1,54 @@
 
 
-## خطة: تنفيذ المناقشة التفاعلية + كاميرا الغش في جميع الأوضاع
+## خطة: تحسين فورم التسجيل وإكمال الملف الشخصي
 
-### الجزء 1: الأسئلة التتبعية والمناقشة
+### المشاكل الحالية
+1. التقويم لا يدعم التنقل السريع بين السنوات — يجب النقر شهر بشهر
+2. لا يوجد حد أدنى للعمر (16 سنة مثلاً)
+3. القوائم المنسدلة (الجنسية/المدينة) لا تدعم البحث — مع قوائم طويلة يصعب الاختيار
+4. الجنسيات تشمل فقط 18 دولة عربية — يجب تغطية جميع دول العالم
+5. لا يوجد validation على رقم الهاتف أو المعدل التراكمي
+6. حقل التخصص نص حر — الأفضل combobox مع خيارات شائعة + إمكانية الكتابة
 
-**`supabase/functions/chat/index.ts`** — إضافة تعليمات للبرومبت:
-- إضافة قواعد المتابعة: "إذا كانت الإجابة غامضة أو مثيرة، اسأل سؤال تتبعي واحد قبل الانتقال"
-- طلب بدء الرد بـ `[NEW_Q]` أو `[FOLLOW_UP]`
+### التغييرات المطلوبة
 
-**`src/hooks/useLiveInterview.ts`** — تعديل `handleRecordingComplete`:
-- فحص رد الـ AI: إذا بدأ بـ `[FOLLOW_UP]` لا نزيد العداد
-- إذا بدأ بـ `[NEW_Q]` نزيد العداد
-- إزالة العلامة من النص قبل العرض والنطق
+**1. `src/lib/location-data.ts` — توسيع بيانات الجنسيات والمدن**
+- إضافة جميع جنسيات العالم (~195 دولة) بالعربية
+- إضافة مدن رئيسية لكل دولة
+- إضافة قائمة تخصصات شائعة
 
-**`src/hooks/useInterviewSession.ts`** — تعديل `sendAnswer`:
-- نفس المنطق: فحص `[NEW_Q]`/`[FOLLOW_UP]` في رد الـ AI
-- `setQuestionCount(c => c + 1)` فقط عند `[NEW_Q]`
+**2. إنشاء `src/components/ui/searchable-select.tsx` — قائمة منسدلة مع بحث**
+- مكون يستخدم `Command` (cmdk) داخل `Popover`
+- يدعم البحث/الفلترة بالكتابة
+- يُستخدم بدلاً من `Select` العادي للجنسية والمدينة والتخصص
 
-### الجزء 2: كاميرا مراقبة الغش في النص والصوت
+**3. إنشاء `src/components/ui/date-picker-with-years.tsx` — منتقي تاريخ مع اختيار سنة وشهر**
+- عرض dropdown للسنة (من السنة الحالية - 70 إلى السنة الحالية - 16)
+- عرض dropdown للشهر
+- عند الاختيار، يعرض التقويم الشهر/السنة المحددة مباشرة
+- هذا يحل مشكلة التنقل البطيء
 
-**`src/pages/TextInterview.tsx`**:
-- فتح الكاميرا عند بدء المقابلة (عرض مصغّر PiP في زاوية الشاشة)
-- التقاط صورة كل 30 ثانية وإرسالها لـ `analyze-video` مع `response_id`
+**4. تحديث `src/pages/CompleteProfile.tsx`**
+- استبدال `Select` بـ `SearchableSelect` للجنسية والمدينة
+- استبدال `Calendar` بـ `DatePickerWithYears`
+- إضافة حد أدنى للعمر: 16 سنة (تعطيل تواريخ أقل من 16 سنة)
+- إضافة validation لرقم الهاتف (أرقام فقط، طول مناسب)
+- إضافة validation للمعدل (0-5 أو 0-100)
+- استخدام `SearchableSelect` أو combobox للتخصص مع خيارات شائعة + كتابة حرة
 
-**`src/hooks/useLiveInterview.ts`** (وضع الصوت):
-- فتح كاميرا تلقائياً حتى في وضع الصوت
-- التقاط صور دورية كل 30 ثانية وإرسالها للتحليل
+**5. تحديث `src/pages/ProfileSettings.tsx`**
+- نفس التحسينات أعلاه (SearchableSelect + DatePickerWithYears + validations)
 
-**`src/components/interview/LiveInterview.tsx`**:
-- عرض كاميرا PiP حتى في وضع الصوت (موجودة فقط للفيديو حالياً)
+### التفاصيل التقنية
+
+- **SearchableSelect**: يستخدم `cmdk` (مُثبّت بالفعل) داخل `Popover` — يعرض حقل بحث في الأعلى ويُفلتر الخيارات
+- **DatePickerWithYears**: يضيف select للسنة والشهر فوق التقويم، مع تقييد النطاق من 1955 إلى (اليوم - 16 سنة)
+- **بيانات الدول**: ~195 جنسية مع 3-10 مدن رئيسية لكل دولة
 
 ### الملفات المعدلة
-- `supabase/functions/chat/index.ts`
-- `src/hooks/useLiveInterview.ts`
-- `src/hooks/useInterviewSession.ts`
-- `src/pages/TextInterview.tsx`
-- `src/components/interview/LiveInterview.tsx`
+- `src/lib/location-data.ts` — بيانات شاملة لجميع الدول
+- `src/components/ui/searchable-select.tsx` — مكون جديد
+- `src/components/ui/date-picker-with-years.tsx` — مكون جديد
+- `src/pages/CompleteProfile.tsx` — تطبيق التحسينات
+- `src/pages/ProfileSettings.tsx` — تطبيق نفس التحسينات
 
