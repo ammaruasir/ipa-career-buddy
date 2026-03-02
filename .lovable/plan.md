@@ -1,57 +1,36 @@
 
 
-## Problem
+## Plan: GCC Male Face Avatar with Traditional Dress
 
-1. **Ugly Avatar**: The current `AvatarHead.tsx` is a hand-crafted primitive (spheres, cones, boxes) that looks cartoonish and robotic. No morph targets means no real lip-sync — just a torus bouncing.
-2. **Vapi Testing**: Need to verify the Vapi real-time flow works end-to-end.
+### Approach
 
-## Plan
+Replace the heavy 3D Ready Player Me model with an **AI-generated 2D avatar** of a GCC male face wearing traditional national dress (thobe + ghutra/shemagh). The avatar will be rendered as an image with CSS-based animations for speaking, listening, and idle states — much lighter and visually cleaner than the current 3D canvas.
 
-### 1. Replace primitive avatar with Ready Player Me GLB model
+### Changes
 
-**What changes:**
+**1. Create a backend function to generate the avatar image**
+- New Edge Function `generate-avatar` that uses the Lovable AI image generation API (`google/gemini-2.5-flash-image`) to create a professional portrait of a GCC male with traditional dress (white thobe, ghutra, agal).
+- Save the generated image to Supabase Storage so it's reused across sessions (generate once, serve forever).
 
-- **New file: `public/models/avatar.glb`** — Download a pre-configured RPM avatar with morph targets (ARKit + Oculus Visemes) enabled. We'll use a public RPM avatar URL with `?morphTargets=ARKit,Oculus+Visemes` query param to ensure the GLB includes viseme blend shapes for lip-sync.
+**2. Replace `AIAvatarScene.tsx`**
+- Remove the Three.js `Canvas`, `Environment`, and `AvatarHead` 3D components.
+- Replace with a styled `<img>` component showing the generated avatar face.
+- Add CSS animations:
+  - **Speaking**: Subtle pulse ring + animated sound wave bars around the avatar.
+  - **Listening**: Soft glow border.
+  - **Idle**: Gentle breathing scale animation.
 
-- **Rewrite `AvatarHead.tsx`** — Replace the primitive geometry with a `useGLTF`-loaded RPM model. The component will:
-  - Load the GLB via `useGLTF("/models/avatar.glb")`
-  - Clone the scene with `SkeletonUtils.clone` to avoid mutation
-  - Extract `nodes` and `materials` via `useGraph`
-  - Render all `skinnedMesh` parts (Head, Teeth, Eyes, Body, Hair, Outfit)
-  - Animate morph targets (visemes) in `useFrame` based on `audioAnalyser` data or timing-based fallback when `state === "speaking"`
-  - Add idle breathing animation via subtle position/rotation oscillation
-  - Map audio frequency bands to viseme morph targets for realistic mouth movement
+**3. Clean up `AvatarHead.tsx`**
+- Remove the file entirely — no longer needed without the 3D scene.
+- Remove the `public/models/avatar.glb` file (saves ~5MB+ of download).
 
-- **Update `AIAvatarScene.tsx`** — Adjust camera position/FOV to frame the half-body RPM avatar properly (the current settings are for a floating head). Add `Environment` preset for better lighting on the realistic model.
+**4. Update `VapiLiveInterview.tsx`**
+- Remove `audioAnalyser` prop passing since the 2D avatar doesn't need it.
+- Simplify the avatar container sizing.
 
-- **Delete `AvatarHead.tsx`** old primitive code (replaced entirely).
-
-### 2. Viseme lip-sync approach
-
-Since Vapi streams audio through the browser (not through our `audioAnalyser`), we'll use a **timing-based viseme cycle** during `speaking` state:
-- Cycle through common visemes (`viseme_aa`, `viseme_O`, `viseme_E`, `viseme_PP`, `viseme_FF`, etc.) at speech-like intervals
-- Smooth transitions between visemes using `THREE.MathUtils.lerp`
-- When `audioAnalyser` IS available (built-in engine with browser TTS), use frequency data to drive mouth openness
-
-### 3. Vapi testing
-
-After the avatar is replaced, I'll verify:
-- The `vapi-token` edge function returns the public key
-- The Vapi call flow initiates properly
-- The avatar state transitions work (idle → speaking → listening)
-
-### Technical Details
-
-**Dependencies**: No new packages needed — `@react-three/drei` (already installed) includes `useGLTF`, `useGraph`, `Environment`. `three-stdlib` (bundled with drei) provides `SkeletonUtils`.
-
-**RPM Avatar URL**: We'll fetch a GLB from Ready Player Me's public API with morph targets enabled:
-```
-https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=ARKit,Oculus+Visemes&textureAtlas=1024
-```
-This gives us a professional half-body avatar with all the blend shapes needed for lip-sync.
-
-**Files modified:**
-- `src/components/interview/AvatarHead.tsx` — Full rewrite (RPM model + viseme animation)
-- `src/components/interview/AIAvatarScene.tsx` — Camera/lighting adjustments
-- `public/models/avatar.glb` — New asset (downloaded from RPM)
+### Result
+- Fast loading (small image vs large GLB model)
+- Professional GCC male appearance with traditional dress
+- Smooth animated states for speaking/listening/idle
+- No Three.js overhead
 
