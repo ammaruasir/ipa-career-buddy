@@ -1,71 +1,105 @@
+## خطة إضافة Vapi.ai للمقابلات المباشرة مع الحفاظ على النظام الحالي
 
+### الفكرة العامة
 
-## نتائج الفحص الشامل للنظام
-
-### الحالة العامة: النظام يعمل بشكل جيد مع بعض المشاكل التي تحتاج إصلاح
-
----
-
-### ما يعمل بشكل صحيح
-
-1. **الصفحة الرئيسية وتسجيل الدخول** - تعمل بشكل ممتاز
-2. **نظام التوثيق (Auth)** - يعمل مع التوجيه الصحيح حسب الدور (candidate/hr/admin)
-3. **Triggers الإشعارات** - الثلاثة موجودة ومفعلة:
-   - `on_new_application` → إشعار HR عند تقديم طلب جديد
-   - `on_application_status_change` → إشعار المرشح عند تغيير مرحلة التوظيف
-   - `on_evaluation_complete` → إشعار المرشح و HR عند اكتمال التقييم
-4. **Realtime** مفعل لجدول `notifications`
-5. **Edge Functions** تعمل:
-   - `check-eligibility` ✅ (اختبرته مباشرة)
-   - `career-guidance` ✅ (يرجع خطأ متوقع عند عدم وجود مهارات)
-   - `generate-report` ✅ (يرجع خطأ متوقع عند عدم وجود تقييم)
-   - `analyze-resume` ✅ (مسجل ومنشور)
-6. **قاعدة البيانات** - هيكل سليم مع بيانات:
-   - 3 مستخدمين (admin + 2 candidates)
-   - 6 وظائف شاغرة نشطة
-   - 1 طلب توظيف
-   - 3 مقابلات (جميعها in_progress، بدون تقييمات مكتملة)
-7. **RLS Policies** - مكتملة وصحيحة لجميع الجداول
-8. **Hiring Pipeline (Kanban)** - الكود سليم مع drag & drop
-9. **مقارنة المرشحين** - الكود سليم مع Radar Chart
-10. **NotificationBell** - مكتمل مع realtime subscription
+إضافة وضع مقابلة مباشرة (Real-time) باستخدام Vapi.ai كخيار بديل للنظام الحالي، مع زر تبديل في إعدادات الأدمن للاختيار بين النظامين.
 
 ---
 
-### المشاكل المكتشفة التي تحتاج إصلاح
+### المتطلبات الخارجية (قبل البدء)
 
-#### 1. صفحة الوظائف فارغة للزوار غير المسجلين (مشكلة RLS)
-- صفحة `/jobs` تحمّل الوظائف قبل التحقق من تسجيل الدخول
-- سياسة RLS تتطلب `authenticated` لعرض الوظائف النشطة
-- **الحل**: إضافة سياسة RLS تسمح لـ `anon` بعرض الوظائف النشطة، أو عرض رسالة تطلب تسجيل الدخول أولاً
-
-#### 2. لا توجد بيانات تقييم لاختبار الميزات المتقدمة
-- جميع المقابلات بحالة `in_progress` - لا يوجد أي تقييم مكتمل
-- هذا يعني أن: تصدير PDF، مقارنة المرشحين، تفاصيل المرشح - كلها ستعرض بيانات فارغة
-- **الحل**: إدراج بيانات تقييم تجريبية لاختبار جميع الميزات
-
-#### 3. عدم وجود مستخدم HR
-- لا يوجد مستخدم بدور `hr` في النظام
-- لوحة HR ومراحل التوظيف ومقارنة المرشحين لا يمكن اختبارها
-- **الحل**: إضافة دور HR لأحد المستخدمين الحاليين
-
-#### 4. `profile_completed = false` لجميع المستخدمين
-- جميع المستخدمين الثلاثة لم يكملوا ملفاتهم
-- المرشحون سيُحولون دائماً لصفحة `/complete-profile`
-- **الحل**: تحديث ملف مستخدم واحد على الأقل ليكون مكتملاً مع بيانات resume_skills
-
-#### 5. تحذيرات React في Console
-- تحذير `Function components cannot be given refs` - ليس خطيراً لكن يجب معالجته
+- **VAPI_PUBLIC_KEY**: مفتاح Vapi العام (من لوحة تحكم Vapi) : this vapi public ley from my dashboard (df962df1-8da5-4ccf-b18c-eec9c2598b40)
+- إنشاء **Assistant** في لوحة Vapi مع system prompt للمقابلة العربية وربطه بصوت عربي
 
 ---
 
-### خطة الإصلاح
+### التغييرات المطلوبة
 
-1. **إضافة سياسة RLS للسماح بعرض الوظائف للزوار** - migration لإضافة policy لـ `anon` role
-2. **إنشاء بيانات اختبار شاملة**:
-   - تحديث ملف مرشح مع `profile_completed = true` و `resume_skills` كاملة
-   - تغيير حالة مقابلة إلى `completed` وإدراج تقييم تجريبي
-   - إضافة دور HR لمستخدم
-   - إدراج إشعارات تجريبية
-3. **إصلاح تحذيرات React** المتعلقة بـ refs
+#### 1. إضافة عمود `interview_engine` لجدول `system_settings`
 
+- عمود جديد `interview_engine` من نوع `text` بقيمة افتراضية `'built_in'`
+- القيم المسموحة: `built_in` (النظام الحالي) أو `vapi` (Vapi.ai)
+
+#### 2. تحديث `useSystemSettings` hook
+
+- إضافة حقل `interview_engine` للـ interface والقيم الافتراضية
+
+#### 3. إضافة زر التبديل في صفحة `AdminSettings`
+
+- في تبويب "إعدادات المقابلة": كارد جديد يحتوي Switch للتبديل بين:
+  - **النظام المدمج** (التسجيل → النسخ → AI → TTS)
+  - **Vapi.ai** (محادثة مباشرة ثنائية الاتجاه)
+
+#### 4. إنشاء Edge Function `vapi-token`
+
+- تُرجع Public Key من الـ secrets لاستخدامه في الـ frontend بشكل آمن
+
+#### 5. إنشاء hook جديد `useVapiInterview`
+
+- يستخدم `@vapi-ai/web` SDK
+- يدير اتصال WebRTC مع Vapi
+- يستمع لأحداث: `speech-start`, `speech-end`, `message`, `call-end`
+- يحفظ النصوص المنسوخة (transcript) في جدول `responses`
+- ينشئ سجل المقابلة في `interviews` عند البدء
+- يُشغّل `evaluate-interview` عند الانتهاء
+
+#### 6. إنشاء مكون `VapiLiveInterview`
+
+- واجهة مقابلة مباشرة: زر بدء/إنهاء المكالمة
+- عرض حالة AI (يتحدث/يستمع) مع الأفاتار ثلاثي الأبعاد الموجود
+- عرض النص المنسوخ في الوقت الحقيقي
+- شريط تقدم للأسئلة
+
+#### 7. تعديل صفحات المقابلة (Voice + Video)
+
+- قراءة `settings.interview_engine` من `useSystemSettings`
+- إذا كان `vapi` → عرض `VapiLiveInterview` بدلاً من الواجهة الحالية
+- إذا كان `built_in` → الكود الحالي كما هو بدون تغيير
+
+#### 8. تعديل `InterviewTypeDialog`
+
+- إضافة بادج "مباشر" على خيار الصوت والفيديو عندما يكون Vapi مفعّل
+
+---
+
+### التفاصيل التقنية
+
+**Vapi Web SDK Usage:**
+
+```text
+import Vapi from '@vapi-ai/web';
+
+const vapi = new Vapi(PUBLIC_KEY);
+vapi.start(assistantId, {
+  assistantOverrides: {
+    firstMessage: "مرحباً، أنا المحاور الآلي...",
+    model: { messages: [{ role: "system", content: systemPrompt }] }
+  }
+});
+vapi.on('message', (msg) => { /* save transcript */ });
+vapi.on('call-end', () => { /* evaluate */ });
+```
+
+**تدفق المقابلة المباشرة:**
+
+```text
+المرشح يختار وظيفة → جلب Public Key → بدء مكالمة Vapi
+    ↕ محادثة صوتية ثنائية الاتجاه (WebRTC)
+    ↕ حفظ النصوص تلقائياً في responses
+انتهاء المكالمة → تقييم AI → عرض النتائج
+```
+
+---
+
+### الملفات المتأثرة
+
+- **جديد**: `supabase/functions/vapi-token/index.ts`
+- **جديد**: `src/hooks/useVapiInterview.ts`
+- **جديد**: `src/components/interview/VapiLiveInterview.tsx`
+- **تعديل**: `src/hooks/useSystemSettings.ts` (إضافة interview_engine)
+- **تعديل**: `src/pages/AdminSettings.tsx` (إضافة switch)
+- **تعديل**: `src/pages/VoiceInterview.tsx` (التبديل حسب Engine)
+- **تعديل**: `src/pages/VideoInterview.tsx` (التبديل حسب Engine)
+- **تعديل**: `src/components/interview/InterviewTypeDialog.tsx` (بادج "مباشر")
+- **migration**: إضافة عمود `interview_engine`
+- **تثبيت**: `@vapi-ai/web`
