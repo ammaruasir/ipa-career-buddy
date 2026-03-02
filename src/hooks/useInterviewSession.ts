@@ -136,6 +136,17 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
           .from("interviews")
           .update({ status: "completed" as any })
           .eq("id", interviewId);
+
+        // Update job application status
+        const vacancyId = searchParams.get("vacancy_id");
+        if (vacancyId && user) {
+          await supabase
+            .from("job_applications")
+            .update({ status: "interviewed" } as any)
+            .eq("vacancy_id", vacancyId)
+            .eq("user_id", user.id);
+        }
+
         setIsCompleted(true);
         toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم...");
         

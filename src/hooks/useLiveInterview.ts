@@ -465,6 +465,15 @@ export const useLiveInterview = ({
       .update({ status: "completed" as any })
       .eq("id", currentId);
 
+    // Update job application status
+    if (vacancyIdRef.current) {
+      await supabase
+        .from("job_applications")
+        .update({ status: "interviewed" } as any)
+        .eq("vacancy_id", vacancyIdRef.current)
+        .eq("user_id", user.id);
+    }
+
     setIsCompleted(true);
     toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم...");
 
