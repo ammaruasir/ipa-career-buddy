@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveInterview } from "@/hooks/useLiveInterview";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
@@ -29,6 +29,22 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
     jobPosition,
     totalQuestions,
   });
+
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Bind video stream to video element
+  useEffect(() => {
+    if (type === "video" && localVideoRef.current && live.videoStream) {
+      localVideoRef.current.srcObject = live.videoStream;
+    }
+  }, [type, live.videoStream]);
+
+  // Also connect videoElementRef for frame capture
+  useEffect(() => {
+    if (type === "video" && localVideoRef.current) {
+      live.videoElementRef.current = localVideoRef.current;
+    }
+  }, [type, live.videoElementRef]);
 
   const handleBack = () => {
     if (live.isCallActive) {
@@ -121,9 +137,22 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
       )}
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 gap-6">
-        {/* AI Avatar */}
-        <div className="w-full max-w-md h-64 rounded-2xl overflow-hidden shadow-xl border">
+        {/* AI Avatar + Candidate Camera */}
+        <div className="relative w-full max-w-md h-64 rounded-2xl overflow-hidden shadow-xl border">
           <AIAvatarScene avatarState={avatarState} />
+          {/* Candidate PiP Camera */}
+          {type === "video" && (
+            <div className="absolute bottom-3 left-3 w-28 h-20 rounded-xl overflow-hidden border-2 border-background shadow-lg bg-black">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover mirror"
+                style={{ transform: "scaleX(-1)" }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Status indicator */}
