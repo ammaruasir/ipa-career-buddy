@@ -378,6 +378,7 @@ export const useLiveInterview = ({
         job_position: jobPosition,
         interview_type: type,
         vacancy_id: vacancyIdRef.current,
+        user_id: user?.id,
       };
 
       if (lastAnswer && contextSummaryRef.current) {

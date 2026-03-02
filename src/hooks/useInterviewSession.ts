@@ -77,6 +77,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
           job_position: job,
           interview_type: type,
           vacancy_id: vacancyId,
+          user_id: user.id,
         },
       });
       if (resp.error) throw resp.error;
@@ -148,6 +149,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
           job_position: selectedJob,
           interview_type: type,
           vacancy_id: vacancyId,
+          user_id: user?.id,
         },
       });
       if (resp.error) throw resp.error;

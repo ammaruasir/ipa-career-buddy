@@ -11,13 +11,40 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, job_position, interview_type, context_summary, last_answer, vacancy_id } = await req.json();
+    const { messages, job_position, interview_type, context_summary, last_answer, vacancy_id, user_id } = await req.json();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Load candidate profile if user_id provided
+    let candidateContext = "";
+    if (user_id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, major, education_level, experience_years, city, resume_skills")
+        .eq("user_id", user_id)
+        .single();
+      if (profile) {
+        const skills = profile.resume_skills || {};
+        const technicalSkills = (skills as any)?.technical_skills || [];
+        const softSkills = (skills as any)?.soft_skills || [];
+        const certifications = (skills as any)?.certifications || [];
+        const summary = (skills as any)?.summary || "";
+        candidateContext = `\n\nبيانات المرشح:
+- الاسم: ${profile.full_name || "غير معروف"}
+- التخصص: ${profile.major || "غير محدد"}
+- المؤهل: ${profile.education_level || "غير محدد"}
+- سنوات الخبرة: ${profile.experience_years || 0}
+- المدينة: ${profile.city || "غير محددة"}
+- المهارات التقنية: ${technicalSkills.length > 0 ? technicalSkills.join("، ") : "غير متوفرة"}
+- المهارات الشخصية: ${softSkills.length > 0 ? softSkills.join("، ") : "غير متوفرة"}
+- الشهادات: ${certifications.length > 0 ? certifications.join("، ") : "لا يوجد"}
+- ملخص السيرة الذاتية: ${summary || "غير متوفر"}`;
+      }
+    }
 
     // Load job data from DB if vacancy_id provided
     let jobData: any = null;
@@ -110,7 +137,12 @@ serve(async (req) => {
 - قيّم بناءً على: البنية المنطقية، العمق، والصلة بالموضوع فقط.
 - لا تكشف عن التقييم.
 
-الوظيفة المطلوبة: ${job_position || "غير محددة"}${jobContext}${questionBankPrompt}`;
+هيكل المقابلة (التزم بهذا الترتيب بدقة):
+1. البداية (سؤال 1-2): تعارف — ابدأ بـ "كلمني عن نفسك" ثم "ليش حاب تقدم على هالوظيفة؟"
+2. الوسط (الأسئلة الرئيسية): أسئلة تقنية وسلوكية مخصصة للوظيفة ومبنية على مهارات وخبرات المرشح من السيرة الذاتية
+3. النهاية (آخر 2-3 أسئلة): اسأل عن الراتب المتوقع، متى يقدر يباشر، وأخيراً "عندك أي أسئلة تحب تسألنا؟"
+
+الوظيفة المطلوبة: ${job_position || "غير محددة"}${candidateContext}${jobContext}${questionBankPrompt}`;
 
     // Latency optimization: use context_summary + last_answer if provided
     let chatMessages: any[];
