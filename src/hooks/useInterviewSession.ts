@@ -177,7 +177,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
             toast.error("حدث خطأ في التقييم، يمكنك المحاولة لاحقاً");
           } else {
             toast.success("تم إعداد التقييم بنجاح!");
-            navigate(`/interview/${interviewId}/results`);
+            navigate("/dashboard");
           }
         } catch {
           toast.error("حدث خطأ في التقييم");

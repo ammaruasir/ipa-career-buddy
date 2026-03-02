@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Video, Play, Download, Mic } from "lucide-react";
+import { Video, Play } from "lucide-react";
 
 interface VideoPlaybackProps {
   interviewId: string;
@@ -25,9 +25,28 @@ const VideoPlayback = ({ interviewId, userId, recordingUrl }: VideoPlaybackProps
     const loadRecordings = async () => {
       const files: RecordingFile[] = [];
 
-      // Add full recording if available
+      // If recordingUrl is a relative path (not a full URL), get signed URL
       if (recordingUrl) {
-        files.push({ name: "full", url: recordingUrl, label: "التسجيل الكامل" });
+        const isRelativePath = !recordingUrl.startsWith("http");
+        if (isRelativePath) {
+          const { data: signedData } = await supabase.storage
+            .from("interview-recordings")
+            .createSignedUrl(recordingUrl, 3600);
+          if (signedData?.signedUrl) {
+            files.push({ name: "full", url: signedData.signedUrl, label: "التسجيل الكامل" });
+          }
+        } else {
+          // Legacy full URL — try to extract path and get signed URL
+          const match = recordingUrl.match(/interview-recordings\/(.+)$/);
+          if (match) {
+            const { data: signedData } = await supabase.storage
+              .from("interview-recordings")
+              .createSignedUrl(match[1], 3600);
+            if (signedData?.signedUrl) {
+              files.push({ name: "full", url: signedData.signedUrl, label: "التسجيل الكامل" });
+            }
+          }
+        }
       }
 
       // List per-question recordings from storage
@@ -38,25 +57,17 @@ const VideoPlayback = ({ interviewId, userId, recordingUrl }: VideoPlaybackProps
 
         if (storageFiles) {
           for (const file of storageFiles) {
-            if (file.name.includes(interviewId)) {
-              const { data: urlData } = supabase.storage
-                .from("interview-recordings")
-                .getPublicUrl(`${userId}/${file.name}`);
-
-              // Try to get a signed URL since bucket is private
+            if (file.name.includes(interviewId) && !file.name.includes("_full")) {
               const { data: signedData } = await supabase.storage
                 .from("interview-recordings")
                 .createSignedUrl(`${userId}/${file.name}`, 3600);
 
-              const url = signedData?.signedUrl || urlData?.publicUrl;
-              if (!url) continue;
+              if (!signedData?.signedUrl) continue;
 
               const qMatch = file.name.match(/_q(\d+)_/);
               const label = qMatch ? `تسجيل السؤال ${qMatch[1]}` : file.name;
 
-              if (!file.name.includes("_full")) {
-                files.push({ name: file.name, url, label });
-              }
+              files.push({ name: file.name, url: signedData.signedUrl, label });
             }
           }
         }
