@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowRight, Award, Brain, MessageSquare, Briefcase,
-  Users, BarChart3, Loader2, Mic, Eye, TrendingUp, TrendingDown
+  Users, BarChart3, Loader2, Eye, TrendingUp, TrendingDown, Clock
 } from "lucide-react";
 
 const discLabels: Record<string, { label: string; desc: string; color: string }> = {
@@ -63,6 +63,25 @@ const InterviewResults = () => {
     );
   }
 
+  // Check review_status — if not released, show pending message
+  const reviewStatus = (evaluation as any).review_status;
+  if (reviewStatus && reviewStatus !== "released") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6 px-4" dir="rtl">
+        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+          <Clock className="w-10 h-10 text-primary" />
+        </div>
+        <h1 className="text-2xl font-bold text-foreground text-center">تم إكمال المقابلة بنجاح</h1>
+        <p className="text-muted-foreground text-center max-w-md text-lg leading-relaxed">
+          سيتم إشعارك بالنتيجة بعد مراجعة فريق الموارد البشرية.
+        </p>
+        <Button size="lg" className="rounded-xl mt-4" onClick={() => navigate("/dashboard")}>
+          العودة للوحة التحكم
+        </Button>
+      </div>
+    );
+  }
+
   const disc = discLabels[evaluation.personality_type] || discLabels.S;
   const recColor = recColors[evaluation.recommendation] || recColors["موصى به"];
   const strengths = (evaluation.strengths as string[]) || [];
@@ -71,7 +90,6 @@ const InterviewResults = () => {
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
-      {/* Header */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto flex items-center justify-between py-4 px-4">
           <div className="flex items-center gap-3">
@@ -93,12 +111,8 @@ const InterviewResults = () => {
             <div className="relative w-32 h-32">
               <svg className="w-32 h-32 -rotate-90" viewBox="0 0 128 128">
                 <circle cx="64" cy="64" r="56" fill="none" stroke="hsl(var(--muted))" strokeWidth="10" />
-                <circle
-                  cx="64" cy="64" r="56" fill="none"
-                  stroke="hsl(var(--primary))" strokeWidth="10"
-                  strokeDasharray={`${(evaluation.overall_score / 100) * 351.86} 351.86`}
-                  strokeLinecap="round"
-                />
+                <circle cx="64" cy="64" r="56" fill="none" stroke="hsl(var(--primary))" strokeWidth="10"
+                  strokeDasharray={`${(evaluation.overall_score / 100) * 351.86} 351.86`} strokeLinecap="round" />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-3xl font-bold text-foreground">{evaluation.overall_score}</span>
@@ -129,6 +143,36 @@ const InterviewResults = () => {
           ))}
         </div>
 
+        {/* New scores: problem_solving, leadership */}
+        {((evaluation as any).problem_solving || (evaluation as any).leadership) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {(evaluation as any).problem_solving != null && (
+              <Card className="rounded-2xl shadow-lg">
+                <CardContent className="p-6 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-5 h-5 text-primary" />
+                    <span className="font-semibold text-foreground">حل المشكلات</span>
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{(evaluation as any).problem_solving}<span className="text-sm text-muted-foreground">/100</span></p>
+                  <Progress value={(evaluation as any).problem_solving} className="h-2" />
+                </CardContent>
+              </Card>
+            )}
+            {(evaluation as any).leadership != null && (
+              <Card className="rounded-2xl shadow-lg">
+                <CardContent className="p-6 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-5 h-5 text-primary" />
+                    <span className="font-semibold text-foreground">القيادة</span>
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{(evaluation as any).leadership}<span className="text-sm text-muted-foreground">/100</span></p>
+                  <Progress value={(evaluation as any).leadership} className="h-2" />
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
         {/* DISC + Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card className="rounded-2xl shadow-lg">
@@ -150,15 +194,10 @@ const InterviewResults = () => {
           </Card>
         </div>
 
-        {/* Video Analysis Scores */}
+        {/* Video Analysis */}
         {videoAnalysis && (
           <Card className="rounded-2xl shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Eye className="w-5 h-5 text-primary" />
-                تحليل الفيديو
-              </CardTitle>
-            </CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Eye className="w-5 h-5 text-primary" />تحليل الفيديو</CardTitle></CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[
@@ -185,9 +224,7 @@ const InterviewResults = () => {
             <CardContent>
               <ul className="space-y-2">
                 {strengths.map((s, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                    <span className="text-green-600 mt-0.5">✓</span>{s}
-                  </li>
+                  <li key={i} className="flex items-start gap-2 text-sm text-foreground"><span className="text-green-600 mt-0.5">✓</span>{s}</li>
                 ))}
               </ul>
             </CardContent>
@@ -198,9 +235,7 @@ const InterviewResults = () => {
             <CardContent>
               <ul className="space-y-2">
                 {improvements.map((s, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                    <span className="text-amber-600 mt-0.5">→</span>{s}
-                  </li>
+                  <li key={i} className="flex items-start gap-2 text-sm text-foreground"><span className="text-amber-600 mt-0.5">→</span>{s}</li>
                 ))}
               </ul>
             </CardContent>
@@ -216,9 +251,7 @@ const InterviewResults = () => {
         </Card>
 
         <div className="flex justify-center pb-8">
-          <Button size="lg" className="rounded-xl" onClick={() => navigate("/dashboard")}>
-            العودة للوحة التحكم
-          </Button>
+          <Button size="lg" className="rounded-xl" onClick={() => navigate("/dashboard")}>العودة للوحة التحكم</Button>
         </div>
       </div>
     </div>
