@@ -1,31 +1,35 @@
 
 
-## خطة: استبدال الشعار والـ Favicon بشعار معهد الإدارة العامة (IPA)
+## خطة: إصلاح مشكلة عدم انتظار إجابة السؤال الأخير + الانتقال التلقائي بعد المقابلة
 
-### المصدر
-شعار IPA متاح على: `https://www.ipa.edu.sa/_catalogs/masterpage/ar-sa/assets/img/ipa-logo.png`
+### المشكلة
+في `useLiveInterview.ts` (سطر 427-433)، عندما يصل عدد الأسئلة للحد الأقصى، الكود يتكلم السؤال الأخير ثم **يستدعي `getClosingResponse()` مباشرة بدون الاستماع لإجابة المرشح**.
+
+```text
+المسار الحالي (خطأ):
+السؤال الأخير → يُنطق → getClosingResponse() → توديع → endInterview()
+
+المسار الصحيح:
+السؤال الأخير → يُنطق → يستمع للإجابة → المرشح يجيب → getClosingResponse() → توديع → endInterview() → انتقال تلقائي
+```
 
 ### التعديلات
 
-**1. `index.html`** — تحديث الـ favicon ليشير لشعار IPA:
-```html
-<link rel="icon" href="https://www.ipa.edu.sa/_catalogs/masterpage/ar-sa/assets/img/ipa-logo.png" type="image/png">
-```
+| الملف | التعديل |
+|-------|---------|
+| `src/hooks/useLiveInterview.ts` | **سطر 427-433**: بدلاً من استدعاء `getClosingResponse()` مباشرة بعد نطق السؤال الأخير، يتم إضافة علامة `lastQuestionRef` ونطق السؤال ثم `startListening()`. بعد استلام الإجابة في `handleRecordingComplete`، يتم التحقق من العلامة واستدعاء `getClosingResponse()` بدلاً من `getNextAIResponse()` |
+| `src/hooks/useLiveInterview.ts` | التأكد أن `endInterview()` ينتقل للصفحة الرئيسية (موجود بالفعل سطر 538) |
+| `src/hooks/useInterviewSession.ts` | **سطر 151**: نفس المشكلة — يتحقق من `questionCount >= totalQuestions` **قبل** أن يستمع للإجابة الأخيرة. الإصلاح: بعد استلام رد الـ AI على السؤال الأخير، ننتظر إجابة المرشح ثم نُنهي |
 
-**2. استبدال أيقونة Briefcase بصورة شعار IPA في جميع الصفحات:**
+### التفاصيل التقنية
 
-| الملف | الموقع |
-|-------|--------|
-| `src/pages/Index.tsx` | Header logo + Footer logo |
-| `src/pages/Login.tsx` | شعار صفحة تسجيل الدخول (×2) |
-| `src/pages/ResetPassword.tsx` | شعار صفحة إعادة التعيين |
-| `src/pages/Dashboard.tsx` | Header |
-| `src/pages/CandidateDashboard.tsx` | Header |
-| `src/pages/AdminDashboard.tsx` | Header |
-| `src/pages/HRDashboard.tsx` | Header |
-| `src/pages/JobVacancies.tsx` | Header |
-| `src/components/interview/JobSelector.tsx` | Header |
-| `src/components/interview/InterviewHeader.tsx` | Header |
+**`useLiveInterview.ts`** — إضافة `lastQuestionRef`:
+- إضافة `const lastQuestionRef = useRef(false)`
+- في `getNextAIResponse`: عند `newCount >= totalQuestions`، نضع `lastQuestionRef.current = true` ثم ننطق السؤال ونستمع عادياً (بدلاً من الإغلاق الفوري)
+- في `handleRecordingComplete`: بعد حفظ إجابة المرشح، نتحقق `if (lastQuestionRef.current)` → نستدعي `getClosingResponse()` بدلاً من `getNextAIResponse()`
 
-**التغيير في كل موقع:** استبدال `<Briefcase>` icon بـ `<img src="https://www.ipa.edu.sa/_catalogs/masterpage/ar-sa/assets/img/ipa-logo.png" alt="معهد الإدارة العامة">` مع الاحتفاظ بنفس الحجم والتنسيق.
+**`useInterviewSession.ts`** — إصلاح مماثل:
+- إضافة `lastQuestionRef` للتتبع
+- عند `questionCount + 1 >= totalQuestions` في `sendAnswer`: نعلّم أن السؤال التالي هو الأخير
+- بعد رد الـ AI على السؤال الأخير وإجابة المرشح عليه → ننهي المقابلة وننتقل تلقائياً
 
