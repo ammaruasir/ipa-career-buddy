@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { useInterviewSession } from "@/hooks/useInterviewSession";
 import { useInterviewTimer } from "@/hooks/useInterviewTimer";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
@@ -20,6 +21,8 @@ const TextInterview = () => {
   const [input, setInput] = useState("");
   const [showExit, setShowExit] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sessionRecorderRef = useRef<MediaRecorder | null>(null);
+  const sessionChunksRef = useRef<Blob[]>([]);
 
   const session = useInterviewSession({ type: "text" });
   const timer = useInterviewTimer({
@@ -59,6 +62,70 @@ const TextInterview = () => {
     setInput("");
     timer.pause();
   };
+
+  // Start session recording when cheat camera stream is available
+  useEffect(() => {
+    if (!cheatCamera.stream || !session.interviewId) return;
+    try {
+      const recorder = new MediaRecorder(cheatCamera.stream, { mimeType: "video/webm" });
+      sessionChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) sessionChunksRef.current.push(e.data);
+      };
+      recorder.start(5000);
+      sessionRecorderRef.current = recorder;
+    } catch (err) {
+      console.error("Failed to start session recorder:", err);
+    }
+    return () => {
+      if (sessionRecorderRef.current?.state === "recording") {
+        sessionRecorderRef.current.stop();
+      }
+    };
+  }, [cheatCamera.stream, session.interviewId]);
+
+  // Upload recording when interview completes
+  useEffect(() => {
+    if (!session.isCompleted || !session.interviewId || !user) return;
+
+    const uploadRecording = async () => {
+      // Stop cheat camera
+      cheatCamera.stopAndUpload();
+
+      // Stop session recorder
+      if (sessionRecorderRef.current?.state === "recording") {
+        sessionRecorderRef.current.stop();
+      }
+
+      // Wait for chunks
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const blob = new Blob(sessionChunksRef.current, { type: "video/webm" });
+      if (blob.size === 0) return;
+
+      try {
+        const fileName = `${user.id}/${session.interviewId}_full.webm`;
+        const { error } = await supabase.storage
+          .from("interview-recordings")
+          .upload(fileName, blob, { contentType: "video/webm", upsert: true });
+
+        if (!error) {
+          const { data: urlData } = supabase.storage
+            .from("interview-recordings")
+            .getPublicUrl(fileName);
+
+          await supabase
+            .from("interviews")
+            .update({ recording_url: urlData.publicUrl } as any)
+            .eq("id", session.interviewId);
+        }
+      } catch (err) {
+        console.error("Failed to upload text interview recording:", err);
+      }
+    };
+
+    uploadRecording();
+  }, [session.isCompleted, session.interviewId, user]);
 
   const handleBack = () => {
     if (session.interviewId) {

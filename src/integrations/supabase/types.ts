@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      cheat_events: {
+        Row: {
+          created_at: string
+          details: string | null
+          event_type: string
+          frame_url: string | null
+          id: string
+          interview_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          event_type: string
+          frame_url?: string | null
+          id?: string
+          interview_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          event_type?: string
+          frame_url?: string | null
+          id?: string
+          interview_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cheat_events_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "interviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evaluations: {
         Row: {
           ai_feedback_ar: string | null
