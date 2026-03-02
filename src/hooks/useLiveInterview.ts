@@ -54,6 +54,7 @@ export const useLiveInterview = ({
   const rafRef = useRef<number>(0);
   const activeRef = useRef(false);
   const stoppedManuallyRef = useRef(false);
+  const isEndingRef = useRef(false);
   
   // Session recording refs
   const sessionRecorderRef = useRef<MediaRecorder | null>(null);
@@ -450,6 +451,7 @@ export const useLiveInterview = ({
   const endInterview = useCallback(async () => {
     activeRef.current = false;
     stoppedManuallyRef.current = true;
+    isEndingRef.current = true;
     setIsActive(false);
     setIsListening(false);
     setIsSpeaking(false);
@@ -484,13 +486,10 @@ export const useLiveInterview = ({
           console.error("[Recording] Upload failed:", uploadErr);
         } else {
           console.log("[Recording] Upload successful:", fileName);
-          const { data: urlData } = supabase.storage
-            .from("interview-recordings")
-            .getPublicUrl(fileName);
-          
+          // Save file path (not public URL) since bucket is private
           await supabase
             .from("interviews")
-            .update({ recording_url: urlData.publicUrl } as any)
+            .update({ recording_url: fileName } as any)
             .eq("id", currentId);
         }
       } catch (err) {
@@ -499,6 +498,11 @@ export const useLiveInterview = ({
     } else {
       console.warn("[Recording] No recording data to upload — blob size:", sessionBlob.size);
     }
+
+    // Now stop streams after upload is complete
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    videoStreamRef.current?.getTracks().forEach(t => t.stop());
+    audioContextRef.current?.close().catch(() => {});
 
     await supabase
       .from("interviews")
@@ -526,12 +530,12 @@ export const useLiveInterview = ({
         toast.error("حدث خطأ في التقييم");
       } else {
         toast.success("تم إعداد التقييم بنجاح!");
-        navigate(`/interview/${currentId}/results`);
       }
     } catch {
       toast.error("حدث خطأ في التقييم");
     }
     setIsEvaluating(false);
+    navigate("/dashboard");
   }, [navigate, user]);
 
   // Get closing response from AI before ending
@@ -695,6 +699,9 @@ export const useLiveInterview = ({
   // Cleanup on unmount — mark interview as completed if still in progress
   useEffect(() => {
     return () => {
+      // If endInterview is running, skip cleanup — it handles everything
+      if (isEndingRef.current) return;
+
       activeRef.current = false;
       stoppedManuallyRef.current = true;
       mediaRecorderRef.current?.state === "recording" && mediaRecorderRef.current.stop();
