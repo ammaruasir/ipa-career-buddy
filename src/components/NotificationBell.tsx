@@ -80,8 +80,18 @@ const NotificationBell = () => {
 
   const handleClick = (n: Notification) => {
     markAsRead(n.id);
-    if (n.type === "evaluation_complete" && n.related_id) {
-      navigate(`/interview/${n.related_id}/results`);
+    if (n.related_id) {
+      switch (n.type) {
+        case "evaluation_complete":
+          navigate(`/interview/${n.related_id}/results`);
+          break;
+        case "new_application":
+          navigate(`/dashboard/admin/candidate/${n.related_id}`);
+          break;
+        case "status_update":
+          navigate(`/interview/${n.related_id}/results`);
+          break;
+      }
     }
     setOpen(false);
   };
