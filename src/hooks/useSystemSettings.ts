@@ -12,6 +12,7 @@ export interface SystemSettings {
   brand_color: string;
   evaluation_thresholds: { highly_recommended: number; recommended: number };
   filler_words: string[];
+  interview_engine: "built_in" | "vapi";
 }
 
 const DEFAULT_SETTINGS: SystemSettings = {
@@ -25,6 +26,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
   brand_color: "#006C35",
   evaluation_thresholds: { highly_recommended: 80, recommended: 60 },
   filler_words: ["ممم", "يعني", "أحس", "كدا", "طبعاً", "بصراحة", "الله يعطيك العافية"],
+  interview_engine: "built_in",
 };
 
 export const useSystemSettings = () => {
@@ -49,6 +51,7 @@ export const useSystemSettings = () => {
         brand_color: data.brand_color,
         evaluation_thresholds: data.evaluation_thresholds as any,
         filler_words: data.filler_words as any,
+        interview_engine: (data as any).interview_engine || "built_in",
       });
     }
     setLoading(false);

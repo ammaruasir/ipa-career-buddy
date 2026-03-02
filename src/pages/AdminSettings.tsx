@@ -337,6 +337,41 @@ const AdminSettings = () => {
           {/* Interview Settings */}
           <TabsContent value="interview" className="space-y-4">
             <h2 className="text-xl font-bold font-tajawal">إعدادات المقابلة</h2>
+
+            {/* Interview Engine Switch */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base font-tajawal flex items-center gap-2">
+                  {settings.interview_engine === "vapi" ? <ToggleRight className="w-5 h-5 text-primary" /> : <ToggleLeft className="w-5 h-5" />}
+                  محرك المقابلة
+                </CardTitle>
+                <CardDescription className="font-tajawal">
+                  اختر بين النظام المدمج (تسجيل → نسخ → AI) أو Vapi.ai (محادثة مباشرة ثنائية الاتجاه)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="font-semibold font-tajawal">
+                      {settings.interview_engine === "vapi" ? "Vapi.ai — مقابلة مباشرة" : "النظام المدمج — تسجيل وتحليل"}
+                    </p>
+                    <p className="text-xs text-muted-foreground font-tajawal">
+                      {settings.interview_engine === "vapi"
+                        ? "المرشح يتحدث مباشرة مع المحاور الآلي عبر WebRTC"
+                        : "المرشح يسجل إجابته ثم يُرسلها للتحليل"}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.interview_engine === "vapi"}
+                    onCheckedChange={async (checked) => {
+                      await updateSettings({ interview_engine: checked ? "vapi" : "built_in" } as any);
+                      toast({ title: checked ? "تم التبديل إلى Vapi.ai" : "تم التبديل إلى النظام المدمج" });
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader>

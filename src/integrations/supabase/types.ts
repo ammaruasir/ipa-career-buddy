@@ -418,6 +418,7 @@ export type Database = {
           evaluation_thresholds: Json
           filler_words: Json
           id: string
+          interview_engine: string
           job_positions: Json
           maintenance_mode: boolean
           questions_per_type: Json
@@ -432,6 +433,7 @@ export type Database = {
           evaluation_thresholds?: Json
           filler_words?: Json
           id?: string
+          interview_engine?: string
           job_positions?: Json
           maintenance_mode?: boolean
           questions_per_type?: Json
@@ -446,6 +448,7 @@ export type Database = {
           evaluation_thresholds?: Json
           filler_words?: Json
           id?: string
+          interview_engine?: string
           job_positions?: Json
           maintenance_mode?: boolean
           questions_per_type?: Json

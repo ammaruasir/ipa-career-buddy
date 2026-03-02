@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.career-guidance]
 verify_jwt = false
+
+[functions.vapi-token]
+verify_jwt = false

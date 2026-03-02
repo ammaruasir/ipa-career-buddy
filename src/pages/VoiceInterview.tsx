@@ -4,12 +4,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInterviewSession } from "@/hooks/useInterviewSession";
 import { useInterviewTimer } from "@/hooks/useInterviewTimer";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
 import JobSelector from "@/components/interview/JobSelector";
 import TypingIndicator from "@/components/interview/TypingIndicator";
 import AudioWaveform from "@/components/interview/AudioWaveform";
 import SuccessCheckmark from "@/components/interview/SuccessCheckmark";
+import VapiLiveInterview from "@/components/interview/VapiLiveInterview";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +22,7 @@ import { toast } from "sonner";
 const VoiceInterview = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { settings, loading: settingsLoading } = useSystemSettings();
   const session = useInterviewSession({ type: "voice" });
   const timer = useInterviewTimer({ durationSeconds: session.timerDuration || 300 });
 
@@ -30,6 +33,7 @@ const VoiceInterview = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -104,7 +108,6 @@ const VoiceInterview = () => {
         stream.getTracks().forEach((t) => t.stop());
         ctx.close();
         setAnalyser(null);
-        // Auto-transcribe
         transcribeAudio(blob);
       };
       mediaRecorderRef.current = recorder;
@@ -158,8 +161,26 @@ const VoiceInterview = () => {
     else navigate("/dashboard");
   };
 
-  if (!session.selectedJob) {
-    return <JobSelector title="المقابلة الصوتية" onSelect={session.startInterview} onBack={() => navigate("/dashboard")} />;
+  const handleJobSelect = (job: string) => {
+    setSelectedJob(job);
+    if (settings.interview_engine !== "vapi") {
+      session.startInterview(job);
+    }
+  };
+
+  if (!selectedJob && !session.selectedJob) {
+    return <JobSelector title="المقابلة الصوتية" onSelect={handleJobSelect} onBack={() => navigate("/dashboard")} />;
+  }
+
+  if (settings.interview_engine === "vapi" && selectedJob) {
+    return (
+      <VapiLiveInterview
+        type="voice"
+        jobPosition={selectedJob}
+        totalQuestions={settings.questions_per_type.voice}
+        onBack={() => navigate("/dashboard")}
+      />
+    );
   }
 
   const lastAIMessage = [...session.messages].reverse().find((m) => m.role === "assistant");
