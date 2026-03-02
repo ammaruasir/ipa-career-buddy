@@ -122,35 +122,64 @@ export const useLiveInterview = ({
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
+        console.log("[LiveInterview] Recorder stopped, chunks:", chunksRef.current.length);
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         stream.getTracks().forEach(t => t.stop());
         ctx.close().catch(() => {});
         setIsListening(false);
         cancelAnimationFrame(rafRef.current);
+        if (maxRecordingTimer) clearTimeout(maxRecordingTimer);
         if (blob.size > 0 && activeRef.current && !stoppedManuallyRef.current) {
           handleRecordingComplete(blob);
         }
       };
 
       mediaRecorderRef.current = recorder;
-      recorder.start();
+      recorder.start(1000); // timeslice: fire ondataavailable every 1s
       setIsListening(true);
+      console.log("[LiveInterview] Recording started with 1s timeslice");
+
+      // Max recording timeout fallback (45s)
+      const maxRecordingTimer = setTimeout(() => {
+        console.log("[LiveInterview] Max recording timeout (45s) reached, force-stopping");
+        if (recorder.state === "recording") {
+          recorder.stop();
+        }
+      }, 45000);
 
       // Silence detection loop
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       let silenceStart: number | null = null;
-      const SILENCE_THRESHOLD = 15; // RMS threshold
-      const SILENCE_DURATION = 2500; // ms
+      let speechDetected = false;
+      const SILENCE_THRESHOLD = 30;
+      const SILENCE_DURATION = 2000; // ms
+      let logCounter = 0;
 
       const checkSilence = () => {
         if (!activeRef.current || stoppedManuallyRef.current) return;
         analyser.getByteFrequencyData(dataArray);
         const rms = Math.sqrt(dataArray.reduce((sum, v) => sum + v * v, 0) / dataArray.length);
 
+        // Log RMS periodically (every ~60 frames ≈ 1s)
+        logCounter++;
+        if (logCounter % 60 === 0) {
+          console.log("[LiveInterview] RMS:", rms.toFixed(1), "speechDetected:", speechDetected);
+        }
+
+        // Require speech before detecting silence
+        if (!speechDetected) {
+          if (rms > SILENCE_THRESHOLD) {
+            speechDetected = true;
+            console.log("[LiveInterview] Speech detected, RMS:", rms.toFixed(1));
+          }
+          rafRef.current = requestAnimationFrame(checkSilence);
+          return;
+        }
+
         if (rms < SILENCE_THRESHOLD) {
           if (!silenceStart) silenceStart = Date.now();
           else if (Date.now() - silenceStart > SILENCE_DURATION) {
-            // Silence detected — stop recording
+            console.log("[LiveInterview] Silence detected after speech, stopping recorder");
             if (recorder.state === "recording") {
               recorder.stop();
             }
@@ -163,9 +192,10 @@ export const useLiveInterview = ({
         rafRef.current = requestAnimationFrame(checkSilence);
       };
 
-      // Wait a moment before starting silence detection to avoid premature cutoff
+      // Wait a moment before starting silence detection
       setTimeout(() => {
         if (activeRef.current && !stoppedManuallyRef.current) {
+          console.log("[LiveInterview] Starting silence detection loop");
           rafRef.current = requestAnimationFrame(checkSilence);
         }
       }, 1500);
