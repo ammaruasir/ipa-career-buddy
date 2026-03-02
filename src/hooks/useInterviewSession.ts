@@ -29,6 +29,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
   const contextSummaryRef = useRef<string>("");
   const interviewIdRef = useRef<string | null>(null);
   const completedRef = useRef(false);
+  const lastQuestionRef = useRef(false);
 
   const totalQuestions = overrideTotalQuestions ?? settings.questions_per_type[type] ?? 8;
   const timerDuration = settings.time_per_question[type] ?? 300;
@@ -148,13 +149,14 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
         setQuestionCount((c) => c + 1);
       }
 
-      if (!isFollowUp && questionCount >= totalQuestions) {
+      // Check if the PREVIOUS question was the last — meaning the candidate just answered it
+      if (lastQuestionRef.current) {
+        lastQuestionRef.current = false;
         await supabase
           .from("interviews")
           .update({ status: "completed" as any })
           .eq("id", interviewId);
 
-        // Update job application status
         const vacancyId = searchParams.get("vacancy_id");
         if (vacancyId && user) {
           await supabase
@@ -183,6 +185,13 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
           toast.error("حدث خطأ في التقييم");
         }
         setIsEvaluating(false);
+        setIsLoading(false);
+        return;
+      }
+
+      // Mark if the next answer will be the last
+      if (!isFollowUp && questionCount + 1 >= totalQuestions) {
+        lastQuestionRef.current = true;
       }
     } catch {
       toast.error("حدث خطأ في الاتصال");
