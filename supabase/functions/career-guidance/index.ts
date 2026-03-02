@@ -34,7 +34,7 @@ serve(async (req) => {
 
     const jobs = jobsRes.data || [];
 
-    const prompt = `أنت مستشار مهني خبير. حلل بيانات هذا الشخص واقترح مسارات مهنية مناسبة.
+    const prompt = `أنت مستشار مهني خبير. حلل بيانات هذا الشخص واقترح مسارات مهنية مناسبة مع خطة تطوير شاملة.
 
 بيانات المرشح:
 - الاسم: ${profile.full_name || "غير محدد"}
@@ -49,12 +49,22 @@ ${jobs.map((j: any) => `- ${j.title} (${j.department || "عام"}): ${(j.require
 أجب بتنسيق JSON فقط بالعربية بالشكل التالي:
 {
   "career_paths": [{"title": "...", "description": "...", "match_percent": 85}],
-  "skills_to_develop": [{"skill": "...", "importance": "high|medium|low"}],
+  "skills_to_develop": [{"skill": "...", "importance": "high|medium|low", "current_level": 30, "required_level": 80}],
   "matching_jobs": [{"title": "...", "department": "...", "match_reason": "..."}],
-  "summary": "ملخص شامل للتحليل المهني..."
+  "summary": "ملخص شامل للتحليل المهني...",
+  "training_plan": [
+    {"phase": "الشهر ١-٣", "goals": ["هدف 1", "هدف 2"], "actions": ["خطوة 1", "خطوة 2"]},
+    {"phase": "الشهر ٤-٦", "goals": ["..."], "actions": ["..."]},
+    {"phase": "الشهر ٧-١٢", "goals": ["..."], "actions": ["..."]}
+  ],
+  "recommended_courses": [
+    {"name": "اسم الدورة", "platform": "Coursera|Udemy|edX|دروب", "skill": "المهارة المرتبطة", "duration": "٤ أسابيع", "level": "مبتدئ|متوسط|متقدم"}
+  ]
 }
 
-اقترح 3-5 مسارات مهنية، 5-8 مهارات للتطوير، والوظائف المطابقة من القائمة المتاحة فقط.`;
+اقترح 3-5 مسارات مهنية، 5-8 مهارات للتطوير مع مستوى المرشح الحالي والمستوى المطلوب (من 0 إلى 100)، والوظائف المطابقة من القائمة المتاحة فقط.
+اقترح خطة تطوير على 3 مراحل (قصيرة، متوسطة، طويلة المدى).
+اقترح 4-8 دورات تدريبية حقيقية من منصات معروفة (Coursera, Udemy, edX, دروب، رواق) مع ذكر المهارة المرتبطة.`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
