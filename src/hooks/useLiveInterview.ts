@@ -55,6 +55,7 @@ export const useLiveInterview = ({
   const activeRef = useRef(false);
   const stoppedManuallyRef = useRef(false);
   const isEndingRef = useRef(false);
+  const lastQuestionRef = useRef(false);
   
   // Session recording refs
   const sessionRecorderRef = useRef<MediaRecorder | null>(null);
@@ -310,8 +311,14 @@ export const useLiveInterview = ({
       // Update context summary with key points
       contextSummaryRef.current += `\nسؤال ${questionCountRef.current}: ${conversationRef.current.filter(m => m.role === "assistant").pop()?.content?.substring(0, 100) || ""}\nإجابة مختصرة: ${userText.substring(0, 150)}`;
 
-      // Get next AI response - question count will be updated based on [NEW_Q]/[FOLLOW_UP] tag
-      await getNextAIResponse(userText);
+      // Check if this was the last question's answer
+      if (lastQuestionRef.current) {
+        lastQuestionRef.current = false;
+        await getClosingResponse();
+      } else {
+        // Get next AI response - question count will be updated based on [NEW_Q]/[FOLLOW_UP] tag
+        await getNextAIResponse(userText);
+      }
 
     } catch (error) {
       console.error("Recording processing error:", error);
@@ -425,11 +432,8 @@ export const useLiveInterview = ({
         questionCountRef.current = newCount;
 
         if (newCount >= totalQuestions) {
-          await speakText(aiText);
-          transcriptRef.current = [...transcriptRef.current, { role: "assistant", text: aiText }];
-          setTranscript([...transcriptRef.current]);
-          await getClosingResponse();
-          return;
+          // Mark as last question — wait for candidate's answer before closing
+          lastQuestionRef.current = true;
         }
       }
 
