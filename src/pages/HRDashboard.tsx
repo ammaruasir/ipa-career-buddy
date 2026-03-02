@@ -13,8 +13,9 @@ import { toArabicNumerals, formatArabicPercent } from "@/lib/arabic-utils";
 import {
   Users, FileText, TrendingUp, Award, LogOut,
   Search, Eye, Loader2, Briefcase, GraduationCap,
-  ChevronDown, ChevronUp, Star, AlertCircle,
+  ChevronDown, ChevronUp, Star, AlertCircle, Kanban, GitCompareArrows,
 } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -179,11 +180,24 @@ const HRDashboard = () => {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
+              <Link to="/dashboard/hr/pipeline">
+                <Kanban className="w-4 h-4 ml-1" />
+                مراحل التوظيف
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/dashboard/hr/compare">
+                <GitCompareArrows className="w-4 h-4 ml-1" />
+                مقارنة المرشحين
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
               <Link to="/dashboard/admin">
                 <Briefcase className="w-4 h-4 ml-1" />
                 لوحة الإدارة
               </Link>
             </Button>
+            <NotificationBell />
             <Button variant="ghost" size="sm" onClick={() => signOut().then(() => navigate("/"))}>
               <LogOut className="w-4 h-4 ml-2" />
               تسجيل الخروج

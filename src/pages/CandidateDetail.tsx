@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowRight, Loader2, User, Briefcase, Calendar, MessageSquare, Mic, Video } from "lucide-react";
+import { ArrowRight, Loader2, User, Briefcase, Calendar, MessageSquare, Mic, Video, FileDown } from "lucide-react";
 import VideoPlayback from "@/components/interview/VideoPlayback";
 import { toast } from "sonner";
 
@@ -39,6 +39,31 @@ const CandidateDetail = () => {
   const [noteText, setNoteText] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const exportPDF = async () => {
+    if (!id) return;
+    setExporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-report", {
+        body: { interview_id: id },
+      });
+      if (error) throw error;
+      const html = data?.html;
+      if (!html) throw new Error("No report generated");
+      const w = window.open("", "_blank");
+      if (w) {
+        w.document.write(html);
+        w.document.close();
+        setTimeout(() => w.print(), 500);
+      }
+      toast.success("تم إنشاء التقرير");
+    } catch (e: any) {
+      toast.error("حدث خطأ في إنشاء التقرير");
+      console.error(e);
+    }
+    setExporting(false);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) { navigate("/login"); return; }
@@ -133,6 +158,12 @@ const CandidateDetail = () => {
             <ArrowRight className="w-5 h-5" />
           </Button>
           <h2 className="text-lg font-bold text-foreground">تفاصيل المرشح</h2>
+          {evaluation && (
+            <Button variant="outline" size="sm" className="rounded-xl" onClick={exportPDF} disabled={exporting}>
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <FileDown className="w-4 h-4 ml-1" />}
+              تصدير PDF
+            </Button>
+          )}
         </div>
       </header>
 
