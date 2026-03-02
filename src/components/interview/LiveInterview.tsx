@@ -5,6 +5,16 @@ import { useAntiCheat } from "@/hooks/useAntiCheat";
 import { useCheatCamera } from "@/hooks/useCheatCamera";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import AIAvatarScene from "@/components/interview/AIAvatarScene";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +33,7 @@ interface LiveInterviewProps {
 const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterviewProps) => {
   const navigate = useNavigate();
   const [showExit, setShowExit] = useState(false);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
   const { tabSwitchCount, showWarning } = useAntiCheat({ enableTabDetection: true });
 
   const live = useLiveInterview({
@@ -241,7 +252,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
           )}
           {live.isCallActive && (
             <Button
-              onClick={live.endCall}
+              onClick={() => setShowEndConfirm(true)}
               size="lg"
               variant="destructive"
               className="rounded-full gap-2 px-8"
@@ -271,6 +282,23 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
         onOpenChange={setShowExit}
         onConfirm={handleExitConfirm}
       />
+
+      <AlertDialog open={showEndConfirm} onOpenChange={setShowEndConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>هل أنت متأكد من إنهاء المقابلة؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم تقييم إجاباتك وإنهاء المقابلة بشكل نهائي.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>متابعة المقابلة</AlertDialogCancel>
+            <AlertDialogAction onClick={live.endCall} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              إنهاء المقابلة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
