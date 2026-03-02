@@ -2,22 +2,23 @@
 
 ## Problem
 
-When a candidate applies to a job from the **Job Vacancies** page, they already selected the job and the interview type. The app navigates to `/interview/voice?job=JobTitle&vacancy_id=xxx`. However, the `VoiceInterview` and `VideoInterview` pages **ignore the `job` URL parameter** — they always start with `selectedJob = null`, which shows the `JobSelector` component again, asking the user to pick a job a second time.
+Two issues cause the interview to break when the candidate scrolls:
 
-The `TextInterview` page (via `useInterviewSession`) already handles the `job` URL param with auto-start logic, but the voice/video pages don't.
+1. **Anti-cheat `window.blur` listener** (line 33-38 in `useAntiCheat.ts`) fires on scroll — especially in iframe contexts. This is a false positive; scrolling within the interview page is not tab-switching. The blur event can also cause the browser to suspend `AudioContext` and pause `Audio` playback on some browsers.
+
+2. **No recovery for interrupted audio** in `speakText` — if the browser pauses the TTS audio (on blur/scroll), neither `onended` nor `onerror` fires, so the flow gets stuck. Or worse, on some browsers `onerror` fires immediately, resolving the promise and triggering `startListening` before the AI has finished speaking.
+
+Both voice and video interviews share the same `useLiveInterview` hook and `LiveInterview` component, so the fix applies to both.
 
 ## Fix
 
-### Update `src/pages/VoiceInterview.tsx` and `src/pages/VideoInterview.tsx`
+### 1. `src/hooks/useAntiCheat.ts` — Remove `window.blur` listener
 
-Read the `job` query parameter from the URL on mount. If present, set `selectedJob` directly — skipping the `JobSelector` entirely.
+Keep only `document.visibilitychange` for tab detection. The `blur` event is too aggressive — it fires on scroll, iframe focus changes, and clicking within the page. `visibilitychange` is the correct API for detecting actual tab/window switches.
 
-```typescript
-const [searchParams] = useSearchParams();
-const [selectedJob, setSelectedJob] = useState<string | null>(
-  searchParams.get("job")
-);
-```
+### 2. `src/hooks/useLiveInterview.ts` — Add audio resilience
 
-That's it — one line change per file. If `job` is in the URL (coming from vacancies), the `JobSelector` is skipped. If the user navigates directly (no URL param), they still see the job picker as before.
+- Store the `Audio` element in a ref so it can be managed across the lifecycle
+- Add a `pause` event handler that automatically resumes playback if the interview is still active (prevents browser auto-pause from breaking the flow)
+- Add a `visibilitychange` listener during playback that resumes audio + `AudioContext` when the page becomes visible again
 
