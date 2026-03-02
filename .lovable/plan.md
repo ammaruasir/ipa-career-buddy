@@ -2,23 +2,35 @@
 
 ## Problem
 
-The `VoiceInterview` component doesn't wait for system settings to finish loading before rendering the job selector. The default value of `interview_engine` is `"built_in"`, so when a user selects a job before settings load, the built-in interview starts instead of Vapi.
+The `analyze-resume` edge function uses `supabase.auth.getClaims(token)` which is **not a valid method** in the Supabase JS client. This causes the function to fail with an error on every call, returning a 401 or throwing an exception. The resume upload succeeds (file goes to storage), but the AI analysis never runs.
 
-Looking at lines 171-184 of `VoiceInterview.tsx`:
-1. Line 171: Job selector renders immediately (settings may still be loading)
-2. Line 164-168: `handleJobSelect` checks `settings.interview_engine` which is still the default `"built_in"` during loading
-3. Line 175: The Vapi check also uses potentially-unloaded settings
-
-The same issue likely exists in `VideoInterview.tsx`.
+The UI shows old `resume_skills` data loaded from the database on page load (lines 95-97 in ProfileSettings), making it look like the analysis returned pre-filled data — but in reality, it's just displaying whatever was previously stored.
 
 ## Fix
 
-### 1. `VoiceInterview.tsx`
-- Add a loading guard that shows a spinner while `settingsLoading` is true (before the job selector)
-- This ensures `settings.interview_engine` has the real DB value (`"vapi"`) before the user can select a job
+### 1. Fix `supabase/functions/analyze-resume/index.ts`
 
-### 2. `VideoInterview.tsx`
-- Apply the same loading guard for settings before rendering job selector or interview UI
+Replace the broken `getClaims` call with the correct `supabase.auth.getUser(token)` method:
 
-Both changes are minimal: add an early return with a loading spinner when `settingsLoading` is true.
+```typescript
+// BEFORE (broken):
+const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+const userId = claimsData.claims.sub;
+
+// AFTER (correct):
+const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+if (authError || !authUser) { return 401 }
+const userId = authUser.id;
+```
+
+### 2. Clear stale `resumeSkills` on new upload (ProfileSettings.tsx + CompleteProfile.tsx)
+
+When a user uploads a new resume, clear the displayed skills immediately so old data doesn't persist while analysis runs:
+
+```typescript
+// Add before the upload call:
+setResumeSkills(null);
+```
+
+This ensures users see the loading state during analysis rather than stale data from a previous resume.
 
