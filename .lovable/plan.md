@@ -1,18 +1,36 @@
 
 
-## Fix: Add confirmation dialog for ending interview
+## Fix: تنقل الإشعارات حسب نوعها
 
-The "إنهاء المقابلة" button in `LiveInterview.tsx` currently calls `live.endCall()` directly. We need to add a confirmation step.
+حالياً `handleClick` يتعامل فقط مع نوع `evaluation_complete`. الأنواع الأخرى (`new_application`, `status_update`) لا تنقل لأي مكان.
 
-### Changes in `src/components/interview/LiveInterview.tsx`
+### التغيير في `src/components/NotificationBell.tsx`
 
-- Add a new state `showEndConfirm` 
-- When clicking "إنهاء المقابلة", set `showEndConfirm = true` instead of calling `endCall` directly
-- Add an `AlertDialog` asking "هل أنت متأكد من إنهاء المقابلة؟" with confirm/cancel
-- On confirm: call `live.endCall()` which already marks the interview done and navigates
+تحديث دالة `handleClick` لتشمل جميع أنواع الإشعارات:
 
-This reuses the existing `AlertDialog` components already imported via `ExitConfirmationDialog`. We'll add a second simple `AlertDialog` inline or reuse the same pattern.
+```typescript
+const handleClick = (n: Notification) => {
+  markAsRead(n.id);
+  if (n.related_id) {
+    switch (n.type) {
+      case "evaluation_complete":
+        navigate(`/interview/${n.related_id}/results`);
+        break;
+      case "new_application":
+        navigate(`/dashboard/admin/candidate/${n.related_id}`);
+        break;
+      case "status_update":
+        navigate(`/interview/${n.related_id}/results`);
+        break;
+    }
+  }
+  setOpen(false);
+};
+```
 
-### File modified
-- `src/components/interview/LiveInterview.tsx` only
+- `evaluation_complete` → صفحة نتائج المقابلة (كما هو)
+- `new_application` → صفحة تفاصيل المرشح
+- `status_update` → صفحة نتائج المقابلة
+
+**ملف واحد فقط**: `src/components/NotificationBell.tsx`
 
