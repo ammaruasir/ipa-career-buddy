@@ -1,36 +1,32 @@
 
 
-## Plan: GCC Male Face Avatar with Traditional Dress
+## Problem
 
-### Approach
+Two issues with the Vapi real-time interview:
 
-Replace the heavy 3D Ready Player Me model with an **AI-generated 2D avatar** of a GCC male face wearing traditional national dress (thobe + ghutra/shemagh). The avatar will be rendered as an image with CSS-based animations for speaking, listening, and idle states — much lighter and visually cleaner than the current 3D canvas.
+1. **Vapi only says "one" and stops** — The inline assistant configuration passed to `vapi.start()` has issues: the ElevenLabs voice ID (`pNInz6obpgDQGcFmaJgB`) is "Adam" which doesn't support Arabic well, and the model/transcriber config may not be structured correctly for the Vapi SDK's expected format.
 
-### Changes
+2. **Not truly real-time** — When the system setting `interview_engine` is `"vapi"`, the code *does* render `VapiLiveInterview` (which is real-time WebRTC). But if the setting is not `"vapi"`, the fallback is the record-based built-in engine. Need to verify the setting is correct.
 
-**1. Create a backend function to generate the avatar image**
-- New Edge Function `generate-avatar` that uses the Lovable AI image generation API (`google/gemini-2.5-flash-image`) to create a professional portrait of a GCC male with traditional dress (white thobe, ghutra, agal).
-- Save the generated image to Supabase Storage so it's reused across sessions (generate once, serve forever).
+## Plan
 
-**2. Replace `AIAvatarScene.tsx`**
-- Remove the Three.js `Canvas`, `Environment`, and `AvatarHead` 3D components.
-- Replace with a styled `<img>` component showing the generated avatar face.
-- Add CSS animations:
-  - **Speaking**: Subtle pulse ring + animated sound wave bars around the avatar.
-  - **Listening**: Soft glow border.
-  - **Idle**: Gentle breathing scale animation.
+### 1. Fix `useVapiInterview.ts` — Correct the Vapi assistant configuration
 
-**3. Clean up `AvatarHead.tsx`**
-- Remove the file entirely — no longer needed without the 3D scene.
-- Remove the `public/models/avatar.glb` file (saves ~5MB+ of download).
+- **Use a proper Arabic voice**: Switch from ElevenLabs voice ID "Adam" to an Arabic-native voice. Use Azure voice provider with an Arabic voice (`ar-SA-HamedNeural`) which natively supports Arabic speech.
+- **Fix model config**: Use `gpt-4o` instead of `gpt-4o-mini` for better Arabic language support in real-time conversation.
+- **Strengthen system prompt**: Add explicit instructions to ONLY speak Arabic, never English, and to maintain a natural conversational flow.
+- **Fix `firstMessage`**: Ensure the Arabic greeting is properly set.
+- **Add `serverUrl` silencing** and proper assistant name.
 
-**4. Update `VapiLiveInterview.tsx`**
-- Remove `audioAnalyser` prop passing since the 2D avatar doesn't need it.
-- Simplify the avatar container sizing.
+### 2. Fix question counting logic
 
-### Result
-- Fast loading (small image vs large GLB model)
-- Professional GCC male appearance with traditional dress
-- Smooth animated states for speaking/listening/idle
-- No Three.js overhead
+Currently every assistant transcript message increments `questionCount`, which over-counts (comments between questions also count). Fix to only count when the assistant actually asks a question by tracking Q&A pairs properly.
+
+### 3. Verify system settings
+
+Check that the `interview_engine` setting in the database is set to `"vapi"` so users get routed to the real-time path, not the record-based fallback.
+
+### Files Changed
+
+- `src/hooks/useVapiInterview.ts` — Fix voice provider, model, system prompt, and question counting
 
