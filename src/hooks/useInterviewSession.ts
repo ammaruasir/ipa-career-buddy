@@ -25,6 +25,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
   const [questionCount, setQuestionCount] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [awaitingEndConfirmation, setAwaitingEndConfirmation] = useState(false);
 
   const contextSummaryRef = useRef<string>("");
   const interviewIdRef = useRef<string | null>(null);
@@ -96,16 +97,25 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     }
   }, [user, settingsLoading]);
 
-  // Cleanup on unmount — mark interview as completed if still in progress
+  // beforeunload warning during active interview
+  useEffect(() => {
+    if (!interviewId || isCompleted) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [interviewId, isCompleted]);
+
+  // Cleanup on unmount — use sendBeacon to mark interview as completed
   useEffect(() => {
     return () => {
       const id = interviewIdRef.current;
       if (id && !completedRef.current) {
-        supabase
-          .from("interviews")
-          .update({ status: "completed" as any })
-          .eq("id", id)
-          .then(() => {});
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/complete-interview`;
+        const body = JSON.stringify({ interview_id: id });
+        navigator.sendBeacon(url, body);
       }
     };
   }, []);
@@ -149,42 +159,10 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
         setQuestionCount((c) => c + 1);
       }
 
-      // Check if the PREVIOUS question was the last — meaning the candidate just answered it
+      // Check if the PREVIOUS question was the last — set awaitingEndConfirmation
       if (lastQuestionRef.current) {
         lastQuestionRef.current = false;
-        await supabase
-          .from("interviews")
-          .update({ status: "completed" as any })
-          .eq("id", interviewId);
-
-        const vacancyId = searchParams.get("vacancy_id");
-        if (vacancyId && user) {
-          await supabase
-            .from("job_applications")
-            .update({ status: "interviewed" } as any)
-            .eq("vacancy_id", vacancyId)
-            .eq("user_id", user.id);
-        }
-
-        setIsCompleted(true);
-        completedRef.current = true;
-        toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم...");
-        
-        setIsEvaluating(true);
-        try {
-          const evalResp = await supabase.functions.invoke("evaluate-interview", {
-            body: { interview_id: interviewId },
-          });
-          if (evalResp.error) {
-            toast.error("حدث خطأ في التقييم، يمكنك المحاولة لاحقاً");
-          } else {
-            toast.success("تم إعداد التقييم بنجاح!");
-            navigate("/dashboard");
-          }
-        } catch {
-          toast.error("حدث خطأ في التقييم");
-        }
-        setIsEvaluating(false);
+        setAwaitingEndConfirmation(true);
         setIsLoading(false);
         return;
       }
@@ -199,6 +177,50 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     setIsLoading(false);
   }, [messages, isLoading, interviewId, selectedJob, questionCount, totalQuestions, type, searchParams]);
 
+  const confirmEnd = useCallback(async () => {
+    if (!interviewId || !user) return;
+    setAwaitingEndConfirmation(false);
+
+    await supabase
+      .from("interviews")
+      .update({ status: "completed" as any })
+      .eq("id", interviewId);
+
+    const vacancyId = searchParams.get("vacancy_id");
+    if (vacancyId) {
+      await supabase
+        .from("job_applications")
+        .update({ status: "interviewed" } as any)
+        .eq("vacancy_id", vacancyId)
+        .eq("user_id", user.id);
+    }
+
+    setIsCompleted(true);
+    completedRef.current = true;
+    toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم...");
+
+    setIsEvaluating(true);
+    try {
+      const evalResp = await supabase.functions.invoke("evaluate-interview", {
+        body: { interview_id: interviewId },
+      });
+      if (evalResp.error) {
+        toast.error("حدث خطأ في التقييم، يمكنك المحاولة لاحقاً");
+      } else {
+        toast.success("تم إعداد التقييم بنجاح!");
+        navigate("/dashboard");
+      }
+    } catch {
+      toast.error("حدث خطأ في التقييم");
+    }
+    setIsEvaluating(false);
+  }, [interviewId, user, searchParams, navigate]);
+
+  const continueInterview = useCallback(() => {
+    setAwaitingEndConfirmation(false);
+    lastQuestionRef.current = false;
+  }, []);
+
   return {
     user,
     navigate,
@@ -212,8 +234,11 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     isCompleted,
     isEvaluating,
     settingsLoading,
+    awaitingEndConfirmation,
     startInterview,
     sendAnswer,
+    confirmEnd,
+    continueInterview,
     setMessages,
   };
 };

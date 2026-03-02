@@ -8,6 +8,16 @@ import { useAntiCheat } from "@/hooks/useAntiCheat";
 import { useCheatCamera } from "@/hooks/useCheatCamera";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import JobSelector from "@/components/interview/JobSelector";
 import TypingIndicator from "@/components/interview/TypingIndicator";
 import { Card } from "@/components/ui/card";
@@ -252,6 +262,24 @@ const TextInterview = () => {
       )}
 
       <ExitConfirmationDialog open={showExit} onOpenChange={setShowExit} onConfirm={() => navigate("/dashboard")} />
+
+      {/* End confirmation dialog when all questions answered */}
+      <AlertDialog open={session.awaitingEndConfirmation}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>اكتملت أسئلة المقابلة</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل ترغب في إنهاء المقابلة والحصول على التقييم، أم المتابعة بأسئلة إضافية؟
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={session.continueInterview}>متابعة بأسئلة إضافية</AlertDialogCancel>
+            <AlertDialogAction onClick={session.confirmEnd} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              إنهاء المقابلة
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.elevenlabs-tts]
 verify_jwt = false
+
+[functions.complete-interview]
+verify_jwt = false
