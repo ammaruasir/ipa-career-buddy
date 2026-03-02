@@ -457,15 +457,18 @@ export const useLiveInterview = ({
     const currentId = interviewIdRef.current;
     if (!currentId) return;
 
-    // Stop session recorder and upload
+    // Stop session recorder and wait for onstop event to ensure all chunks are collected
     if (sessionRecorderRef.current?.state === "recording") {
-      sessionRecorderRef.current.stop();
+      await new Promise<void>((resolve) => {
+        const recorder = sessionRecorderRef.current!;
+        recorder.onstop = () => resolve();
+        recorder.stop();
+      });
     }
     
-    // Wait for chunks to finalize
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
     const sessionBlob = new Blob(sessionChunksRef.current, { type: "video/webm" });
+    console.log(`[Recording] Session blob size: ${sessionBlob.size} bytes, chunks: ${sessionChunksRef.current.length}`);
+    
     if (sessionBlob.size > 0 && user) {
       try {
         const fileName = `${user.id}/${currentId}_full.webm`;
@@ -473,7 +476,10 @@ export const useLiveInterview = ({
           .from("interview-recordings")
           .upload(fileName, sessionBlob, { contentType: "video/webm", upsert: true });
         
-        if (!uploadErr) {
+        if (uploadErr) {
+          console.error("[Recording] Upload failed:", uploadErr);
+        } else {
+          console.log("[Recording] Upload successful:", fileName);
           const { data: urlData } = supabase.storage
             .from("interview-recordings")
             .getPublicUrl(fileName);
@@ -484,8 +490,10 @@ export const useLiveInterview = ({
             .eq("id", currentId);
         }
       } catch (err) {
-        console.error("Failed to upload session recording:", err);
+        console.error("[Recording] Failed to upload session recording:", err);
       }
+    } else {
+      console.warn("[Recording] No recording data to upload — blob size:", sessionBlob.size);
     }
 
     await supabase
