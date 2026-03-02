@@ -93,9 +93,7 @@ const Index = () => {
         <div className="container mx-auto flex items-center justify-between py-3 px-4">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
-              <Briefcase className="w-6 h-6 text-primary-foreground" />
-            </div>
+            <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="w-11 h-11 rounded-xl object-contain shadow-md group-hover:shadow-lg transition-shadow" />
             <div className="hidden sm:block">
               <h2 className="text-base font-bold text-foreground leading-tight">منصة المقابلات الذكية</h2>
               <p className="text-[11px] text-muted-foreground">مدعومة بالذكاء الاصطناعي</p>
@@ -496,9 +494,7 @@ const Index = () => {
             {/* Brand */}
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                  <Briefcase className="w-5 h-5 text-primary-foreground" />
-                </div>
+                <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="w-10 h-10 rounded-xl object-contain" />
                 <div>
                   <h3 className="font-bold text-foreground">منصة المقابلات الذكية</h3>
                   <p className="text-xs text-muted-foreground">مدعومة بالذكاء الاصطناعي</p>

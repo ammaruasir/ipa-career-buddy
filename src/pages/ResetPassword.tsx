@@ -76,9 +76,7 @@ const ResetPassword = () => {
       <div className="absolute inset-0 bg-gradient-to-bl from-primary/5 via-transparent to-secondary/5" />
       <Card className="w-full max-w-md rounded-2xl shadow-xl relative z-10">
         <CardHeader className="text-center space-y-4 pb-2">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-primary flex items-center justify-center">
-            <Briefcase className="w-9 h-9 text-primary-foreground" />
-          </div>
+          <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="mx-auto w-16 h-16 rounded-2xl object-contain" />
           <CardTitle className="text-2xl font-bold">إعادة تعيين كلمة المرور</CardTitle>
           <CardDescription>أدخل كلمة المرور الجديدة</CardDescription>
         </CardHeader>
