@@ -123,11 +123,15 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
         },
       });
       if (resp.error) throw resp.error;
-      const aiReply = resp.data?.choices?.[0]?.message?.content || "";
+      let aiReply = resp.data?.choices?.[0]?.message?.content || "";
+      const isFollowUp = aiReply.startsWith("[FOLLOW_UP]");
+      aiReply = aiReply.replace(/^\[(NEW_Q|FOLLOW_UP)\]\s*/, "");
       setMessages((prev) => [...prev, { role: "assistant", content: aiReply }]);
-      setQuestionCount((c) => c + 1);
+      if (!isFollowUp) {
+        setQuestionCount((c) => c + 1);
+      }
 
-      if (questionCount >= totalQuestions) {
+      if (!isFollowUp && questionCount >= totalQuestions) {
         await supabase
           .from("interviews")
           .update({ status: "completed" as any })

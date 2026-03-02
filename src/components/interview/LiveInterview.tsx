@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveInterview } from "@/hooks/useLiveInterview";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
+import { useCheatCamera } from "@/hooks/useCheatCamera";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
 import AIAvatarScene from "@/components/interview/AIAvatarScene";
@@ -9,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Phone, PhoneOff, AlertTriangle, Loader2, Mic, Volume2, Brain, FileText } from "lucide-react";
+import { Phone, PhoneOff, AlertTriangle, Loader2, Mic, Volume2, Brain, FileText, Camera } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface LiveInterviewProps {
@@ -28,6 +29,12 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
     type,
     jobPosition,
     totalQuestions,
+  });
+
+  // Cheat camera for voice mode (video mode already has camera via useLiveInterview)
+  const cheatCamera = useCheatCamera({
+    enabled: type === "voice" && live.isCallActive,
+    interviewId: live.interviewId,
   });
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -140,7 +147,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
         {/* AI Avatar + Candidate Camera */}
         <div className="relative w-full max-w-md h-64 rounded-2xl overflow-hidden shadow-xl border">
           <AIAvatarScene avatarState={avatarState} />
-          {/* Candidate PiP Camera */}
+          {/* Candidate PiP Camera - video mode */}
           {type === "video" && (
             <div className="absolute bottom-3 left-3 w-28 h-20 rounded-xl overflow-hidden border-2 border-background shadow-lg bg-black">
               <video
@@ -151,6 +158,23 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
                 className="w-full h-full object-cover mirror"
                 style={{ transform: "scaleX(-1)" }}
               />
+            </div>
+          )}
+          {/* Candidate PiP Camera - voice mode (cheat detection) */}
+          {type === "voice" && cheatCamera.stream && (
+            <div className="absolute bottom-3 left-3 w-28 h-20 rounded-xl overflow-hidden border-2 border-background shadow-lg bg-black">
+              <video
+                ref={cheatCamera.videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+                style={{ transform: "scaleX(-1)" }}
+              />
+              <div className="absolute top-1 right-1 flex items-center gap-1 bg-black/60 rounded-full px-1.5 py-0.5">
+                <Camera className="w-3 h-3 text-red-400" />
+                <span className="text-[9px] text-red-400 font-medium">REC</span>
+              </div>
             </div>
           )}
         </div>
