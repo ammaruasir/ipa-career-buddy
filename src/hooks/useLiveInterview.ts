@@ -59,6 +59,26 @@ export const useLiveInterview = ({
   useEffect(() => { questionCountRef.current = questionCount; }, [questionCount]);
 
   // Speak text using ElevenLabs TTS and resolve when done
+  // Fallback: use browser SpeechSynthesis
+  const speakWithBrowserTTS = useCallback((text: string): Promise<void> => {
+    return new Promise((resolve) => {
+      if (!window.speechSynthesis) { resolve(); return; }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "ar-SA";
+      utterance.rate = 0.95;
+      const voices = window.speechSynthesis.getVoices();
+      const arabicVoice = voices.find(v => v.lang.startsWith("ar") && v.localService)
+        || voices.find(v => v.lang.startsWith("ar"));
+      if (arabicVoice) utterance.voice = arabicVoice;
+      utterance.onend = () => { setIsSpeaking(false); resolve(); };
+      utterance.onerror = () => { setIsSpeaking(false); resolve(); };
+      setIsSpeaking(true);
+      window.speechSynthesis.speak(utterance);
+    });
+  }, []);
+
+  // Speak text using ElevenLabs TTS with browser fallback
   const speakText = useCallback((text: string): Promise<void> => {
     return new Promise(async (resolve) => {
       setIsSpeaking(true);
@@ -90,7 +110,6 @@ export const useLiveInterview = ({
           document.removeEventListener("visibilitychange", handleVisibility);
         };
 
-        // Auto-resume if browser pauses audio (e.g. on scroll in iframe)
         audio.addEventListener("pause", () => {
           if (activeRef.current && !stoppedManuallyRef.current && !audio.ended) {
             audio.play().catch(() => {});
@@ -111,13 +130,15 @@ export const useLiveInterview = ({
 
         await audio.play();
       } catch (error) {
-        console.error("ElevenLabs TTS error:", error);
+        console.error("ElevenLabs TTS failed, falling back to browser TTS:", error);
         currentAudioRef.current = null;
         setIsSpeaking(false);
+        // Fallback to browser TTS
+        await speakWithBrowserTTS(text);
         resolve();
       }
     });
-  }, []);
+  }, [speakWithBrowserTTS]);
 
   // Start recording microphone with silence detection
   const startListening = useCallback(async () => {
