@@ -457,6 +457,7 @@ export const useLiveInterview = ({
     stoppedManuallyRef.current = true;
     isEndingRef.current = true;
     setIsActive(false);
+    setIsCompleted(true);
     setIsListening(false);
     setIsSpeaking(false);
     if (mediaRecorderRef.current?.state === "recording") {
@@ -526,7 +527,6 @@ export const useLiveInterview = ({
         .eq("user_id", user.id);
     }
 
-    setIsCompleted(true);
     toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم...");
 
     setIsEvaluating(true);
