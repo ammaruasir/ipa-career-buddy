@@ -44,6 +44,7 @@ const CandidateDetail = () => {
   const [submitting, setSubmitting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [selectedCheatFrame, setSelectedCheatFrame] = useState<string | null>(null);
+  const [overrideDecision, setOverrideDecision] = useState(false);
 
   const exportPDF = async () => {
     if (!id) return;
@@ -469,13 +470,33 @@ const CandidateDetail = () => {
           <CardHeader><CardTitle className="text-base">ملاحظات الموارد البشرية</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <Textarea placeholder="أضف ملاحظتك هنا..." value={noteText} onChange={(e) => setNoteText(e.target.value)} className="rounded-xl" />
-            <div className="flex flex-wrap gap-2">
-              {actionButtons.map((btn) => (
-                <Button key={btn.action} variant={btn.variant} size="sm" className="rounded-xl" disabled={submitting} onClick={() => submitNote(btn.action)}>
-                  {btn.label}
-                </Button>
-              ))}
-            </div>
+            {(() => {
+              const lastDecision = notes.find((n: any) => ["accepted", "rejected"].includes(n.action));
+              if (lastDecision && !overrideDecision) {
+                return (
+                  <div className="flex items-center gap-3">
+                    <Badge variant={lastDecision.action === "accepted" ? "default" : "destructive"}>
+                      {lastDecision.action === "accepted" ? "✓ تم القبول" : "✗ تم الرفض"}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(lastDecision.created_at).toLocaleString("ar-SA")}
+                    </span>
+                    <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setOverrideDecision(true)}>
+                      تغيير القرار
+                    </Button>
+                  </div>
+                );
+              }
+              return (
+                <div className="flex flex-wrap gap-2">
+                  {actionButtons.map((btn) => (
+                    <Button key={btn.action} variant={btn.variant} size="sm" className="rounded-xl" disabled={submitting} onClick={() => { submitNote(btn.action); setOverrideDecision(false); }}>
+                      {btn.label}
+                    </Button>
+                  ))}
+                </div>
+              );
+            })()}
             {notes.length > 0 && (
               <div className="border-t border-border pt-4 space-y-3">
                 {notes.map((n) => (
