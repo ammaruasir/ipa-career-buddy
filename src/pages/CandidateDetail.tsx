@@ -112,6 +112,14 @@ const CandidateDetail = () => {
       setNotes((prev) => prev.filter((n) => n.id !== optimisticNote.id));
       setNoteText(savedText);
     } else {
+      // Auto-release results when a decision is made (accept/reject/retry)
+      if (["accepted", "rejected", "retry"].includes(action) && evaluation?.id) {
+        await supabase
+          .from("evaluations")
+          .update({ review_status: "released" } as any)
+          .eq("id", evaluation.id);
+        setEvaluation((prev: any) => ({ ...prev, review_status: "released" }));
+      }
       toast.success("تم حفظ الإجراء بنجاح");
       const { data } = await supabase.from("hr_notes").select("*").eq("interview_id", id).order("created_at", { ascending: false });
       setNotes(data || []);
@@ -180,25 +188,11 @@ const CandidateDetail = () => {
         {/* Approve / Reject bar */}
         {evaluation && (
           <Card className="rounded-2xl shadow-lg border-2 border-primary/20">
-            <CardContent className="p-4 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-muted-foreground">حالة المراجعة:</span>
-                <Badge variant={reviewStatus === "released" ? "default" : reviewStatus === "rejected" ? "destructive" : "secondary"}>
-                  {reviewStatus === "released" ? "تم الإطلاق" : reviewStatus === "rejected" ? "مرفوض" : "بانتظار المراجعة"}
-                </Badge>
-              </div>
-              {reviewStatus === "pending_review" && (
-                <div className="flex gap-2">
-                  <Button size="sm" className="rounded-xl gap-1" onClick={() => updateReviewStatus("released")}>
-                    <CheckCircle className="w-4 h-4" />
-                    إطلاق النتائج للمرشح
-                  </Button>
-                  <Button size="sm" variant="destructive" className="rounded-xl gap-1" onClick={() => updateReviewStatus("rejected")}>
-                    <XCircle className="w-4 h-4" />
-                    رفض
-                  </Button>
-                </div>
-              )}
+            <CardContent className="p-4 flex flex-wrap items-center gap-4">
+              <span className="text-sm font-semibold text-muted-foreground">حالة المراجعة:</span>
+              <Badge variant={reviewStatus === "released" ? "default" : "secondary"}>
+                {reviewStatus === "released" ? "تم إطلاق النتائج للمرشح" : "بانتظار اتخاذ القرار"}
+              </Badge>
             </CardContent>
           </Card>
         )}
