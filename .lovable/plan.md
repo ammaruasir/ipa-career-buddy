@@ -1,32 +1,22 @@
 
 
-## Problem
+## Plan: Fix Vapi Arabic + Saudi Avatar
 
-Two issues with the Vapi real-time interview:
+### 1. Generate Saudi Male Avatar
+- Create an edge function `generate-avatar` that uses Lovable AI image generation (`google/gemini-3-pro-image-preview`) to generate a professional portrait of a Saudi male wearing traditional national dress (white thobe, red/white shemagh/ghutra with black agal).
+- Download the result and replace `src/assets/interviewer-avatar.png`.
 
-1. **Vapi only says "one" and stops** — The inline assistant configuration passed to `vapi.start()` has issues: the ElevenLabs voice ID (`pNInz6obpgDQGcFmaJgB`) is "Adam" which doesn't support Arabic well, and the model/transcriber config may not be structured correctly for the Vapi SDK's expected format.
+### 2. Fix Vapi Arabic Language Issue
+The Vapi inline assistant config needs additional language enforcement. Changes to `useVapiInterview.ts`:
 
-2. **Not truly real-time** — When the system setting `interview_engine` is `"vapi"`, the code *does* render `VapiLiveInterview` (which is real-time WebRTC). But if the setting is not `"vapi"`, the fallback is the record-based built-in engine. Need to verify the setting is correct.
-
-## Plan
-
-### 1. Fix `useVapiInterview.ts` — Correct the Vapi assistant configuration
-
-- **Use a proper Arabic voice**: Switch from ElevenLabs voice ID "Adam" to an Arabic-native voice. Use Azure voice provider with an Arabic voice (`ar-SA-HamedNeural`) which natively supports Arabic speech.
-- **Fix model config**: Use `gpt-4o` instead of `gpt-4o-mini` for better Arabic language support in real-time conversation.
-- **Strengthen system prompt**: Add explicit instructions to ONLY speak Arabic, never English, and to maintain a natural conversational flow.
-- **Fix `firstMessage`**: Ensure the Arabic greeting is properly set.
-- **Add `serverUrl` silencing** and proper assistant name.
-
-### 2. Fix question counting logic
-
-Currently every assistant transcript message increments `questionCount`, which over-counts (comments between questions also count). Fix to only count when the assistant actually asks a question by tracking Q&A pairs properly.
-
-### 3. Verify system settings
-
-Check that the `interview_engine` setting in the database is set to `"vapi"` so users get routed to the real-time path, not the record-based fallback.
+- **Add `language` field** at the assistant level (not just transcriber) — Vapi uses this to set the overall conversation language.
+- **Add `inputMinCharacters`** to prevent Vapi from cutting off short Arabic utterances.
+- **Set `responseDelaySeconds`** to give the model time to formulate Arabic responses.
+- **Restructure the voice config** — use `languageCode: "ar-SA"` explicitly in the Azure voice config since Vapi may default to English without it.
+- **Strengthen the system prompt** — add explicit instruction in English at the top: `"CRITICAL: You MUST speak ONLY in Arabic (العربية). Never use English under any circumstances."` (mixing English instruction with Arabic content helps LLMs follow language constraints better).
 
 ### Files Changed
-
-- `src/hooks/useVapiInterview.ts` — Fix voice provider, model, system prompt, and question counting
+- `supabase/functions/generate-avatar/index.ts` — New edge function to generate the avatar image
+- `src/assets/interviewer-avatar.png` — Replaced with Saudi male portrait
+- `src/hooks/useVapiInterview.ts` — Fix Vapi config for Arabic
 
