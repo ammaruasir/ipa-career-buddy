@@ -1,45 +1,45 @@
 
 
-## المشكلتان
+## المشكلة
 
-### 1. لقطات الغش لا تُحفظ ولا تُعرض
-عمود `frame_url` في جدول `cheat_events` موجود لكن:
-- **في `analyze-video/index.ts`**: عند إدراج أحداث الغش (سطر 166-174)، لا يتم حفظ الفريم (الصورة) في Storage ولا تعبئة `frame_url`
-- **في `CandidateDetail.tsx`**: عند عرض أحداث الغش (سطر 409-436)، لا يُعرض `frame_url` حتى لو كان موجوداً
+يوجد **13 مقابلة عالقة بحالة `in_progress`** في قاعدة البيانات. السبب:
 
-### 2. تسجيلات الفيديو
-`VideoPlayback` موجود ويُعرض في صفحة المرشح (سطر 394-396). يعمل إذا كانت التسجيلات محفوظة في Storage. هذا الجزء يبدو سليماً.
+1. **عند إغلاق الصفحة أو التنقل بعيداً**: دالة `useEffect` cleanup (سطر 656-667) توقف الميديا فقط ولا تحدّث حالة المقابلة في قاعدة البيانات
+2. **عند حدوث خطأ أثناء المقابلة**: إذا فشل الاتصال أو حدث crash، تبقى المقابلة `in_progress` للأبد
+3. **نفس المشكلة في `useInterviewSession.ts`**: لا يوجد cleanup عند unmount
 
 ## الحل
 
-### 1. تعديل `supabase/functions/analyze-video/index.ts`
-عند كشف حدث غش، نحفظ أول فريم من الـ batch في Storage bucket `interview-recordings` ونعبّئ `frame_url`:
+### 1. `src/hooks/useLiveInterview.ts` — تحديث الحالة عند unmount
+في دالة cleanup (سطر 656-667)، نضيف تحديث حالة المقابلة إلى `abandoned` أو `completed` إذا كانت لا تزال `in_progress`:
 
 ```typescript
-// لكل حدث غش: حفظ الفريم في Storage
-const frameData = frames[0]; // أول لقطة من الدفعة
-const frameBuffer = decode(frameData.split(",")[1]); // base64 → Uint8Array
-const framePath = `cheat-frames/${actualInterviewId}/${Date.now()}_${e.event_type}.jpg`;
-const { data: uploadData } = await supabase.storage
-  .from("interview-recordings")
-  .upload(framePath, frameBuffer, { contentType: "image/jpeg", upsert: true });
-
-// إضافة frame_url للحدث
-const { data: signedUrl } = await supabase.storage
-  .from("interview-recordings")
-  .createSignedUrl(framePath, 86400 * 365); // سنة
+useEffect(() => {
+  return () => {
+    activeRef.current = false;
+    stoppedManuallyRef.current = true;
+    // Stop media...
+    
+    // Mark interview as abandoned if still in progress
+    const id = interviewIdRef.current;
+    if (id && !completedRef.current) {
+      supabase.from("interviews")
+        .update({ status: "completed" as any })
+        .eq("id", id)
+        .then(() => {});
+    }
+  };
+}, []);
 ```
 
-### 2. تعديل `src/pages/CandidateDetail.tsx`
-في قسم عرض أحداث الغش، نضيف عرض الصورة عند الضغط على الحدث:
-- إضافة state لـ `selectedCheatFrame`
-- عند الضغط على حدث غش له `frame_url`، يُعرض في Dialog مع الصورة
-- إضافة أيقونة كاميرا تدل على وجود لقطة
+### 2. `src/hooks/useInterviewSession.ts` — نفس المعالجة
+إضافة cleanup مماثل عند unmount لتحديث حالة المقابلة النصية.
 
-### 3. تعديل `supabase/functions/analyze-video/index.ts` — حفظ `frame_url` في الإدراج
-تحديث rows ليشمل `frame_url` لكل حدث
+### 3. تنظيف البيانات الحالية
+تحديث المقابلات الـ 13 العالقة بحالة `in_progress` إلى `completed`.
 
-### الملفات المعدّلة
-- `supabase/functions/analyze-video/index.ts` — حفظ لقطة الفريم في Storage وتعبئة `frame_url`
-- `src/pages/CandidateDetail.tsx` — عرض لقطة الغش عند الضغط على الحدث في Dialog
+### 4. إضافة `interviewIdRef` و `completedRef`
+لأن cleanup يحتاج الوصول لـ `interviewId` و `isCompleted` بدون أن تكون في dependency array، نستخدم refs.
+
+**الملفات المعدّلة:** `useLiveInterview.ts`، `useInterviewSession.ts`
 
