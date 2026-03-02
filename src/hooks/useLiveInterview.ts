@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ export const useLiveInterview = ({
 }: UseLiveInterviewOptions) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [isActive, setIsActive] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
@@ -39,6 +40,8 @@ export const useLiveInterview = ({
   const transcriptRef = useRef<TranscriptEntry[]>([]);
   const questionCountRef = useRef(0);
   const conversationRef = useRef<{ role: string; content: string }[]>([]);
+  const contextSummaryRef = useRef<string>("");
+  const vacancyIdRef = useRef<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -73,9 +76,7 @@ export const useLiveInterview = ({
           }
         );
 
-        if (!response.ok) {
-          throw new Error(`TTS request failed: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`TTS request failed: ${response.status}`);
 
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
@@ -92,30 +93,21 @@ export const useLiveInterview = ({
         // Auto-resume if browser pauses audio (e.g. on scroll in iframe)
         audio.addEventListener("pause", () => {
           if (activeRef.current && !stoppedManuallyRef.current && !audio.ended) {
-            console.log("[LiveInterview] Audio paused unexpectedly, resuming...");
             audio.play().catch(() => {});
           }
         });
 
-        // Resume audio + AudioContext when tab becomes visible again
         const handleVisibility = () => {
           if (!document.hidden && activeRef.current && !stoppedManuallyRef.current) {
             if (audio.paused && !audio.ended) {
-              console.log("[LiveInterview] Page visible again, resuming audio");
               audio.play().catch(() => {});
             }
           }
         };
         document.addEventListener("visibilitychange", handleVisibility);
 
-        audio.onended = () => {
-          cleanup();
-          resolve();
-        };
-        audio.onerror = () => {
-          cleanup();
-          resolve();
-        };
+        audio.onended = () => { cleanup(); resolve(); };
+        audio.onerror = () => { cleanup(); resolve(); };
 
         await audio.play();
       } catch (error) {
@@ -149,7 +141,6 @@ export const useLiveInterview = ({
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
-        console.log("[LiveInterview] Recorder stopped, chunks:", chunksRef.current.length);
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         stream.getTracks().forEach(t => t.stop());
         ctx.close().catch(() => {});
@@ -162,43 +153,27 @@ export const useLiveInterview = ({
       };
 
       mediaRecorderRef.current = recorder;
-      recorder.start(1000); // timeslice: fire ondataavailable every 1s
+      recorder.start(1000);
       setIsListening(true);
-      console.log("[LiveInterview] Recording started with 1s timeslice");
 
-      // Max recording timeout fallback (45s)
       const maxRecordingTimer = setTimeout(() => {
-        console.log("[LiveInterview] Max recording timeout (45s) reached, force-stopping");
-        if (recorder.state === "recording") {
-          recorder.stop();
-        }
+        if (recorder.state === "recording") recorder.stop();
       }, 45000);
 
-      // Silence detection loop
+      // Silence detection
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       let silenceStart: number | null = null;
       let speechDetected = false;
       const SILENCE_THRESHOLD = 30;
-      const SILENCE_DURATION = 2000; // ms
-      let logCounter = 0;
+      const SILENCE_DURATION = 2000;
 
       const checkSilence = () => {
         if (!activeRef.current || stoppedManuallyRef.current) return;
         analyser.getByteFrequencyData(dataArray);
         const rms = Math.sqrt(dataArray.reduce((sum, v) => sum + v * v, 0) / dataArray.length);
 
-        // Log RMS periodically (every ~60 frames ≈ 1s)
-        logCounter++;
-        if (logCounter % 60 === 0) {
-          console.log("[LiveInterview] RMS:", rms.toFixed(1), "speechDetected:", speechDetected);
-        }
-
-        // Require speech before detecting silence
         if (!speechDetected) {
-          if (rms > SILENCE_THRESHOLD) {
-            speechDetected = true;
-            console.log("[LiveInterview] Speech detected, RMS:", rms.toFixed(1));
-          }
+          if (rms > SILENCE_THRESHOLD) speechDetected = true;
           rafRef.current = requestAnimationFrame(checkSilence);
           return;
         }
@@ -206,10 +181,7 @@ export const useLiveInterview = ({
         if (rms < SILENCE_THRESHOLD) {
           if (!silenceStart) silenceStart = Date.now();
           else if (Date.now() - silenceStart > SILENCE_DURATION) {
-            console.log("[LiveInterview] Silence detected after speech, stopping recorder");
-            if (recorder.state === "recording") {
-              recorder.stop();
-            }
+            if (recorder.state === "recording") recorder.stop();
             return;
           }
         } else {
@@ -219,10 +191,8 @@ export const useLiveInterview = ({
         rafRef.current = requestAnimationFrame(checkSilence);
       };
 
-      // Wait a moment before starting silence detection
       setTimeout(() => {
         if (activeRef.current && !stoppedManuallyRef.current) {
-          console.log("[LiveInterview] Starting silence detection loop");
           rafRef.current = requestAnimationFrame(checkSilence);
         }
       }, 1500);
@@ -261,7 +231,6 @@ export const useLiveInterview = ({
 
       if (!userText || userText.length < 2) {
         toast.warning("لم يتم التعرف على كلام، حاول مرة أخرى");
-        // Re-listen
         if (activeRef.current && !stoppedManuallyRef.current) {
           setTimeout(() => startListening(), 500);
         }
@@ -283,6 +252,9 @@ export const useLiveInterview = ({
         });
       }
 
+      // Update context summary with key points
+      contextSummaryRef.current += `\nسؤال ${questionCountRef.current}: ${conversationRef.current.filter(m => m.role === "assistant").pop()?.content?.substring(0, 100) || ""}\nإجابة مختصرة: ${userText.substring(0, 150)}`;
+
       // Check if interview should end
       const newCount = questionCountRef.current + 1;
       setQuestionCount(newCount);
@@ -293,8 +265,8 @@ export const useLiveInterview = ({
         return;
       }
 
-      // Get next AI response
-      await getNextAIResponse();
+      // Get next AI response using optimized context
+      await getNextAIResponse(userText);
 
     } catch (error) {
       console.error("Recording processing error:", error);
@@ -306,19 +278,28 @@ export const useLiveInterview = ({
     }
   }, [totalQuestions]);
 
-  // Get next question from AI
-  const getNextAIResponse = useCallback(async () => {
+  // Get next question from AI - latency optimized
+  const getNextAIResponse = useCallback(async (lastAnswer?: string) => {
     if (!activeRef.current || stoppedManuallyRef.current) return;
     
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("chat", {
-        body: {
-          messages: conversationRef.current,
-          job_position: jobPosition,
-          interview_type: type,
-        },
-      });
+      const body: any = {
+        job_position: jobPosition,
+        interview_type: type,
+        vacancy_id: vacancyIdRef.current,
+      };
+
+      if (lastAnswer && contextSummaryRef.current) {
+        // Optimized: send only summary + last answer
+        body.context_summary = contextSummaryRef.current;
+        body.last_answer = lastAnswer;
+      } else {
+        // First call or fallback: send full messages
+        body.messages = conversationRef.current;
+      }
+
+      const { data, error } = await supabase.functions.invoke("chat", { body });
 
       if (error) throw error;
 
@@ -350,7 +331,6 @@ export const useLiveInterview = ({
     setIsActive(false);
     setIsListening(false);
     setIsSpeaking(false);
-    // Stop any active recording
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop();
     }
@@ -359,7 +339,6 @@ export const useLiveInterview = ({
     const currentId = interviewIdRef.current;
     if (!currentId) return;
 
-    // Mark completed
     await supabase
       .from("interviews")
       .update({ status: "completed" as any })
@@ -368,7 +347,6 @@ export const useLiveInterview = ({
     setIsCompleted(true);
     toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم...");
 
-    // Evaluate
     setIsEvaluating(true);
     try {
       const resp = await supabase.functions.invoke("evaluate-interview", {
@@ -391,9 +369,13 @@ export const useLiveInterview = ({
     if (!user || !jobPosition) return;
     setIsStarting(true);
     stoppedManuallyRef.current = false;
+    contextSummaryRef.current = "";
+
+    // Get vacancy_id from URL params
+    const vacancyId = searchParams.get("vacancy_id");
+    vacancyIdRef.current = vacancyId;
 
     try {
-      // Create interview record
       const { data: interview, error } = await supabase
         .from("interviews")
         .insert({
@@ -414,31 +396,28 @@ export const useLiveInterview = ({
       setInterviewId(interview.id);
       interviewIdRef.current = interview.id;
 
+      // Link to job application if vacancy_id present
+      if (vacancyId) {
+        await supabase
+          .from("job_applications")
+          .update({ interview_id: interview.id, status: "interviewing" } as any)
+          .eq("vacancy_id", vacancyId)
+          .eq("user_id", user.id);
+      }
+
       // Build system prompt
-      const systemPrompt = `CRITICAL INSTRUCTION: You MUST speak ONLY in Arabic (العربية). Never use English under any circumstances.
+      const systemPrompt = `CRITICAL INSTRUCTION: You MUST speak ONLY in Arabic (العربية). Never use English.
 
-أنت محاور ذكي متخصص في إجراء مقابلات وظيفية احترافية.
+أنت محاور وظيفي محترف يعمل في المملكة العربية السعودية.
+- الوظيفة: ${jobPosition}
+- اطرح سؤالاً واحداً فقط. أقصى 2-3 جمل. أبقِ الرد أقل من 80 كلمة.
+- لا تلخص إجابة المرشح. لا تكرر ما قاله.
+- عدّل الصعوبة ديناميكياً بناءً على جودة الإجابة.
+- لا تساعد المرشح. لا تقدم تلميحات.
+- اطرح ${totalQuestions} أسئلة متنوعة (سلوكية، تقنية، موقفية، توافق ثقافي).`;
 
-## تعليمات صارمة:
-- تحدث باللغة العربية الفصحى فقط. لا تستخدم أي كلمة إنجليزية أبداً.
-- أنت تجري مقابلة وظيفية لمنصب: ${jobPosition}.
-- اطرح ${totalQuestions} أسئلة بالترتيب التالي:
-  • السؤال 1-2: أسئلة سلوكية عن خبرات سابقة
-  • السؤال 3-5: أسئلة تقنية متعلقة بـ ${jobPosition}
-  • السؤال 6-7: أسئلة موقفية (ماذا ستفعل لو...)
-  • السؤال 8: سؤال عن التوافق الثقافي والعمل الجماعي
-- اطرح سؤالاً واحداً فقط في كل مرة.
-- انتظر إجابة المرشح الكاملة قبل طرح السؤال التالي.
-- علّق بإيجاز (جملة أو جملتين) على كل إجابة قبل الانتقال للسؤال التالي.
-- حافظ على لهجة مهنية ودودة طوال المقابلة.
-- بعد آخر سؤال، اشكر المرشح وأخبره أن التقييم سيكون جاهزاً قريباً.
-- لا تكرر الأسئلة ولا تطرح أسئلة خارج نطاق الوظيفة.
+      const firstMessage = `مرحباً بك! أنا المحاور الآلي وسأجري معك مقابلة لوظيفة ${jobPosition}. سأطرح عليك ${totalQuestions} أسئلة. هل أنت مستعد؟`;
 
-REMEMBER: Every word must be in Arabic. No English at all.`;
-
-      const firstMessage = `مرحباً بك! أنا المحاور الآلي وسأجري معك مقابلة لوظيفة ${jobPosition}. سأطرح عليك ${totalQuestions} أسئلة متنوعة. هل أنت مستعد للبدء؟`;
-
-      // Initialize conversation
       conversationRef.current = [
         { role: "system", content: systemPrompt },
         { role: "assistant", content: firstMessage },
@@ -453,7 +432,6 @@ REMEMBER: Every word must be in Arabic. No English at all.`;
       setIsActive(true);
       setIsStarting(false);
 
-      // Speak first message, then start listening
       await speakText(firstMessage);
       if (activeRef.current && !stoppedManuallyRef.current) {
         await startListening();
@@ -463,12 +441,9 @@ REMEMBER: Every word must be in Arabic. No English at all.`;
       toast.error("فشل في بدء المقابلة المباشرة");
       setIsStarting(false);
     }
-  }, [user, type, jobPosition, totalQuestions, speakText, startListening]);
+  }, [user, type, jobPosition, totalQuestions, speakText, startListening, searchParams]);
 
-  // End call manually
-  const endCall = useCallback(() => {
-    endInterview();
-  }, [endInterview]);
+  const endCall = useCallback(() => { endInterview(); }, [endInterview]);
 
   // Cleanup on unmount
   useEffect(() => {

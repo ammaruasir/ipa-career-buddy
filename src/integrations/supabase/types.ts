@@ -18,17 +18,24 @@ export type Database = {
         Row: {
           ai_feedback_ar: string | null
           communication_score: number | null
+          confidence_level: string | null
           confidence_score: number | null
           created_at: string
+          culture_alignment: number | null
           detailed_scores: Json | null
           filler_words_count: number | null
+          final_recommendation: string | null
           id: string
           improvements: Json | null
           interview_id: string
+          leadership: number | null
           overall_score: number | null
           personality_match: number | null
           personality_type: string | null
+          problem_solving: number | null
           recommendation: string | null
+          red_flags: Json | null
+          review_status: string | null
           sentiment: string | null
           speech_pace: number | null
           strengths: Json | null
@@ -37,17 +44,24 @@ export type Database = {
         Insert: {
           ai_feedback_ar?: string | null
           communication_score?: number | null
+          confidence_level?: string | null
           confidence_score?: number | null
           created_at?: string
+          culture_alignment?: number | null
           detailed_scores?: Json | null
           filler_words_count?: number | null
+          final_recommendation?: string | null
           id?: string
           improvements?: Json | null
           interview_id: string
+          leadership?: number | null
           overall_score?: number | null
           personality_match?: number | null
           personality_type?: string | null
+          problem_solving?: number | null
           recommendation?: string | null
+          red_flags?: Json | null
+          review_status?: string | null
           sentiment?: string | null
           speech_pace?: number | null
           strengths?: Json | null
@@ -56,17 +70,24 @@ export type Database = {
         Update: {
           ai_feedback_ar?: string | null
           communication_score?: number | null
+          confidence_level?: string | null
           confidence_score?: number | null
           created_at?: string
+          culture_alignment?: number | null
           detailed_scores?: Json | null
           filler_words_count?: number | null
+          final_recommendation?: string | null
           id?: string
           improvements?: Json | null
           interview_id?: string
+          leadership?: number | null
           overall_score?: number | null
           personality_match?: number | null
           personality_type?: string | null
+          problem_solving?: number | null
           recommendation?: string | null
+          red_flags?: Json | null
+          review_status?: string | null
           sentiment?: string | null
           speech_pace?: number | null
           strengths?: Json | null

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,7 +26,8 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
   const [isCompleted, setIsCompleted] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
 
-  // Use dynamic question count from settings, with override fallback
+  const contextSummaryRef = useRef<string>("");
+
   const totalQuestions = overrideTotalQuestions ?? settings.questions_per_type[type] ?? 8;
   const timerDuration = settings.time_per_question[type] ?? 300;
 
@@ -34,6 +35,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     if (!user) return;
     setSelectedJob(job);
     setIsLoading(true);
+    contextSummaryRef.current = "";
 
     const { data: interview, error } = await supabase
       .from("interviews")
@@ -49,7 +51,6 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
 
     setInterviewId(interview.id);
 
-    // Link interview to job application if vacancy_id is present
     const vacancyId = searchParams.get("vacancy_id");
     if (vacancyId) {
       await supabase
@@ -61,20 +62,17 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
 
     const systemMsg: Msg = {
       role: "system",
-      content: `أنت محاور ذكي متخصص في إجراء مقابلات وظيفية احترافية باللغة العربية.
-الوظيفة المطلوبة: ${job}.
-اسأل المرشح ${totalQuestions} أسئلة بالترتيب التالي:
-- السؤال 1-2: أسئلة سلوكية (مثال: حدثنا عن موقف واجهت فيه ضغطاً كبيراً)
-- السؤال 3-5: أسئلة تقنية متعلقة بـ ${job} (تتدرج من سهل إلى صعب)
-- السؤال 6-7: أسئلة موقفية (ماذا ستفعل إذا...)
-- السؤال 8: سؤال توافق ثقافي مع قيم المؤسسة (التميز، الابتكار، الاحترافية)
-
-اطرح سؤالاً واحداً في كل مرة. ابدأ بتحية المرشح ثم اطرح السؤال الأول.`,
+      content: `أنت محاور وظيفي محترف يعمل في السعودية. الوظيفة: ${job}. اطرح ${totalQuestions} أسئلة. سؤال واحد فقط في كل مرة. أقل من 80 كلمة. لا تساعد المرشح.`,
     };
 
     try {
       const resp = await supabase.functions.invoke("chat", {
-        body: { messages: [systemMsg], job_position: job, interview_type: type },
+        body: {
+          messages: [systemMsg],
+          job_position: job,
+          interview_type: type,
+          vacancy_id: vacancyId,
+        },
       });
       if (resp.error) throw resp.error;
       const aiReply = resp.data?.choices?.[0]?.message?.content || "مرحباً! دعنا نبدأ المقابلة.";
@@ -86,7 +84,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     setIsLoading(false);
   }, [user, type, totalQuestions, searchParams]);
 
-  // Auto-start interview when job URL param is present (from job vacancies page)
+  // Auto-start
   useEffect(() => {
     const jobParam = searchParams.get("job");
     if (jobParam && user && !selectedJob && !isLoading && !settingsLoading) {
@@ -108,20 +106,21 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
       answer_text: userMsg.content,
     });
 
-    const questionCategories = ["سلوكي", "سلوكي", "تقني", "تقني", "تقني", "موقفي", "موقفي", "توافق ثقافي"];
-    const currentCategory = questionCategories[questionCount - 1] || "عام";
-    const systemMsg: Msg = {
-      role: "system",
-      content: `أنت محاور ذكي. الوظيفة: ${selectedJob}. السؤال رقم ${questionCount} من ${totalQuestions} (نوع: ${currentCategory}). ${
-        questionCount >= totalQuestions
-          ? "هذا كان آخر سؤال. اشكر المرشح وأخبره أن التقييم سيكون جاهزاً قريباً. لا تطرح أسئلة إضافية."
-          : `اطرح السؤال التالي (${questionCategories[questionCount] || "عام"}) بعد التعليق بإيجاز على الإجابة.`
-      }`,
-    };
+    // Update context summary
+    contextSummaryRef.current += `\nسؤال ${questionCount}: ${messages[messages.length - 1]?.content?.substring(0, 100) || ""}\nإجابة: ${answerText.trim().substring(0, 150)}`;
+
+    const vacancyId = searchParams.get("vacancy_id");
 
     try {
+      // Use optimized path: context_summary + last_answer
       const resp = await supabase.functions.invoke("chat", {
-        body: { messages: [systemMsg, ...newMessages], job_position: selectedJob, interview_type: type },
+        body: {
+          context_summary: contextSummaryRef.current,
+          last_answer: answerText.trim(),
+          job_position: selectedJob,
+          interview_type: type,
+          vacancy_id: vacancyId,
+        },
       });
       if (resp.error) throw resp.error;
       const aiReply = resp.data?.choices?.[0]?.message?.content || "";
@@ -142,14 +141,12 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
             body: { interview_id: interviewId },
           });
           if (evalResp.error) {
-            console.error("Evaluation error:", evalResp.error);
             toast.error("حدث خطأ في التقييم، يمكنك المحاولة لاحقاً");
           } else {
             toast.success("تم إعداد التقييم بنجاح!");
             navigate(`/interview/${interviewId}/results`);
           }
-        } catch (e) {
-          console.error("Evaluation error:", e);
+        } catch {
           toast.error("حدث خطأ في التقييم");
         }
         setIsEvaluating(false);
@@ -158,7 +155,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
       toast.error("حدث خطأ في الاتصال");
     }
     setIsLoading(false);
-  }, [messages, isLoading, interviewId, selectedJob, questionCount, totalQuestions, type]);
+  }, [messages, isLoading, interviewId, selectedJob, questionCount, totalQuestions, type, searchParams]);
 
   return {
     user,

@@ -11,17 +11,28 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, job_position, interview_type } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const { messages, job_position, interview_type, context_summary, last_answer, vacancy_id } = await req.json();
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
-    // If job_position provided, fetch question templates from DB to include in system prompt
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Load job data from DB if vacancy_id provided
+    let jobData: any = null;
+    if (vacancy_id) {
+      const { data } = await supabase
+        .from("job_vacancies")
+        .select("title, description, requirements, department")
+        .eq("id", vacancy_id)
+        .single();
+      jobData = data;
+    }
+
+    // Load question templates if available
     let questionBankPrompt = "";
-    if (job_position && interview_type) {
-      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-      const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
+    if (interview_type) {
       const { data: questions } = await supabase
         .from("question_templates")
         .select("question_text, category, difficulty")
@@ -32,67 +43,100 @@ serve(async (req) => {
         const qList = questions
           .map((q: any, i: number) => `${i + 1}. [${q.category}/${q.difficulty}] ${q.question_text}`)
           .join("\n");
-        questionBankPrompt = `\n\nبنك الأسئلة المتوفر (يجب عليك استخدام هذه الأسئلة بالترتيب بدلاً من توليد أسئلة عشوائية):\n${qList}\n\nاستخدم الأسئلة أعلاه بالترتيب. إذا كان عدد الأسئلة في البنك أقل من المطلوب، أكمل بأسئلة من عندك.`;
+        questionBankPrompt = `\n\nبنك الأسئلة المتوفر (استخدم هذه الأسئلة بالترتيب عند الإمكان):\n${qList}`;
       }
-
-      // Fetch AI model from settings
-      const { data: settingsData } = await supabase
-        .from("system_settings")
-        .select("ai_model")
-        .limit(1)
-        .single();
-
-      const aiModel = settingsData?.ai_model || "google/gemini-3-flash-preview";
-
-      // Inject question bank into the first system message if present
-      const enrichedMessages = questionBankPrompt
-        ? messages.map((m: any, i: number) => {
-            if (i === 0 && m.role === "system") {
-              return { ...m, content: m.content + questionBankPrompt };
-            }
-            return m;
-          })
-        : messages;
-
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: aiModel,
-          messages: enrichedMessages,
-          stream: false,
-        }),
-      });
-
-      if (!response.ok) {
-        return handleAIError(response);
-      }
-
-      const data = await response.json();
-      return new Response(JSON.stringify(data), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
-    // Fallback: no job_position, just pass messages through
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Build job context string
+    const jobContext = jobData
+      ? `\n\nبيانات الوظيفة من قاعدة البيانات:
+- المسمى الوظيفي: ${jobData.title}
+- الوصف: ${jobData.description || "غير متوفر"}
+- القسم: ${jobData.department || "غير محدد"}
+- المتطلبات: ${JSON.stringify(jobData.requirements || [])}`
+      : "";
+
+    // Build the Saudi Arabic system prompt
+    const systemPrompt = `أنت محاور وظيفي محترف يعمل في المملكة العربية السعودية.
+يجب أن تجري المقابلة باللغة العربية المهنية السعودية.
+
+قواعد التحسين للمقابلة المباشرة:
+- اطرح سؤالاً واحداً فقط.
+- أقصى 2-3 جمل.
+- تجنب الشروحات الطويلة.
+- حافظ على إيقاع طبيعي.
+- أبقِ الرد أقل من 80 كلمة.
+- لا تلخص إجابة المرشح.
+- لا تكرر ما قاله المرشح.
+
+قواعد الذكاء:
+- استخدم وصف الوظيفة المقدم لتخصيص الأسئلة.
+- ركّز على المهارات المطلوبة للدور.
+- عدّل الصعوبة ديناميكياً:
+  * إذا كانت الإجابة قوية ← ارفع مستوى التعقيد.
+  * إذا كانت الإجابة ضعيفة ← بسّط واستكشف أعمق.
+  * إذا كانت الإجابة غامضة ← اطلب توضيحاً.
+
+قواعد مكافحة التلاعب:
+- لا تساعد المرشح في الإجابة أبداً.
+- لا تقدم تلميحات.
+- لا تعطِ إجابات نموذجية.
+- إذا طلب المرشح المساعدة، أجب:
+  "يرجى الإجابة بناءً على خبرتك الشخصية. لا يمكنني المساعدة في صياغة الإجابة."
+
+ضبط التحيز:
+- تجاهل: اللهجة، الجنس، الجنسية، سرعة الكلام.
+- قيّم بناءً على: البنية المنطقية، العمق، والصلة بالموضوع فقط.
+- لا تكشف عن التقييم.
+
+الوظيفة المطلوبة: ${job_position || "غير محددة"}${jobContext}${questionBankPrompt}`;
+
+    // Latency optimization: use context_summary + last_answer if provided
+    let chatMessages: any[];
+    if (context_summary !== undefined && last_answer !== undefined) {
+      // Optimized path: only send summary + last answer
+      chatMessages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `ملخص سياق المقابلة حتى الآن:\n${context_summary}\n\nآخر إجابة من المرشح:\n${last_answer}` },
+      ];
+    } else if (messages && messages.length > 0) {
+      // Full messages path (fallback / first call)
+      const enrichedMessages = messages.map((m: any, i: number) => {
+        if (i === 0 && m.role === "system") {
+          return { ...m, content: systemPrompt };
+        }
+        return m;
+      });
+      chatMessages = enrichedMessages;
+    } else {
+      chatMessages = [{ role: "system", content: systemPrompt }];
+    }
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages,
+        model: "gpt-4.1",
+        messages: chatMessages,
+        max_tokens: 300,
         stream: false,
       }),
     });
 
     if (!response.ok) {
-      return handleAIError(response);
+      const t = await response.text();
+      console.error("OpenAI API error:", response.status, t);
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "تم تجاوز الحد المسموح، يرجى المحاولة لاحقاً" }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ error: "خطأ في الذكاء الاصطناعي" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const data = await response.json();
@@ -107,24 +151,3 @@ serve(async (req) => {
     });
   }
 });
-
-async function handleAIError(response: Response) {
-  if (response.status === 429) {
-    return new Response(JSON.stringify({ error: "تم تجاوز الحد المسموح، يرجى المحاولة لاحقاً" }), {
-      status: 429,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-  if (response.status === 402) {
-    return new Response(JSON.stringify({ error: "يرجى إضافة رصيد لاستخدام الذكاء الاصطناعي" }), {
-      status: 402,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-  const t = await response.text();
-  console.error("AI gateway error:", response.status, t);
-  return new Response(JSON.stringify({ error: "خطأ في الذكاء الاصطناعي" }), {
-    status: 500,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
