@@ -1,6 +1,8 @@
-import { useRef, useMemo } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useRef, useEffect, useMemo } from "react";
+import { useFrame, useGraph } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { SkeletonUtils } from "three-stdlib";
 
 type AvatarState = "idle" | "speaking" | "listening";
 
@@ -9,197 +11,166 @@ interface AvatarHeadProps {
   audioAnalyser: AnalyserNode | null;
 }
 
+// Visemes to cycle through during speaking
+const VISEME_NAMES = [
+  "viseme_aa",
+  "viseme_O",
+  "viseme_E",
+  "viseme_PP",
+  "viseme_FF",
+  "viseme_TH",
+  "viseme_DD",
+  "viseme_SS",
+  "viseme_nn",
+  "viseme_RR",
+  "viseme_CH",
+  "viseme_kk",
+];
+
 const AvatarHead = ({ state, audioAnalyser }: AvatarHeadProps) => {
   const groupRef = useRef<THREE.Group>(null);
-  const mouthRef = useRef<THREE.Mesh>(null);
-  const leftEyeRef = useRef<THREE.Group>(null);
-  const rightEyeRef = useRef<THREE.Group>(null);
-  const leftBrowRef = useRef<THREE.Mesh>(null);
-  const rightBrowRef = useRef<THREE.Mesh>(null);
-  const leftPupilRef = useRef<THREE.Mesh>(null);
-  const rightPupilRef = useRef<THREE.Mesh>(null);
+  const { scene } = useGLTF("/models/avatar.glb");
 
-  const blinkState = useRef({ nextBlink: 2, blinking: false, blinkProgress: 0 });
+  // Clone scene to avoid shared mutation
+  const clone = useMemo(() => SkeletonUtils.clone(scene), [scene]);
+  const { nodes } = useGraph(clone);
+
+  // Collect all skinned meshes with morph targets
+  const morphMeshes = useMemo(() => {
+    const meshes: THREE.SkinnedMesh[] = [];
+    clone.traverse((child) => {
+      if (
+        (child as THREE.SkinnedMesh).isSkinnedMesh &&
+        (child as THREE.SkinnedMesh).morphTargetDictionary
+      ) {
+        meshes.push(child as THREE.SkinnedMesh);
+      }
+    });
+    return meshes;
+  }, [clone]);
+
   const dataArray = useMemo(() => {
     if (!audioAnalyser) return null;
     return new Uint8Array(audioAnalyser.frequencyBinCount);
   }, [audioAnalyser]);
 
-  // Skin & material colors
-  const skinColor = useMemo(() => new THREE.Color("#e8b89d"), []);
-  const lipColor = useMemo(() => new THREE.Color("#c47a6a"), []);
-  const eyeWhite = useMemo(() => new THREE.Color("#f5f5f5"), []);
-  const irisColor = useMemo(() => new THREE.Color("#3d2b1f"), []);
-  const browColor = useMemo(() => new THREE.Color("#4a3728"), []);
-  const noseColor = useMemo(() => new THREE.Color("#d9a68a"), []);
+  // Refs for animation state
+  const visemeState = useRef({
+    currentIndex: 0,
+    nextSwitch: 0,
+    currentInfluences: new Float32Array(VISEME_NAMES.length),
+  });
 
   useFrame((_, delta) => {
     if (!groupRef.current) return;
     const t = performance.now() / 1000;
 
-    // --- Head sway ---
-    const swayAmount = state === "listening" ? 0.06 : 0.03;
+    // --- Idle breathing ---
+    const breathe = Math.sin(t * 1.2) * 0.003;
+    groupRef.current.position.y = -1.5 + breathe;
+
+    // Subtle head sway
+    const swayAmount = state === "listening" ? 0.04 : 0.02;
     const swaySpeed = state === "listening" ? 0.4 : 0.6;
     groupRef.current.rotation.y = Math.sin(t * swaySpeed) * swayAmount;
-    groupRef.current.rotation.x = Math.sin(t * 0.3) * 0.015;
-
-    // Breathing
-    const breathe = 1 + Math.sin(t * 1.2) * 0.008;
-    groupRef.current.scale.setScalar(breathe);
+    groupRef.current.rotation.x = Math.sin(t * 0.3) * 0.01;
 
     // Listening tilt
     if (state === "listening") {
-      groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, 0.05, delta * 2);
+      groupRef.current.rotation.z = THREE.MathUtils.lerp(
+        groupRef.current.rotation.z,
+        0.03,
+        delta * 2
+      );
     } else {
-      groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, 0, delta * 2);
+      groupRef.current.rotation.z = THREE.MathUtils.lerp(
+        groupRef.current.rotation.z,
+        0,
+        delta * 2
+      );
     }
 
     // Speaking nod
     if (state === "speaking") {
-      groupRef.current.rotation.x += Math.sin(t * 2.5) * 0.012;
+      groupRef.current.rotation.x += Math.sin(t * 2.5) * 0.008;
     }
 
-    // --- Mouth animation ---
-    if (mouthRef.current) {
-      let mouthOpen = 0;
-      if (state === "speaking") {
-        if (audioAnalyser && dataArray) {
-          audioAnalyser.getByteFrequencyData(dataArray);
-          let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-          const avg = sum / dataArray.length / 255;
-          mouthOpen = Math.min(avg * 3, 1);
-        } else {
-          // Fallback timing-based
-          mouthOpen = (Math.sin(t * 8) * 0.5 + 0.5) * 0.7;
+    // --- Viseme / Lip-sync animation ---
+    const vs = visemeState.current;
+
+    if (state === "speaking") {
+      let mouthOpenness = 0;
+
+      if (audioAnalyser && dataArray) {
+        // Use real audio data
+        audioAnalyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        mouthOpenness = Math.min((sum / dataArray.length / 255) * 3, 1);
+      } else {
+        // Timing-based fallback for Vapi
+        mouthOpenness = Math.sin(t * 8) * 0.5 + 0.5;
+      }
+
+      // Cycle through visemes
+      vs.nextSwitch -= delta;
+      if (vs.nextSwitch <= 0) {
+        vs.currentIndex = (vs.currentIndex + 1) % VISEME_NAMES.length;
+        vs.nextSwitch = 0.08 + Math.random() * 0.12; // 80-200ms per viseme
+      }
+
+      // Update morph target influences
+      for (let i = 0; i < VISEME_NAMES.length; i++) {
+        const target = i === vs.currentIndex ? mouthOpenness * 0.7 : 0;
+        vs.currentInfluences[i] = THREE.MathUtils.lerp(
+          vs.currentInfluences[i],
+          target,
+          delta * 12
+        );
+      }
+    } else {
+      // Reset all visemes when not speaking
+      for (let i = 0; i < VISEME_NAMES.length; i++) {
+        vs.currentInfluences[i] = THREE.MathUtils.lerp(
+          vs.currentInfluences[i],
+          0,
+          delta * 8
+        );
+      }
+    }
+
+    // Apply morph targets to all skinned meshes
+    morphMeshes.forEach((mesh) => {
+      if (!mesh.morphTargetDictionary || !mesh.morphTargetInfluences) return;
+      for (let i = 0; i < VISEME_NAMES.length; i++) {
+        const idx = mesh.morphTargetDictionary[VISEME_NAMES[i]];
+        if (idx !== undefined) {
+          mesh.morphTargetInfluences[idx] = vs.currentInfluences[i];
         }
       }
-      const targetScaleY = 0.3 + mouthOpen * 1.2;
-      mouthRef.current.scale.y = THREE.MathUtils.lerp(mouthRef.current.scale.y, targetScaleY, delta * 12);
-      // Slightly open mouth width when speaking
-      mouthRef.current.scale.x = THREE.MathUtils.lerp(mouthRef.current.scale.x, 1 + mouthOpen * 0.15, delta * 8);
-    }
 
-    // --- Blink ---
-    const blink = blinkState.current;
-    blink.nextBlink -= delta;
-    if (blink.nextBlink <= 0 && !blink.blinking) {
-      blink.blinking = true;
-      blink.blinkProgress = 0;
-    }
-    if (blink.blinking) {
-      blink.blinkProgress += delta * 8;
-      const p = blink.blinkProgress;
-      const scaleY = p < 0.5 ? 1 - p * 2 : (p - 0.5) * 2;
-      leftEyeRef.current?.scale.set(1, Math.max(scaleY, 0.05), 1);
-      rightEyeRef.current?.scale.set(1, Math.max(scaleY, 0.05), 1);
-      if (p >= 1) {
-        blink.blinking = false;
-        blink.nextBlink = 2.5 + Math.random() * 3;
-        leftEyeRef.current?.scale.set(1, 1, 1);
-        rightEyeRef.current?.scale.set(1, 1, 1);
+      // Blink animation
+      const blinkIdx = mesh.morphTargetDictionary["eyeBlinkLeft"];
+      const blinkIdxR = mesh.morphTargetDictionary["eyeBlinkRight"];
+      if (blinkIdx !== undefined && blinkIdxR !== undefined) {
+        const blinkCycle = t % 4;
+        const blinkValue =
+          blinkCycle > 3.7 && blinkCycle < 3.9
+            ? Math.sin((blinkCycle - 3.7) * Math.PI * 5)
+            : 0;
+        mesh.morphTargetInfluences[blinkIdx] = blinkValue;
+        mesh.morphTargetInfluences[blinkIdxR] = blinkValue;
       }
-    }
-
-    // --- Eyebrows ---
-    const browRaise = state === "speaking" ? 0.06 + Math.sin(t * 3) * 0.02 : 0;
-    if (leftBrowRef.current) {
-      leftBrowRef.current.position.y = THREE.MathUtils.lerp(leftBrowRef.current.position.y, 0.52 + browRaise, delta * 5);
-    }
-    if (rightBrowRef.current) {
-      rightBrowRef.current.position.y = THREE.MathUtils.lerp(rightBrowRef.current.position.y, 0.52 + browRaise, delta * 5);
-    }
-
-    // --- Pupil micro-movement ---
-    const pupilDrift = state === "listening" ? 0.02 : 0.01;
-    const px = Math.sin(t * 0.7) * pupilDrift;
-    const py = Math.cos(t * 0.5) * pupilDrift * 0.5;
-    leftPupilRef.current?.position.set(px, py, 0.06);
-    rightPupilRef.current?.position.set(px, py, 0.06);
+    });
   });
 
   return (
-    <group ref={groupRef} position={[0, 0, 0]}>
-      {/* Head */}
-      <mesh>
-        <sphereGeometry args={[1, 64, 64]} />
-        <meshStandardMaterial color={skinColor} roughness={0.6} metalness={0.05} />
-      </mesh>
-
-      {/* Ears */}
-      <mesh position={[-0.95, 0.05, 0]} rotation={[0, 0, 0.15]}>
-        <sphereGeometry args={[0.18, 16, 16]} />
-        <meshStandardMaterial color={skinColor} roughness={0.6} />
-      </mesh>
-      <mesh position={[0.95, 0.05, 0]} rotation={[0, 0, -0.15]}>
-        <sphereGeometry args={[0.18, 16, 16]} />
-        <meshStandardMaterial color={skinColor} roughness={0.6} />
-      </mesh>
-
-      {/* Nose */}
-      <mesh position={[0, -0.05, 0.9]} rotation={[0.3, 0, 0]}>
-        <coneGeometry args={[0.12, 0.3, 8]} />
-        <meshStandardMaterial color={noseColor} roughness={0.5} />
-      </mesh>
-      {/* Nose bridge */}
-      <mesh position={[0, 0.12, 0.88]}>
-        <sphereGeometry args={[0.08, 8, 8]} />
-        <meshStandardMaterial color={noseColor} roughness={0.5} />
-      </mesh>
-
-      {/* Left Eye */}
-      <group ref={leftEyeRef} position={[-0.32, 0.28, 0.78]}>
-        <mesh>
-          <sphereGeometry args={[0.14, 32, 32]} />
-          <meshStandardMaterial color={eyeWhite} roughness={0.2} />
-        </mesh>
-        {/* Iris */}
-        <mesh ref={leftPupilRef} position={[0, 0, 0.06]}>
-          <sphereGeometry args={[0.08, 16, 16]} />
-          <meshStandardMaterial color={irisColor} roughness={0.3} />
-        </mesh>
-        {/* Pupil */}
-        <mesh position={[0, 0, 0.11]}>
-          <sphereGeometry args={[0.04, 12, 12]} />
-          <meshStandardMaterial color="black" />
-        </mesh>
-      </group>
-
-      {/* Right Eye */}
-      <group ref={rightEyeRef} position={[0.32, 0.28, 0.78]}>
-        <mesh>
-          <sphereGeometry args={[0.14, 32, 32]} />
-          <meshStandardMaterial color={eyeWhite} roughness={0.2} />
-        </mesh>
-        <mesh ref={rightPupilRef} position={[0, 0, 0.06]}>
-          <sphereGeometry args={[0.08, 16, 16]} />
-          <meshStandardMaterial color={irisColor} roughness={0.3} />
-        </mesh>
-        <mesh position={[0, 0, 0.11]}>
-          <sphereGeometry args={[0.04, 12, 12]} />
-          <meshStandardMaterial color="black" />
-        </mesh>
-      </group>
-
-      {/* Left Eyebrow */}
-      <mesh ref={leftBrowRef} position={[-0.32, 0.52, 0.8]} rotation={[0, 0, 0.1]}>
-        <boxGeometry args={[0.22, 0.04, 0.06]} />
-        <meshStandardMaterial color={browColor} roughness={0.8} />
-      </mesh>
-
-      {/* Right Eyebrow */}
-      <mesh ref={rightBrowRef} position={[0.32, 0.52, 0.8]} rotation={[0, 0, -0.1]}>
-        <boxGeometry args={[0.22, 0.04, 0.06]} />
-        <meshStandardMaterial color={browColor} roughness={0.8} />
-      </mesh>
-
-      {/* Mouth */}
-      <mesh ref={mouthRef} position={[0, -0.35, 0.85]}>
-        <torusGeometry args={[0.15, 0.04, 8, 24]} />
-        <meshStandardMaterial color={lipColor} roughness={0.4} />
-      </mesh>
+    <group ref={groupRef} position={[0, -1.5, 0]} scale={1.8}>
+      <primitive object={clone} />
     </group>
   );
 };
+
+useGLTF.preload("/models/avatar.glb");
 
 export default AvatarHead;
