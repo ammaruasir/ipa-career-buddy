@@ -1,22 +1,33 @@
 
 
-## Plan: Fix Vapi Arabic + Saudi Avatar
+## Problem
 
-### 1. Generate Saudi Male Avatar
-- Create an edge function `generate-avatar` that uses Lovable AI image generation (`google/gemini-3-pro-image-preview`) to generate a professional portrait of a Saudi male wearing traditional national dress (white thobe, red/white shemagh/ghutra with black agal).
-- Download the result and replace `src/assets/interviewer-avatar.png`.
+The current live interview uses **browser TTS** (`window.speechSynthesis`) for speaking Arabic text. Browser TTS has very poor Arabic support on most platforms — voices are robotic, often unavailable, or simply don't work.
 
-### 2. Fix Vapi Arabic Language Issue
-The Vapi inline assistant config needs additional language enforcement. Changes to `useVapiInterview.ts`:
+## Solution: Replace Browser TTS with ElevenLabs TTS
 
-- **Add `language` field** at the assistant level (not just transcriber) — Vapi uses this to set the overall conversation language.
-- **Add `inputMinCharacters`** to prevent Vapi from cutting off short Arabic utterances.
-- **Set `responseDelaySeconds`** to give the model time to formulate Arabic responses.
-- **Restructure the voice config** — use `languageCode: "ar-SA"` explicitly in the Azure voice config since Vapi may default to English without it.
-- **Strengthen the system prompt** — add explicit instruction in English at the top: `"CRITICAL: You MUST speak ONLY in Arabic (العربية). Never use English under any circumstances."` (mixing English instruction with Arabic content helps LLMs follow language constraints better).
+Use ElevenLabs' `eleven_multilingual_v2` model, which has excellent Arabic support with natural-sounding voices.
 
-### Files Changed
-- `supabase/functions/generate-avatar/index.ts` — New edge function to generate the avatar image
-- `src/assets/interviewer-avatar.png` — Replaced with Saudi male portrait
-- `src/hooks/useVapiInterview.ts` — Fix Vapi config for Arabic
+### Changes
+
+**1. Create `supabase/functions/elevenlabs-tts/index.ts`** — New edge function that:
+- Accepts `{ text, voiceId }` in the request body
+- Calls ElevenLabs API with `eleven_multilingual_v2` model
+- Returns raw MP3 audio bytes
+- Uses a male Arabic-suitable voice (e.g. George - `JBFqnCBsd6RMkjVDRZzb` or Daniel - `onwK4e9ZLuTAKqWW03F9`)
+
+**2. Add `ELEVENLABS_API_KEY` secret** — Required for the ElevenLabs API. You'll need to provide your API key.
+
+**3. Update `src/hooks/useLiveInterview.ts`** — Replace the `speakText` function:
+- Instead of `window.speechSynthesis`, fetch audio from the `elevenlabs-tts` edge function
+- Play the returned MP3 blob using `new Audio(URL.createObjectURL(blob))`
+- Use the `audio.onended` event to resolve the promise (triggering mic auto-start)
+- Set `isSpeaking` state based on audio playback
+
+### How it works
+```text
+AI text → elevenlabs-tts edge function → MP3 audio blob → Audio playback → onended → auto-start mic
+```
+
+This replaces the broken browser TTS while keeping the exact same conversational loop flow.
 
