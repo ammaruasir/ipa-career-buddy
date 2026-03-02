@@ -8,7 +8,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowRight, Award, Brain, MessageSquare, Briefcase,
-  Users, BarChart3, Loader2, Eye, TrendingUp, TrendingDown, Clock
+  Users, BarChart3, Loader2, Eye, TrendingUp, TrendingDown, Clock,
+  Smartphone, AlertTriangle
 } from "lucide-react";
 
 const discLabels: Record<string, { label: string; desc: string; color: string }> = {
@@ -213,6 +214,21 @@ const InterviewResults = () => {
                   </div>
                 ))}
               </div>
+              {/* Phone Detection Alert */}
+              {videoAnalysis.phone_detected && (
+                <div className="mt-4 flex items-start gap-3 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-destructive flex items-center gap-1.5">
+                      <Smartphone className="w-4 h-4" />
+                      تم رصد هاتف محمول
+                    </p>
+                    {videoAnalysis.phone_detection_notes && (
+                      <p className="text-xs text-muted-foreground mt-1">{videoAnalysis.phone_detection_notes}</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

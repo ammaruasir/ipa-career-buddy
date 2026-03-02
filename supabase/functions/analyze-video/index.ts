@@ -39,7 +39,8 @@ serve(async (req) => {
 1. التواصل البصري (eye contact) - هل ينظر المرشح للكاميرا؟
 2. الثقة بالنفس - تعبيرات الوجه، الوضعية
 3. الانخراط والاهتمام - هل يبدو منتبهًا ومشاركًا؟
-4. لغة الجسد العامة - الوضعية، الحركات، المظهر المهني`;
+4. لغة الجسد العامة - الوضعية، الحركات، المظهر المهني
+5. كشف الهاتف المحمول - هل يوجد هاتف محمول مرئي في الإطار؟ هل يمسك المرشح بهاتف أو يوجد هاتف على الطاولة أو بالقرب منه؟`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -74,10 +75,13 @@ serve(async (req) => {
                   body_language_assessment: { type: "string", description: "Body language assessment in Arabic" },
                   professional_appearance: { type: "number", description: "Professional appearance score 0-100" },
                   overall_impression: { type: "string", description: "Overall impression summary in Arabic" },
+                  phone_detected: { type: "boolean", description: "Whether a mobile phone is visible in the frame" },
+                  phone_detection_notes: { type: "string", description: "Notes about phone location and usage in Arabic, empty string if no phone detected" },
                 },
                 required: [
                   "eye_contact_score", "confidence_score", "engagement_score",
                   "body_language_assessment", "professional_appearance", "overall_impression",
+                  "phone_detected", "phone_detection_notes",
                 ],
                 additionalProperties: false,
               },
