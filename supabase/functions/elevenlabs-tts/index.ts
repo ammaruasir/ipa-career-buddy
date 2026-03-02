@@ -12,43 +12,34 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voiceId } = await req.json();
-    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+    const { text } = await req.json();
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
-    if (!ELEVENLABS_API_KEY) {
-      return new Response(JSON.stringify({ error: "ELEVENLABS_API_KEY not set" }), {
+    if (!OPENAI_API_KEY) {
+      return new Response(JSON.stringify({ error: "OPENAI_API_KEY not set" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const voice = voiceId || "onwK4e9ZLuTAKqWW03F9"; // Daniel - good for Arabic
-
-    const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`,
-      {
-        method: "POST",
-        headers: {
-          "xi-api-key": ELEVENLABS_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: {
-            stability: 0.6,
-            similarity_boost: 0.75,
-            style: 0.4,
-            use_speaker_boost: true,
-            speed: 0.95,
-          },
-        }),
-      }
-    );
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini-tts",
+        input: text,
+        voice: "ash",
+        response_format: "mp3",
+        speed: 0.95,
+      }),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("ElevenLabs API error:", errorText);
+      console.error("OpenAI TTS API error:", errorText);
       return new Response(JSON.stringify({ error: "TTS generation failed" }), {
         status: response.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -64,7 +55,7 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error("Error in elevenlabs-tts:", error);
+    console.error("Error in TTS function:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
