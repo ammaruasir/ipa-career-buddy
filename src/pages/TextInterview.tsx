@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInterviewSession } from "@/hooks/useInterviewSession";
 import { useInterviewTimer } from "@/hooks/useInterviewTimer";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
+import { useCheatCamera } from "@/hooks/useCheatCamera";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
 import JobSelector from "@/components/interview/JobSelector";
@@ -11,7 +12,7 @@ import TypingIndicator from "@/components/interview/TypingIndicator";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Bot, AlertTriangle } from "lucide-react";
+import { Send, Bot, AlertTriangle, Camera } from "lucide-react";
 
 const TextInterview = () => {
   const { user, loading: authLoading } = useAuth();
@@ -31,6 +32,11 @@ const TextInterview = () => {
   const { tabSwitchCount, showWarning, handlePaste } = useAntiCheat({
     enableTabDetection: true,
     enablePasteDetection: true,
+  });
+
+  const cheatCamera = useCheatCamera({
+    enabled: !!session.selectedJob,
+    interviewId: session.interviewId,
   });
 
   useEffect(() => {
@@ -87,7 +93,24 @@ const TextInterview = () => {
       )}
 
       {/* Chat Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 relative">
+        {/* Cheat Camera PiP */}
+        {cheatCamera.stream && (
+          <div className="fixed bottom-24 left-4 w-32 h-24 rounded-xl overflow-hidden border-2 border-border shadow-lg bg-black z-50">
+            <video
+              ref={cheatCamera.videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+              style={{ transform: "scaleX(-1)" }}
+            />
+            <div className="absolute top-1 right-1 flex items-center gap-1 bg-black/60 rounded-full px-1.5 py-0.5">
+              <Camera className="w-3 h-3 text-red-400" />
+              <span className="text-[9px] text-red-400 font-medium">REC</span>
+            </div>
+          </div>
+        )}
         <div className="container mx-auto max-w-2xl space-y-4">
           {session.messages.map((msg, i) => (
             <div

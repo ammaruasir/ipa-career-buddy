@@ -299,17 +299,7 @@ export const useLiveInterview = ({
       // Update context summary with key points
       contextSummaryRef.current += `\nسؤال ${questionCountRef.current}: ${conversationRef.current.filter(m => m.role === "assistant").pop()?.content?.substring(0, 100) || ""}\nإجابة مختصرة: ${userText.substring(0, 150)}`;
 
-      // Check if interview should end
-      const newCount = questionCountRef.current + 1;
-      setQuestionCount(newCount);
-      questionCountRef.current = newCount;
-
-      if (newCount >= totalQuestions) {
-        await getClosingResponse();
-        return;
-      }
-
-      // Get next AI response using optimized context
+      // Get next AI response - question count will be updated based on [NEW_Q]/[FOLLOW_UP] tag
       await getNextAIResponse(userText);
 
     } catch (error) {
@@ -382,14 +372,31 @@ export const useLiveInterview = ({
 
       if (error) throw error;
 
-      const aiText = data?.choices?.[0]?.message?.content || data?.content || "";
+      let aiText = data?.choices?.[0]?.message?.content || data?.content || "";
       if (!aiText) throw new Error("Empty AI response");
+
+      // Handle [NEW_Q]/[FOLLOW_UP] tags
+      const isFollowUp = aiText.startsWith("[FOLLOW_UP]");
+      aiText = aiText.replace(/^\[(NEW_Q|FOLLOW_UP)\]\s*/, "");
 
       setIsProcessing(false);
 
       const aiEntry: TranscriptEntry = { role: "assistant", text: aiText };
       setTranscript(prev => [...prev, aiEntry]);
       conversationRef.current.push({ role: "assistant", content: aiText });
+
+      // Only increment question count for new questions
+      if (!isFollowUp) {
+        const newCount = questionCountRef.current + 1;
+        setQuestionCount(newCount);
+        questionCountRef.current = newCount;
+
+        if (newCount >= totalQuestions) {
+          await speakText(aiText);
+          await getClosingResponse();
+          return;
+        }
+      }
 
       // Speak and then listen
       await speakText(aiText);
