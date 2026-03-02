@@ -122,6 +122,7 @@ const CompleteProfile = () => {
       return;
     }
     setUploading(true);
+    setResumeSkills(null);
     const path = `${user.id}/resume.pdf`;
     const { error } = await supabase.storage.from("resumes").upload(path, file, { upsert: true });
     if (error) {
