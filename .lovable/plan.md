@@ -1,28 +1,18 @@
 
 
-## Fix: Auto-scroll transcript in LiveInterview
+## Fix: Add confirmation dialog for ending interview
 
-The transcript `ScrollArea` (line 201) never scrolls to show new messages. The fix is simple:
+The "إنهاء المقابلة" button in `LiveInterview.tsx` currently calls `live.endCall()` directly. We need to add a confirmation step.
 
-**`src/components/interview/LiveInterview.tsx`**:
-- Add a ref to a dummy div at the bottom of the transcript list
-- Add a `useEffect` that triggers `scrollIntoView` whenever `live.transcript` changes
+### Changes in `src/components/interview/LiveInterview.tsx`
 
-This is the same pattern already used in `TextInterview.tsx` (line with `scrollRef`).
+- Add a new state `showEndConfirm` 
+- When clicking "إنهاء المقابلة", set `showEndConfirm = true` instead of calling `endCall` directly
+- Add an `AlertDialog` asking "هل أنت متأكد من إنهاء المقابلة؟" with confirm/cancel
+- On confirm: call `live.endCall()` which already marks the interview done and navigates
 
-### Changes
-```tsx
-// Add a ref for the bottom of transcript
-const transcriptEndRef = useRef<HTMLDivElement>(null);
+This reuses the existing `AlertDialog` components already imported via `ExitConfirmationDialog`. We'll add a second simple `AlertDialog` inline or reuse the same pattern.
 
-// Auto-scroll when transcript updates
-useEffect(() => {
-  transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
-}, [live.transcript]);
-
-// Inside the ScrollArea, after the transcript map:
-<div ref={transcriptEndRef} />
-```
-
-**File modified**: `src/components/interview/LiveInterview.tsx` only.
+### File modified
+- `src/components/interview/LiveInterview.tsx` only
 
