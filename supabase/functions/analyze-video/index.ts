@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { decode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -163,11 +164,40 @@ serve(async (req) => {
       }
 
       if (events.length > 0) {
-        const rows = events.map(e => ({
-          interview_id: actualInterviewId,
-          event_type: e.event_type,
-          details: e.details,
-        }));
+        // Upload first frame from the batch for each cheat event
+        const rows = [];
+        for (const e of events) {
+          let frameUrl: string | null = null;
+          try {
+            const frameData = frames[0]; // first frame from batch
+            if (frameData && frameData.includes(",")) {
+              const base64Part = frameData.split(",")[1];
+              const frameBuffer = decode(base64Part);
+              const framePath = `cheat-frames/${actualInterviewId}/${Date.now()}_${e.event_type}.jpg`;
+              const { error: uploadErr } = await supabase.storage
+                .from("interview-recordings")
+                .upload(framePath, frameBuffer, { contentType: "image/jpeg", upsert: true });
+
+              if (!uploadErr) {
+                const { data: signedData } = await supabase.storage
+                  .from("interview-recordings")
+                  .createSignedUrl(framePath, 86400 * 365); // 1 year
+                frameUrl = signedData?.signedUrl || null;
+              } else {
+                console.error("Failed to upload cheat frame:", uploadErr);
+              }
+            }
+          } catch (frameErr) {
+            console.error("Error processing cheat frame:", frameErr);
+          }
+
+          rows.push({
+            interview_id: actualInterviewId,
+            event_type: e.event_type,
+            details: e.details,
+            frame_url: frameUrl,
+          });
+        }
 
         const { error: insertErr } = await supabase
           .from("cheat_events")
