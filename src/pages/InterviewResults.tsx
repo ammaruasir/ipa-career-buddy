@@ -74,7 +74,7 @@ const InterviewResults = () => {
         </div>
         <h1 className="text-2xl font-bold text-foreground text-center">تم إكمال المقابلة بنجاح</h1>
         <p className="text-muted-foreground text-center max-w-md text-lg leading-relaxed">
-          سيتم إشعارك بالنتيجة بعد مراجعة فريق الموارد البشرية.
+          سيتم إشعارك بالنتيجة بعد مراجعة فريق الموارد البشرية واتخاذ القرار.
         </p>
         <Button size="lg" className="rounded-xl mt-4" onClick={() => navigate("/dashboard")}>
           العودة للوحة التحكم
