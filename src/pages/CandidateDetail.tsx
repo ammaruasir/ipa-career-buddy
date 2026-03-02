@@ -395,7 +395,7 @@ const CandidateDetail = () => {
 
         {/* Video/Audio Playback — for all interview types */}
         {interview.user_id && (
-          <VideoPlayback interviewId={interview.id} userId={interview.user_id} recordingUrl={(interview as any).recording_url} />
+          <VideoPlayback interviewId={interview.id} userId={interview.user_id} recordingUrl={(interview as any).recording_url} interviewType={interview.type} />
         )}
 
         {/* Cheat Events Log */}

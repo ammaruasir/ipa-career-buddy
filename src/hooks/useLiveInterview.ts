@@ -480,24 +480,28 @@ export const useLiveInterview = ({
     console.log(`[Recording] Session blob size: ${sessionBlob.size} bytes, chunks: ${sessionChunksRef.current.length}`);
     
     if (sessionBlob.size > 0 && user) {
-      try {
-        const fileName = `${user.id}/${currentId}_full.webm`;
-        const { error: uploadErr } = await supabase.storage
-          .from("interview-recordings")
-          .upload(fileName, sessionBlob, { contentType: "video/webm", upsert: true });
-        
-        if (uploadErr) {
-          console.error("[Recording] Upload failed:", uploadErr);
-        } else {
-          console.log("[Recording] Upload successful:", fileName);
-          // Save file path (not public URL) since bucket is private
-          await supabase
-            .from("interviews")
-            .update({ recording_url: fileName } as any)
-            .eq("id", currentId);
+      const fileName = `${user.id}/${currentId}_full.webm`;
+      let uploaded = false;
+      
+      for (let attempt = 0; attempt < 2 && !uploaded; attempt++) {
+        try {
+          const { error: uploadErr } = await supabase.storage
+            .from("interview-recordings")
+            .upload(fileName, sessionBlob, { contentType: "video/webm", upsert: true });
+          
+          if (uploadErr) {
+            console.error(`[Recording] Upload attempt ${attempt + 1} failed:`, uploadErr);
+          } else {
+            console.log("[Recording] Upload successful:", fileName);
+            await supabase
+              .from("interviews")
+              .update({ recording_url: fileName } as any)
+              .eq("id", currentId);
+            uploaded = true;
+          }
+        } catch (err) {
+          console.error(`[Recording] Upload attempt ${attempt + 1} error:`, err);
         }
-      } catch (err) {
-        console.error("[Recording] Failed to upload session recording:", err);
       }
     } else {
       console.warn("[Recording] No recording data to upload — blob size:", sessionBlob.size);
