@@ -20,7 +20,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Phone, PhoneOff, AlertTriangle, Loader2, Mic, Volume2, Brain, FileText, Camera } from "lucide-react";
+import { Phone, PhoneOff, AlertTriangle, Loader2, Mic, Volume2, Brain, FileText, Camera, Send } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface LiveInterviewProps {
@@ -251,15 +251,27 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
             </Button>
           )}
           {live.isCallActive && (
-            <Button
-              onClick={() => setShowEndConfirm(true)}
-              size="lg"
-              variant="destructive"
-              className="rounded-full gap-2 px-8"
-            >
-              <PhoneOff className="w-5 h-5" />
-              إنهاء المقابلة
-            </Button>
+            <>
+              {live.isListening && (
+                <Button
+                  onClick={live.submitAnswer}
+                  size="lg"
+                  className="rounded-full gap-2 px-8 bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <Send className="w-5 h-5" />
+                  إرسال الرد
+                </Button>
+              )}
+              <Button
+                onClick={() => setShowEndConfirm(true)}
+                size="lg"
+                variant="destructive"
+                className="rounded-full gap-2 px-8"
+              >
+                <PhoneOff className="w-5 h-5" />
+                إنهاء المقابلة
+              </Button>
+            </>
           )}
         </div>
 

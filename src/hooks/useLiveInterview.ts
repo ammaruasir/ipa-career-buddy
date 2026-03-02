@@ -704,6 +704,12 @@ export const useLiveInterview = ({
     };
   }, [isCompleted]);
 
+  const submitAnswer = () => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
   return {
     isCallActive: isActive,
     isConnecting: isStarting,
@@ -718,6 +724,7 @@ export const useLiveInterview = ({
     questionCount,
     startCall,
     endCall,
+    submitAnswer,
     videoStream: videoStreamRef.current,
     videoElementRef,
   };
