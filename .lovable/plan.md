@@ -2,35 +2,22 @@
 
 ## Problem
 
-The live interview gets stuck at "Listening to you..." because the silence detection never triggers `recorder.stop()`. Two likely causes:
+When a candidate applies to a job from the **Job Vacancies** page, they already selected the job and the interview type. The app navigates to `/interview/voice?job=JobTitle&vacancy_id=xxx`. However, the `VoiceInterview` and `VideoInterview` pages **ignore the `job` URL parameter** — they always start with `selectedJob = null`, which shows the `JobSelector` component again, asking the user to pick a job a second time.
 
-1. **No maximum recording duration** — If ambient noise keeps the RMS above the threshold (15), the recording runs forever with no fallback timeout.
-2. **Threshold too low** — A threshold of 15 on `getByteFrequencyData` RMS is very low; ambient room noise can easily exceed it, meaning "silence" is never detected.
-3. **No `timeslice` on `MediaRecorder.start()`** — `ondataavailable` only fires on `stop()`, which never comes if silence isn't detected.
+The `TextInterview` page (via `useInterviewSession`) already handles the `job` URL param with auto-start logic, but the voice/video pages don't.
 
 ## Fix
 
-### Update `src/hooks/useLiveInterview.ts`
+### Update `src/pages/VoiceInterview.tsx` and `src/pages/VideoInterview.tsx`
 
-1. **Add a maximum recording timeout** (e.g., 45 seconds) — if silence detection hasn't stopped the recording by then, force-stop it as a fallback.
+Read the `job` query parameter from the URL on mount. If present, set `selectedJob` directly — skipping the `JobSelector` entirely.
 
-2. **Raise the silence threshold** from 15 to ~30 and reduce silence duration from 2500ms to 2000ms for more reliable detection.
-
-3. **Use `recorder.start(1000)` with a timeslice** so `ondataavailable` fires periodically, ensuring chunks are captured even if stop is delayed.
-
-4. **Add console.log statements** for key events (recording started, RMS levels periodically, silence detected, recording stopped) to aid future debugging.
-
-5. **Add a "require speech first" guard** — only start silence detection after the user has actually spoken (RMS exceeded a "speech detected" threshold at least once), preventing premature cutoff on ambient silence.
-
-```text
-Flow after fix:
-AI speaks → onended → startListening() → recorder.start(1000) →
-  wait 1.5s → begin silence check loop →
-    wait for speech (RMS > 30 at least once) →
-      then detect 2s of silence → stop recorder →
-        handleRecordingComplete(blob) →
-          transcribe → chat → speakText → loop
-
-Fallback: max 45s timeout force-stops recording
+```typescript
+const [searchParams] = useSearchParams();
+const [selectedJob, setSelectedJob] = useState<string | null>(
+  searchParams.get("job")
+);
 ```
+
+That's it — one line change per file. If `job` is in the URL (coming from vacancies), the `JobSelector` is skipped. If the user navigates directly (no URL param), they still see the job picker as before.
 
