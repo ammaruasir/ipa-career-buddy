@@ -195,37 +195,29 @@ const CandidateDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Quick Start */}
-        <div>
-          <h3 className="text-xl font-bold text-foreground mb-4">ابدأ مقابلة جديدة</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {(["text", "voice", "video"] as const).map((t) => {
-              const { label, icon: Icon } = typeMap[t];
-              return (
-                <Button key={t} variant="outline" className="rounded-2xl h-auto py-6 flex flex-col gap-3 shadow-lg hover:shadow-xl transition-all hover:border-primary/30" asChild>
-                  <Link to={`/interview/${t}`}>
-                    <Icon className="w-8 h-8 text-primary" />
-                    <span className="text-lg font-semibold">مقابلة {label}</span>
-                  </Link>
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-
         {/* Practice Mode */}
         <Card className="rounded-2xl shadow-lg border-dashed border-2 border-secondary/40">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 mb-4">
               <Sparkles className="w-6 h-6 text-secondary" />
               <div>
                 <p className="font-bold text-foreground">وضع التدريب</p>
                 <p className="text-sm text-muted-foreground">تدرب على مقابلات وهمية مع الذكاء الاصطناعي</p>
               </div>
             </div>
-            <Button asChild className="rounded-xl">
-              <Link to="/interview/text?practice=true">تدرب الآن</Link>
-            </Button>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {(["text", "voice", "video"] as const).map((t) => {
+                const { label, icon: Icon } = typeMap[t];
+                return (
+                  <Button key={t} variant="outline" className="rounded-2xl h-auto py-5 flex flex-col gap-2 hover:border-secondary/50 transition-all" asChild>
+                    <Link to={`/interview/${t}?practice=true`}>
+                      <Icon className="w-7 h-7 text-secondary" />
+                      <span className="text-base font-semibold">تدريب {label}</span>
+                    </Link>
+                  </Button>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
 
