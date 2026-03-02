@@ -424,14 +424,18 @@ export const useLiveInterview = ({
         questionCountRef.current = newCount;
 
         if (newCount >= totalQuestions) {
-          await Promise.all([streamTextToTranscript(), speakText(aiText)]);
+          await speakText(aiText);
+          transcriptRef.current = [...transcriptRef.current, { role: "assistant", text: aiText }];
+          setTranscript([...transcriptRef.current]);
           await getClosingResponse();
           return;
         }
       }
 
-      // Stream text and speak in parallel, then listen
-      await Promise.all([streamTextToTranscript(), speakText(aiText)]);
+      // Speak first, then show text after audio finishes
+      await speakText(aiText);
+      transcriptRef.current = [...transcriptRef.current, { role: "assistant", text: aiText }];
+      setTranscript([...transcriptRef.current]);
       if (activeRef.current && !stoppedManuallyRef.current) {
         await startListening();
       }
