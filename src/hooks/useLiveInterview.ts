@@ -202,7 +202,7 @@ export const useLiveInterview = ({
       let silenceStart: number | null = null;
       let speechDetected = false;
       const SILENCE_THRESHOLD = 30;
-      const SILENCE_DURATION = 2000;
+      const SILENCE_DURATION = 1200;
 
       const checkSilence = () => {
         if (!activeRef.current || stoppedManuallyRef.current) return;
@@ -232,7 +232,7 @@ export const useLiveInterview = ({
         if (activeRef.current && !stoppedManuallyRef.current) {
           rafRef.current = requestAnimationFrame(checkSilence);
         }
-      }, 1500);
+      }, 600);
 
     } catch {
       toast.error("لم يتم السماح بالوصول إلى الميكروفون");
