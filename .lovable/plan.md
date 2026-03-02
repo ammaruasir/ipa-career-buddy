@@ -2,25 +2,23 @@
 
 ## المشكلة
 
-عند الضغط على المقابلة من صفحة الوظائف الشاغرة، يتم تمرير اسم الوظيفة عبر URL (`?job=...`). في `VideoInterview.tsx` (سطر 14 و 30-32)، إذا كان `job` موجوداً في الـ URL، يتم تخطي `JobSelector` بالكامل واستخدام العدد الافتراضي من الإعدادات مباشرة. لذلك لا تظهر خطوة اختيار عدد الأسئلة.
-
-في وضع التدريب، لا يوجد `job` في الـ URL، فيظهر `JobSelector` → ثم خطوة اختيار العدد.
+عند انتهاء المقابلة، يتم تعيين `isActive = false` فوراً (سطر 459 في `useLiveInterview.ts`)، لكن `isCompleted = true` لا يتم تعيينها إلا بعد رفع التسجيل وتحديث قاعدة البيانات (سطر 529). خلال هذه الفترة الزمنية، شرط عرض زر "بدء المقابلة" يتحقق (`!isActive && !isConnecting && !isCompleted`)، فيظهر الزر مؤقتاً.
 
 ## الحل
 
-تعديل صفحات المقابلة الثلاث (`VideoInterview.tsx`, `VoiceInterview.tsx`, `TextInterview.tsx`) بحيث حتى لو جاء اسم الوظيفة من الـ URL، يتم عرض `JobSelector` مع الوظيفة محددة مسبقاً ليظهر للمستخدم خطوة اختيار عدد الأسئلة.
+نقل `setIsCompleted(true)` إلى بداية دالة `endInterview` مباشرة بعد `setIsActive(false)` حتى لا يظهر الزر أبداً بعد انتهاء المقابلة.
 
-### التعديلات
+### التعديل
 
 | الملف | التغيير |
 |-------|---------|
-| `src/pages/VideoInterview.tsx` | إزالة منطق `searchParams.get("job")` من تهيئة `selectedJob` (سطر 14) وإزالة الـ auto-set (سطر 30-32). بدلاً من ذلك، تمرير الوظيفة كـ prop `preSelectedJob` إلى `JobSelector` لتخطي خطوة اختيار الوظيفة وعرض خطوة العدد مباشرة |
-| `src/pages/VoiceInterview.tsx` | نفس التعديل |
-| `src/pages/TextInterview.tsx` | نفس التعديل |
-| `src/components/interview/JobSelector.tsx` | إضافة prop اختياري `preSelectedJob?: string` — إذا كان موجوداً، يتم ضبط `selectedJob` تلقائياً عند التحميل لعرض خطوة اختيار العدد مباشرة بدون خطوة اختيار الوظيفة |
+| `src/hooks/useLiveInterview.ts` | نقل `setIsCompleted(true)` من سطر 529 إلى بعد `setIsActive(false)` مباشرة (سطر 460). هذا يضمن إخفاء زر البدء فوراً عند بدء عملية الإنهاء |
 
-### النتيجة
-- من الوظائف الشاغرة → يظهر مباشرة خطوة اختيار عدد الأسئلة (الوظيفة محددة مسبقاً)
-- من التدريب → يظهر الوظائف المقترحة ثم خطوة العدد
-- بدون أي params → يظهر قائمة الوظائف الكاملة ثم خطوة العدد
+```typescript
+// في endInterview — التغيير المطلوب
+setIsActive(false);
+setIsCompleted(true);  // ← نقلها هنا بدلاً من سطر 529
+setIsListening(false);
+setIsSpeaking(false);
+```
 
