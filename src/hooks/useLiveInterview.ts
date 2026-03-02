@@ -84,8 +84,14 @@ export const useLiveInterview = ({
     });
   }, []);
 
+  // Clean repeated characters for smoother TTS (e.g. "مررررررة" → "مرة")
+  const cleanTextForTTS = (text: string): string => {
+    return text.replace(/(.)\1{2,}/g, '$1');
+  };
+
   // Speak text using ElevenLabs TTS with browser fallback
   const speakText = useCallback((text: string): Promise<void> => {
+    const cleanedText = cleanTextForTTS(text);
     return new Promise(async (resolve) => {
       setIsSpeaking(true);
       try {
@@ -98,7 +104,7 @@ export const useLiveInterview = ({
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             },
-            body: JSON.stringify({ text }),
+            body: JSON.stringify({ text: cleanedText }),
           }
         );
 
