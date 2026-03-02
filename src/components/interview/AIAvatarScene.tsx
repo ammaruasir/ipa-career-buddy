@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { Environment } from "@react-three/drei";
 import AvatarHead from "./AvatarHead";
 
 type AvatarState = "idle" | "speaking" | "listening";
@@ -22,25 +22,19 @@ const AIAvatarScene = ({ avatarState, audioAnalyser }: AIAvatarSceneProps) => {
       )}
 
       <Canvas
-        camera={{ position: [0, 0, 3.2], fov: 35 }}
+        camera={{ position: [0, 0, 2.2], fov: 30 }}
         gl={{ antialias: true, alpha: true }}
         style={{ background: "transparent" }}
       >
         <Suspense fallback={null}>
-          {/* Lighting */}
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[3, 4, 5]} intensity={0.8} castShadow />
-          <directionalLight position={[-2, 2, 3]} intensity={0.3} color="#b8d4ff" />
-          {/* Rim light */}
-          <pointLight position={[0, 0, -3]} intensity={0.4} color="#ffd4b8" />
+          <ambientLight intensity={0.7} />
+          <directionalLight position={[3, 4, 5]} intensity={1} castShadow />
+          <directionalLight position={[-2, 2, 3]} intensity={0.4} color="#b8d4ff" />
+          <pointLight position={[0, 0, -3]} intensity={0.3} color="#ffd4b8" />
+
+          <Environment preset="studio" />
 
           <AvatarHead state={avatarState} audioAnalyser={audioAnalyser} />
-
-          <OrbitControls
-            enableZoom={false}
-            enablePan={false}
-            enableRotate={false}
-          />
         </Suspense>
       </Canvas>
 
