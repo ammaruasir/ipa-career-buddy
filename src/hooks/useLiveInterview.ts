@@ -32,6 +32,7 @@ export const useLiveInterview = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [awaitingEndConfirmation, setAwaitingEndConfirmation] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [interviewId, setInterviewId] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState(0);
@@ -311,12 +312,14 @@ export const useLiveInterview = ({
       // Update context summary with key points
       contextSummaryRef.current += `\nسؤال ${questionCountRef.current}: ${conversationRef.current.filter(m => m.role === "assistant").pop()?.content?.substring(0, 100) || ""}\nإجابة مختصرة: ${userText.substring(0, 150)}`;
 
-      // Check if this was the last question's answer
+      // Check if this was the last question's answer — ask for confirmation
       if (lastQuestionRef.current) {
         lastQuestionRef.current = false;
-        await getClosingResponse();
+        setAwaitingEndConfirmation(true);
+        // Stop listening while waiting for confirmation
+        setIsListening(false);
       } else {
-        // Get next AI response - question count will be updated based on [NEW_Q]/[FOLLOW_UP] tag
+        // Get next AI response
         await getNextAIResponse(userText);
       }
 
@@ -704,10 +707,35 @@ export const useLiveInterview = ({
 
   const endCall = useCallback(() => { endInterview(); }, [endInterview]);
 
-  // Cleanup on unmount — mark interview as completed if still in progress
+  // confirmEnd: user confirmed ending after last question
+  const confirmEnd = useCallback(async () => {
+    setAwaitingEndConfirmation(false);
+    await getClosingResponse();
+  }, [getClosingResponse]);
+
+  // continueInterview: user wants more questions
+  const continueInterview = useCallback(async () => {
+    setAwaitingEndConfirmation(false);
+    lastQuestionRef.current = false;
+    if (activeRef.current && !stoppedManuallyRef.current) {
+      await getNextAIResponse();
+    }
+  }, [getNextAIResponse]);
+
+  // beforeunload warning during active interview
+  useEffect(() => {
+    if (!isActive || isCompleted) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isActive, isCompleted]);
+
+  // Cleanup on unmount — use sendBeacon to mark interview as completed
   useEffect(() => {
     return () => {
-      // If endInterview is running, skip cleanup — it handles everything
       if (isEndingRef.current) return;
 
       activeRef.current = false;
@@ -719,14 +747,11 @@ export const useLiveInterview = ({
       cancelAnimationFrame(rafRef.current);
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
 
-      // Mark interview as completed if still in progress (user left or navigated away)
       const id = interviewIdRef.current;
       if (id && !isCompleted) {
-        supabase
-          .from("interviews")
-          .update({ status: "completed" as any })
-          .eq("id", id)
-          .then(() => {});
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/complete-interview`;
+        const body = JSON.stringify({ interview_id: id });
+        navigator.sendBeacon(url, body);
       }
     };
   }, [isCompleted]);
@@ -746,12 +771,15 @@ export const useLiveInterview = ({
     isProcessing,
     isEvaluating,
     isCompleted,
+    awaitingEndConfirmation,
     transcript,
     interviewId,
     questionCount,
     startCall,
     endCall,
     submitAnswer,
+    confirmEnd,
+    continueInterview,
     videoStream: videoStreamRef.current,
     videoElementRef,
   };
