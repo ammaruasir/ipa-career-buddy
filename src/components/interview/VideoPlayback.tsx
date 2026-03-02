@@ -57,18 +57,27 @@ const VideoPlayback = ({ interviewId, userId, recordingUrl, interviewType }: Vid
           .list(userId);
 
         if (storageFiles) {
-          // Also check for full recording if not found via recordingUrl
+          let hasFullRecording = files.length > 0;
+          let partialFile: typeof storageFiles[0] | null = null;
+
           for (const file of storageFiles) {
             if (!file.name.includes(interviewId)) continue;
 
             // Full recording fallback
-            if (file.name.includes("_full") && files.length === 0) {
+            if (file.name.includes("_full") && !hasFullRecording) {
               const { data: signedData } = await supabase.storage
                 .from("interview-recordings")
                 .createSignedUrl(`${userId}/${file.name}`, 3600);
               if (signedData?.signedUrl) {
                 files.push({ name: file.name, url: signedData.signedUrl, label: "التسجيل الكامل" });
+                hasFullRecording = true;
               }
+              continue;
+            }
+
+            // Track partial file for later
+            if (file.name.includes("_partial")) {
+              partialFile = file;
               continue;
             }
 
@@ -92,6 +101,16 @@ const VideoPlayback = ({ interviewId, userId, recordingUrl, interviewType }: Vid
               const qMatch = file.name.match(/_q(\d+)_/);
               const label = qMatch ? `تسجيل السؤال ${qMatch[1]}` : file.name;
               files.push({ name: file.name, url: signedData.signedUrl, label });
+            }
+          }
+
+          // Use partial recording as fallback if no full recording found
+          if (!hasFullRecording && partialFile) {
+            const { data: signedData } = await supabase.storage
+              .from("interview-recordings")
+              .createSignedUrl(`${userId}/${partialFile.name}`, 3600);
+            if (signedData?.signedUrl) {
+              files.push({ name: partialFile.name, url: signedData.signedUrl, label: "تسجيل جزئي" });
             }
           }
         }

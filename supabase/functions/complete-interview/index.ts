@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { interview_id } = await req.json();
+    const { interview_id, recording_url } = await req.json();
     if (!interview_id) {
       return new Response(JSON.stringify({ error: "interview_id required" }), {
         status: 400,
@@ -25,9 +25,14 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const updateData: Record<string, unknown> = { status: "completed" };
+    if (recording_url) {
+      updateData.recording_url = recording_url;
+    }
+
     const { error } = await supabase
       .from("interviews")
-      .update({ status: "completed" })
+      .update(updateData)
       .eq("id", interview_id)
       .eq("status", "in_progress");
 
