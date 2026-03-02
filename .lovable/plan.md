@@ -1,27 +1,28 @@
 
 
-## خطة حذف جميع سجلات المرشحين
+## المشكلة
+حالياً نص المحاور الآلي يظهر حرفاً بحرف بالتوازي مع الكلام الصوتي (`Promise.all([streamTextToTranscript(), speakText()])`). المطلوب: إظهار النص **بعد** انتهاء الكلام الصوتي.
 
-### البيانات الموجودة حالياً:
-- **المقابلات**: 21 سجل
-- **التقييمات**: 8 سجلات
-- **الإجابات**: 57 سجل
-- **ملاحظات HR**: 6 سجلات
-- **أحداث الغش**: 31 سجل
-- **طلبات التوظيف**: 12 سجل
-- **الإشعارات**: 87 سجل
+## التعديل — `src/hooks/useLiveInterview.ts`
 
-### ترتيب الحذف (مهم بسبب العلاقات بين الجداول):
-1. حذف `cheat_events` (يعتمد على interviews)
-2. حذف `evaluations` (يعتمد على interviews)
-3. حذف `responses` (يعتمد على interviews)
-4. حذف `hr_notes` (يعتمد على interviews)
-5. حذف `job_applications` (يعتمد على interviews + job_vacancies)
-6. حذف `interviews`
-7. حذف `notifications`
-8. حذف ملفات التخزين من bucket `interview-recordings`
+في دالة `getNextAIResponse` (سطور 427-434):
 
-### ملاحظة
-- لن يتم حذف الملفات الشخصية (profiles) أو حسابات المستخدمين أو الوظائف الشاغرة (job_vacancies)
-- سيتم حذف البيانات باستخدام أداة الإدخال (insert tool) لكل جدول
+1. **تغيير الترتيب**: بدلاً من `Promise.all` الذي يشغل النص والصوت معاً، نشغل `speakText` أولاً ثم بعد انتهائه نضيف النص كاملاً للـ transcript مباشرة (بدون تأثير الكتابة حرف بحرف).
+
+2. **استبدال `streamTextToTranscript`** بإضافة مباشرة:
+```text
+// قبل:
+await Promise.all([streamTextToTranscript(), speakText(aiText)]);
+
+// بعد:
+await speakText(aiText);
+// أضف النص كاملاً بعد انتهاء الكلام
+transcriptRef.current = [...transcriptRef.current, { role: "assistant", text: aiText }];
+setTranscript([...transcriptRef.current]);
+```
+
+3. نفس التعديل يُطبق على الحالتين: السؤال الأخير (سطر 427) والأسئلة العادية (سطر 434).
+
+### الملفات المعدّلة
+- `src/hooks/useLiveInterview.ts`
 
