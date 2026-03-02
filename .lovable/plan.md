@@ -1,22 +1,34 @@
 
 
-## الخطة — إضافة زر "إرسال الرد" اليدوي
+## خطة إصلاح مشكلة عدم ظهور تسجيل الفيديو
 
-### الفكرة
-إضافة زر يظهر أثناء استماع الذكاء الاصطناعي (`isListening`) يتيح للمرشح إرسال رده فوراً بدون انتظار كشف الصمت التلقائي. الزر يوقف التسجيل يدوياً مما يُطلق نفس تدفق المعالجة التلقائي.
+### المشكلة
+تسجيل مقابلة Wakeb (interview: `787e6f85`) لم يُرفع — `recording_url = NULL` ولا يوجد ملف في التخزين. السبب: race condition في `endInterview` حيث يتم إيقاف `MediaRecorder` ثم انتظار 500ms ثابتة فقط بدلاً من انتظار حدث `onstop` الذي يضمن وصول كل البيانات.
 
-### التعديلات
+### التعديل — `src/hooks/useLiveInterview.ts`
 
-#### 1. `src/hooks/useLiveInterview.ts`
-- إضافة دالة `submitAnswer` تقوم بإيقاف `mediaRecorder` يدوياً (`recorder.stop()`) — هذا يُطلق حدث `onstop` الموجود أصلاً الذي يعالج الصوت تلقائياً
-- تصدير `submitAnswer` من الـ hook
+استبدال المنطق الحالي:
+```text
+// قبل (مشكلة):
+sessionRecorderRef.current.stop();
+await new Promise(resolve => setTimeout(resolve, 500));  // قد لا يكفي
+const sessionBlob = new Blob(sessionChunksRef.current, ...);
+```
 
-#### 2. `src/components/interview/LiveInterview.tsx`
-- إضافة زر "إرسال الرد" (أيقونة Send) يظهر فقط عندما `isListening === true`
-- الزر يستدعي `live.submitAnswer()`
-- يوضع بجانب زر "إنهاء المقابلة" في منطقة التحكم
+بمنطق ينتظر حدث `onstop` فعلياً:
+```typescript
+// بعد (الإصلاح):
+await new Promise<void>((resolve) => {
+  const recorder = sessionRecorderRef.current!;
+  recorder.onstop = () => resolve();
+  recorder.stop();
+});
+// الآن sessionChunksRef.current مضمون يحتوي كل البيانات
+const sessionBlob = new Blob(sessionChunksRef.current, { type: "video/webm" });
+```
+
+بالإضافة لإضافة logging في حال فشل الرفع أو كان حجم الملف صفر لتسهيل التتبع مستقبلاً.
 
 ### الملفات المعدّلة
 - `src/hooks/useLiveInterview.ts`
-- `src/components/interview/LiveInterview.tsx`
 
