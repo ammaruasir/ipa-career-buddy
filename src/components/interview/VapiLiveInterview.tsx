@@ -69,7 +69,6 @@ const VapiLiveInterview = ({ type, jobPosition, totalQuestions, onBack }: VapiLi
         <div className="w-full max-w-md h-64 rounded-2xl overflow-hidden shadow-xl border">
           <AIAvatarScene
             avatarState={vapi.isSpeaking ? "speaking" : vapi.isCallActive ? "listening" : "idle"}
-            audioAnalyser={null}
           />
         </div>
 
