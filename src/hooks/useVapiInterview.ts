@@ -138,8 +138,10 @@ export const useVapiInterview = ({
         toast.error("حدث خطأ في الاتصال");
       });
 
-      // Build system prompt — strict Arabic-only
-      const systemPrompt = `أنت محاور ذكي متخصص في إجراء مقابلات وظيفية احترافية.
+      // Build system prompt — strict Arabic-only with English meta-instruction
+      const systemPrompt = `CRITICAL INSTRUCTION: You MUST speak ONLY in Arabic (العربية). Never use English under any circumstances. Every single word you say must be in Modern Standard Arabic (العربية الفصحى). If the user speaks English, still respond in Arabic.
+
+أنت محاور ذكي متخصص في إجراء مقابلات وظيفية احترافية.
 
 ## تعليمات صارمة:
 - تحدث باللغة العربية الفصحى فقط. لا تستخدم أي كلمة إنجليزية أبداً.
@@ -154,7 +156,9 @@ export const useVapiInterview = ({
 - علّق بإيجاز (جملة أو جملتين) على كل إجابة قبل الانتقال للسؤال التالي.
 - حافظ على لهجة مهنية ودودة طوال المقابلة.
 - بعد آخر سؤال، اشكر المرشح وأخبره أن التقييم سيكون جاهزاً قريباً.
-- لا تكرر الأسئلة ولا تطرح أسئلة خارج نطاق الوظيفة.`;
+- لا تكرر الأسئلة ولا تطرح أسئلة خارج نطاق الوظيفة.
+
+REMEMBER: Every word must be in Arabic. No English at all.`;
 
       // Start the call with proper Arabic assistant config
       await vapi.start({
@@ -163,10 +167,12 @@ export const useVapiInterview = ({
           provider: "openai",
           model: "gpt-4o",
           messages: [{ role: "system", content: systemPrompt }],
+          language: "ar",
         },
         voice: {
           provider: "azure",
           voiceId: "ar-SA-HamedNeural",
+          languageCode: "ar-SA",
         },
         firstMessage: `مرحباً بك! أنا المحاور الآلي وسأجري معك مقابلة لوظيفة ${jobPosition}. سأطرح عليك ${totalQuestions} أسئلة متنوعة. هل أنت مستعد للبدء؟`,
         transcriber: {
@@ -174,6 +180,8 @@ export const useVapiInterview = ({
           model: "nova-2",
           language: "ar",
         },
+        inputMinCharacters: 2,
+        responseDelaySeconds: 0.5,
         silenceTimeoutSeconds: 30,
         maxDurationSeconds: 1800,
       } as any);
