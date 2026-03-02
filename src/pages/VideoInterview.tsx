@@ -31,6 +31,8 @@ const VideoInterview = () => {
     setQuestionCount(settings.questions_per_type.video);
   }
 
+  const isPractice = searchParams.get("practice") === "true";
+
   if (!selectedJob || questionCount === null) {
     return (
       <JobSelector
@@ -40,6 +42,7 @@ const VideoInterview = () => {
           setQuestionCount(count ?? settings.questions_per_type.video);
         }}
         onBack={() => navigate("/dashboard")}
+        isPractice={isPractice}
       />
     );
   }
