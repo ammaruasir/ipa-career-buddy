@@ -391,8 +391,30 @@ export const useLiveInterview = ({
 
       setIsProcessing(false);
 
-      const aiEntry: TranscriptEntry = { role: "assistant", text: aiText };
-      setTranscript(prev => [...prev, aiEntry]);
+      // Stream text character by character while speaking
+      const streamTextToTranscript = (): Promise<void> => {
+        return new Promise((resolve) => {
+          const entryIndex = transcriptRef.current.length;
+          const emptyEntry: TranscriptEntry = { role: "assistant", text: "" };
+          transcriptRef.current = [...transcriptRef.current, emptyEntry];
+          setTranscript([...transcriptRef.current]);
+
+          let charIndex = 0;
+          const interval = setInterval(() => {
+            charIndex++;
+            if (charIndex <= aiText.length) {
+              const updated = [...transcriptRef.current];
+              updated[entryIndex] = { role: "assistant", text: aiText.slice(0, charIndex) };
+              transcriptRef.current = updated;
+              setTranscript([...updated]);
+            } else {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 30);
+        });
+      };
+
       conversationRef.current.push({ role: "assistant", content: aiText });
 
       // Only increment question count for new questions
@@ -402,14 +424,14 @@ export const useLiveInterview = ({
         questionCountRef.current = newCount;
 
         if (newCount >= totalQuestions) {
-          await speakText(aiText);
+          await Promise.all([streamTextToTranscript(), speakText(aiText)]);
           await getClosingResponse();
           return;
         }
       }
 
-      // Speak and then listen
-      await speakText(aiText);
+      // Stream text and speak in parallel, then listen
+      await Promise.all([streamTextToTranscript(), speakText(aiText)]);
       if (activeRef.current && !stoppedManuallyRef.current) {
         await startListening();
       }
