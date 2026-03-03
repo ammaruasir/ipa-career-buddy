@@ -1,18 +1,55 @@
 
 
-## تحويل TTS إلى ElevenLabs بصوت عربي سعودي
+## تغيير اسم المحاور + صورة ديناميكية حسب الصوت
 
-الدالة الحالية تستخدم OpenAI TTS. سنحولها لاستخدام ElevenLabs API مع مفتاح `ELEVENLABS_API_KEY` الموجود بالفعل.
+### المشكلة
+الصوت الحالي (River) أنثوي، لكن الاسم "أحمد" ذكوري والصورة لرجل سعودي. نحتاج أيضاً آلية ديناميكية تربط الصوت بالاسم والصورة.
+
+### الحل
 
 | الملف | التعديل |
 |-------|---------|
-| `supabase/functions/elevenlabs-tts/index.ts` | استبدال OpenAI API بـ ElevenLabs API |
+| Migration | إضافة عمود `interviewer_voice` (jsonb) في `system_settings` يحتوي: `name`, `gender`, `voice_id`, `avatar_url` |
+| `src/hooks/useSystemSettings.ts` | إضافة حقل `interviewer_voice` في الواجهة والقيمة الافتراضية |
+| `supabase/functions/elevenlabs-tts/index.ts` | قراءة `voice_id` من الطلب بدل القيمة الثابتة |
+| `src/hooks/useLiveInterview.ts` | تمرير `voice_id` لدالة TTS + استخدام اسم المحاور/ة من الإعدادات في البرومبت |
+| `src/components/interview/AIAvatarScene.tsx` | استقبال `avatarUrl` و `name` و `gender` كـ props بدل الصورة الثابتة |
+| `src/components/interview/LiveInterview.tsx` | تمرير بيانات المحاور من الإعدادات للمكونات |
+| `supabase/functions/chat/index.ts` | قراءة اسم وجنس المحاور من الطلب واستخدامه في البرومبت |
+| `src/pages/AdminSettings.tsx` | إضافة قسم لاختيار صوت المحاور (اسم، صوت، صورة) |
 
 ### التفاصيل
 
-- استخدام نموذج `eleven_multilingual_v2` (أفضل جودة للعربية)
-- استخدام صوت **River** (`SAz9YHcvj6GT2YYXdXww`) — صوت ذكوري طبيعي يدعم العربية
-- استخدام `ELEVENLABS_API_KEY` بدلاً من `OPENAI_API_KEY`
-- الاستجابة تبقى `audio/mpeg` — لا تغيير في الكود الأمامي (`useLiveInterview.ts`)
-- تمرير `output_format` كـ query parameter (حسب متطلبات ElevenLabs API)
+**1. عمود جديد في `system_settings`:**
+```json
+{
+  "name": "نورة",
+  "gender": "female",
+  "voice_id": "SAz9YHcvj6GT2YYXdXww",
+  "avatar_url": ""
+}
+```
+القيمة الافتراضية: نورة + River voice
+
+**2. دالة TTS تصبح ديناميكية:**
+- تستقبل `voiceId` من body الطلب
+- إذا لم يُمرر تستخدم القيمة الافتراضية (River)
+
+**3. البرومبت يتغير تلقائياً:**
+- إذا `gender === "female"`: `اسمك "نورة" وأنتِ محاورة...`
+- إذا `gender === "male"`: `اسمك "أحمد" وأنت محاور...`
+- نفس المنطق في `chat/index.ts`
+
+**4. الأفاتار ديناميكي:**
+- إذا كان `avatar_url` فارغ: يُولَّد أفاتار افتراضي بالحروف الأولى من الاسم مع تدرج لوني
+- إذا كان موجود: يعرض الصورة
+- التسميات تتغير حسب الجنس (تتحدث/يتحدث، تستمع/يستمع، جاهزة/جاهز)
+
+**5. صفحة الإعدادات:**
+- إضافة قسم "صوت المحاور" في تبويب النظام
+- حقول: الاسم، الجنس (ذكر/أنثى)، معرّف الصوت (قائمة منسدلة بأصوات ElevenLabs)
+
+### النتيجة
+- الآن: يتحول الاسم لـ "نورة" مع ضمائر مؤنثة
+- مستقبلاً: المسؤول يقدر يغير الاسم والصوت والصورة من الإعدادات وكل شيء يتحدث تلقائياً
 
