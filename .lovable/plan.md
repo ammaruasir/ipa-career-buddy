@@ -1,43 +1,34 @@
 
 
-## التعديلات المطلوبة
+## المشكلة
 
-### 1. تغيير الاسم من "المحاور الذكي" إلى "محاور واكب الذكي"
+التسجيل الحالي يأخذ فقط `videoStreamRef.current` (كاميرا + ميكروفون المرشح). صوت المحاور الذكي يُشغّل عبر `new Audio(audioUrl)` منفصلاً — لا يدخل في الـ MediaStream المسجّل.
 
-| الملف | التعديل |
-|-------|---------|
-| `src/components/interview/AIAvatarScene.tsx` | تغيير النص في سطر 34 (`alt`) وسطر 58 (التسمية) |
+## الحل: دمج صوت المحاور في التسجيل
 
-### 2. إزالة نافذة "متابعة أو إنهاء" — المقابلة تنتهي تلقائياً
+### الفكرة
+استخدام `AudioContext.createMediaStreamDestination()` لإنشاء stream مدمج يجمع:
+1. صوت المرشح (من الميكروفون)
+2. صوت المحاور (من TTS audio element)
+3. فيديو المرشح (في وضع الفيديو)
 
-المشكلة: عند اكتمال عدد الأسئلة، يظهر `AlertDialog` يسأل المرشح "هل تريد المتابعة أم الإنهاء؟" — هذا يجب ألا يكون خيار المرشح. بدلاً من ذلك، عند اكتمال الأسئلة التقنية، يجب أن ينتقل المحاور تلقائياً لأسئلة الختام ثم ينهي المقابلة.
-
-| الملف | التعديل |
-|-------|---------|
-| `src/hooks/useLiveInterview.ts` | في سطر 320-325: بدلاً من `setAwaitingEndConfirmation(true)`، استدعي `getClosingResponse()` مباشرة. حذف `awaitingEndConfirmation`, `confirmEnd`, `continueInterview` |
-| `src/hooks/useInterviewSession.ts` | نفس التعديل: في سطر 164-169 استدعي `confirmEnd()` مباشرة بدل `setAwaitingEndConfirmation`. حذف `awaitingEndConfirmation`, `continueInterview` |
-| `src/components/interview/LiveInterview.tsx` | حذف `AlertDialog` الخاص بـ `awaitingEndConfirmation` (سطر 315-333) |
-| `src/pages/TextInterview.tsx` | حذف `AlertDialog` الخاص بـ `awaitingEndConfirmation` (سطر 266-282) |
-
-### 3. جعل الجملة الافتتاحية ديناميكية (Live Interview)
+### التعديلات
 
 | الملف | التعديل |
 |-------|---------|
-| `src/hooks/useLiveInterview.ts` | سطر 730: بدلاً من رسالة ثابتة (`هلا والله! أنا أحمد...`)، استدعي `/chat` بدون رسائل سابقة ليولّد AI رسالة افتتاحية ديناميكية بناءً على الـ prompt الموجود الذي يوجهه لتنويع البداية |
+| `src/hooks/useLiveInterview.ts` | 1. إنشاء `mixedAudioDestRef` عبر `AudioContext.createMediaStreamDestination()` عند بدء المقابلة |
+| | 2. توصيل ميكروفون المرشح بالـ destination |
+| | 3. في `speakText`: توصيل TTS audio element بنفس الـ destination عبر `createMediaElementSource()` |
+| | 4. استخدام الـ mixed stream (audio tracks من destination + video track من الكاميرا) كمصدر للـ `sessionRecorder` بدلاً من `videoStreamRef` مباشرة |
 
-### تفاصيل تقنية
-
-**إزالة نافذة التأكيد — التدفق الجديد:**
-```
-الأسئلة تكتمل → lastQuestionRef = true
-المرشح يجيب على آخر سؤال → 
-  بدلاً من: setAwaitingEndConfirmation(true) ← يُحذف
-  الجديد: getClosingResponse() ← ينتقل مباشرة لأسئلة الختام ثم ينهي المقابلة
+### التدفق الجديد
+```text
+ميكروفون المرشح ──┐
+                   ├──→ AudioContext.destination ──→ Mixed MediaStream ──→ MediaRecorder
+صوت TTS المحاور ───┘                                    + video track
 ```
 
-**الجملة الافتتاحية الديناميكية:**
-```
-بدلاً من: firstMessage = "هلا والله! أنا أحمد..." (ثابت)
-الجديد: استدعاء chat API بـ messages فارغة + system prompt → AI يولّد تحية مختلفة كل مرة
-```
+### ملاحظة تقنية
+- `createMediaElementSource()` يُستخدم مرة واحدة لكل Audio element — لذا يجب إنشاء الاتصال في كل استدعاء لـ `speakText`
+- الـ Audio element يظل يُسمع عبر السماعات لأن الـ destination لا يمنع الإخراج الافتراضي (نحتاج توصيله بـ `ctx.destination` أيضاً ليُسمع)
 
