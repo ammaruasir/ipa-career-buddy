@@ -110,7 +110,17 @@ const CandidateDashboard = () => {
       setInterviews((prev) =>
         prev.map((i) => i.id === endingInterviewId ? { ...i, status: "completed" } : i)
       );
-      toast.success("تم إنهاء المقابلة بنجاح");
+      toast.success("تم إنهاء المقابلة بنجاح — جارٍ التقييم...");
+      // Trigger evaluation in background
+      supabase.functions.invoke("evaluate-interview", {
+        body: { interview_id: endingInterviewId },
+      }).then(({ error: evalError }) => {
+        if (evalError) {
+          toast.error("تعذّر التقييم التلقائي، يمكن لمسؤول الموارد البشرية إعادة التقييم");
+        } else {
+          toast.success("تم تقييم المقابلة بنجاح");
+        }
+      });
     } catch (e: any) {
       toast.error("فشل إنهاء المقابلة: " + (e.message || "خطأ غير معروف"));
     } finally {
