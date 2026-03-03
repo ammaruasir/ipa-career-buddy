@@ -263,23 +263,6 @@ const TextInterview = () => {
 
       <ExitConfirmationDialog open={showExit} onOpenChange={setShowExit} onConfirm={() => navigate("/dashboard")} />
 
-      {/* End confirmation dialog when all questions answered */}
-      <AlertDialog open={session.awaitingEndConfirmation}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>اكتملت أسئلة المقابلة</AlertDialogTitle>
-            <AlertDialogDescription>
-              هل ترغب في إنهاء المقابلة والحصول على التقييم، أم المتابعة بأسئلة إضافية؟
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={session.continueInterview}>متابعة بأسئلة إضافية</AlertDialogCancel>
-            <AlertDialogAction onClick={session.confirmEnd} className="bg-primary text-primary-foreground hover:bg-primary/90">
-              إنهاء المقابلة
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

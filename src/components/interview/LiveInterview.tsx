@@ -312,23 +312,6 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* End confirmation when all questions answered */}
-      <AlertDialog open={live.awaitingEndConfirmation}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>اكتملت أسئلة المقابلة</AlertDialogTitle>
-            <AlertDialogDescription>
-              هل ترغب في إنهاء المقابلة والحصول على التقييم، أم المتابعة بأسئلة إضافية؟
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={live.continueInterview}>متابعة بأسئلة إضافية</AlertDialogCancel>
-            <AlertDialogAction onClick={live.confirmEnd} className="bg-primary text-primary-foreground hover:bg-primary/90">
-              إنهاء المقابلة
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

@@ -31,7 +31,7 @@ const AIAvatarScene = ({ avatarState }: AIAvatarSceneProps) => {
       >
         <img
           src={interviewerAvatar}
-          alt="المحاور الذكي"
+          alt="محاور واكب الذكي"
           className="w-full h-full object-cover rounded-2xl"
           draggable={false}
         />
@@ -55,7 +55,7 @@ const AIAvatarScene = ({ avatarState }: AIAvatarSceneProps) => {
 
       {/* Label */}
       <div className="absolute bottom-3 left-0 right-0 flex flex-col items-center pointer-events-none z-10">
-        <span className="text-xs font-bold text-foreground/80 bg-background/60 backdrop-blur-sm px-2 py-0.5 rounded">المحاور الذكي</span>
+        <span className="text-xs font-bold text-foreground/80 bg-background/60 backdrop-blur-sm px-2 py-0.5 rounded">محاور واكب الذكي</span>
         <span className="text-[10px] text-muted-foreground bg-background/60 backdrop-blur-sm px-2 rounded">
           {avatarState === "speaking" ? "يتحدث..." : avatarState === "listening" ? "يستمع..." : "جاهز"}
         </span>

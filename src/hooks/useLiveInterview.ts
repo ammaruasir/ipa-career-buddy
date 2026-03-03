@@ -32,7 +32,7 @@ export const useLiveInterview = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
-  const [awaitingEndConfirmation, setAwaitingEndConfirmation] = useState(false);
+  
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [interviewId, setInterviewId] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState(0);
@@ -317,12 +317,11 @@ export const useLiveInterview = ({
       // Update context summary with key points
       contextSummaryRef.current += `\nسؤال ${questionCountRef.current}: ${conversationRef.current.filter(m => m.role === "assistant").pop()?.content?.substring(0, 100) || ""}\nإجابة مختصرة: ${userText.substring(0, 150)}`;
 
-      // Check if this was the last question's answer — ask for confirmation
+      // Check if this was the last question's answer — auto-end with closing
       if (lastQuestionRef.current) {
         lastQuestionRef.current = false;
-        setAwaitingEndConfirmation(true);
-        // Stop listening while waiting for confirmation
         setIsListening(false);
+        await getClosingResponse();
       } else {
         // Get next AI response
         await getNextAIResponse(userText);
@@ -727,12 +726,33 @@ export const useLiveInterview = ({
 - اطرح ${totalQuestions} أسئلة متنوعة (سلوكية، تقنية، موقفية، توافق ثقافي).
 - نوّع أسلوبك: أحياناً اسأل مباشرة، أحياناً اطرح موقف.`;
 
-      const firstMessage = `هلا والله! أنا أحمد، بكون معك اليوم في المقابلة لوظيفة ${jobPosition}. عندنا ${totalQuestions} أسئلة، بس لا تشيل هم — خلّها دردشة عادية. جاهز نبدأ؟`;
-
+      // Fetch dynamic opening from AI
       conversationRef.current = [
         { role: "system", content: systemPrompt },
-        { role: "assistant", content: firstMessage },
       ];
+
+      let firstMessage = "";
+      try {
+        const { data: greetData, error: greetErr } = await supabase.functions.invoke("chat", {
+          body: {
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: `ابدأ المقابلة بتحية ودية ومختلفة كل مرة. عرّف نفسك (اسمك أحمد، محاور واكب الذكي)، اذكر الوظيفة (${jobPosition})، وعدد الأسئلة (${totalQuestions}). اجعلها دافئة وطبيعية. لا تكرر نفس الصيغة.` },
+            ],
+            job_position: jobPosition,
+            interview_type: type,
+          },
+        });
+        if (!greetErr && greetData?.choices?.[0]?.message?.content) {
+          firstMessage = greetData.choices[0].message.content.replace(/^\[(NEW_Q|FOLLOW_UP)\]\s*/, "");
+        }
+      } catch {}
+      
+      if (!firstMessage) {
+        firstMessage = `هلا والله! أنا أحمد من محاور واكب الذكي، بكون معك اليوم في المقابلة لوظيفة ${jobPosition}. عندنا ${totalQuestions} أسئلة، خلّها دردشة عادية. جاهز نبدأ؟`;
+      }
+
+      conversationRef.current.push({ role: "assistant", content: firstMessage });
 
       const firstEntry: TranscriptEntry = { role: "assistant", text: firstMessage };
       setTranscript([firstEntry]);
@@ -756,20 +776,6 @@ export const useLiveInterview = ({
 
   const endCall = useCallback(() => { endInterview(); }, [endInterview]);
 
-  // confirmEnd: user confirmed ending after last question
-  const confirmEnd = useCallback(async () => {
-    setAwaitingEndConfirmation(false);
-    await getClosingResponse();
-  }, [getClosingResponse]);
-
-  // continueInterview: user wants more questions
-  const continueInterview = useCallback(async () => {
-    setAwaitingEndConfirmation(false);
-    lastQuestionRef.current = false;
-    if (activeRef.current && !stoppedManuallyRef.current) {
-      await getNextAIResponse();
-    }
-  }, [getNextAIResponse]);
 
   // beforeunload warning during active interview
   useEffect(() => {
@@ -828,15 +834,12 @@ export const useLiveInterview = ({
     isProcessing,
     isEvaluating,
     isCompleted,
-    awaitingEndConfirmation,
     transcript,
     interviewId,
     questionCount,
     startCall,
     endCall,
     submitAnswer,
-    confirmEnd,
-    continueInterview,
     videoStream: videoStreamRef.current,
     videoElementRef,
   };
