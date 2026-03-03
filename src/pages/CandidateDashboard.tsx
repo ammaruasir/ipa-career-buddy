@@ -136,7 +136,7 @@ const CandidateDashboard = () => {
         {/* Hero */}
         <div className="rounded-2xl bg-gradient-to-l from-primary/10 via-secondary/5 to-transparent p-8 border border-border">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
-            مرحباً {displayName}، أهلاً بك في بوابة المقابلات الذكية
+            مرحباً {displayName}، أهلاً بك في منصة المقابلات الذكية - معهد الإدارة العامة
           </h1>
           <p className="text-muted-foreground">تابع تقدمك وابدأ مقابلات جديدة لتحسين أدائك</p>
         </div>
