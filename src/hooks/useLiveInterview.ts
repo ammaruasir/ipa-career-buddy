@@ -13,12 +13,18 @@ interface UseLiveInterviewOptions {
   type: "voice" | "video";
   jobPosition: string;
   totalQuestions: number;
+  interviewerName?: string;
+  interviewerGender?: "male" | "female";
+  interviewerVoiceId?: string;
 }
 
 export const useLiveInterview = ({
   type,
   jobPosition,
   totalQuestions,
+  interviewerName = "نورة",
+  interviewerGender = "female",
+  interviewerVoiceId,
 }: UseLiveInterviewOptions) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -117,7 +123,7 @@ export const useLiveInterview = ({
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             },
-            body: JSON.stringify({ text: cleanedText }),
+            body: JSON.stringify({ text: cleanedText, voiceId: interviewerVoiceId }),
           }
         );
 
@@ -403,6 +409,8 @@ export const useLiveInterview = ({
         user_id: user?.id,
         current_question: questionCountRef.current + 1,
         total_questions: totalQuestions,
+        interviewer_name: interviewerName,
+        interviewer_gender: interviewerGender,
       };
 
       if (lastAnswer && contextSummaryRef.current) {
@@ -764,37 +772,39 @@ export const useLiveInterview = ({
           .eq("user_id", user.id);
       }
 
-      // Build conversational system prompt
+      // Build conversational system prompt - dynamic based on interviewer identity
+      const isFemale = interviewerGender === "female";
+      const pronounSelf = isFemale ? "أنتِ محاورة وظيفية ودودة ومحترفة" : "أنت محاور وظيفي ودود ومحترف";
       const systemPrompt = `CRITICAL INSTRUCTION: You MUST speak ONLY in Arabic (العربية). Never use English.
 
-اسمك "أحمد" وأنت محاور وظيفي ودود ومحترف تعمل في السعودية.
+اسمك "${interviewerName}" و${pronounSelf} ${isFemale ? "تعملين" : "تعمل"} في السعودية.
 - الوظيفة: ${jobPosition}
-- تتكلم بلهجة سعودية مهنية ودودة.
-- علّق بجملة قصيرة على إجابة المرشح قبل السؤال التالي (مثل: "حلو"، "ممتاز"، "فهمت عليك").
-- استخدم انتقالات طبيعية: "طيب"، "حلو خلنا نشوف"، "تمام، بسألك الحين عن...".
-- اطرح سؤالاً واحداً فقط. أقصى 2-3 جمل. أبقِ الرد أقل من 80 كلمة.
-- لا تلخص إجابة المرشح. لا تكرر ما قاله.
-- عدّل الصعوبة ديناميكياً بناءً على جودة الإجابة.
-- لا تساعد المرشح. لا تقدم تلميحات.
-- نوّع أسلوبك: أحياناً اسأل مباشرة، أحياناً اطرح موقف.
+- ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية ودودة.
+- ${isFemale ? "علّقي" : "علّق"} بجملة قصيرة على إجابة المرشح قبل السؤال التالي (مثل: "حلو"، "ممتاز"، "فهمت عليك").
+- ${isFemale ? "استخدمي" : "استخدم"} انتقالات طبيعية: "طيب"، "حلو خلنا نشوف"، "تمام، بسألك الحين عن...".
+- ${isFemale ? "اطرحي" : "اطرح"} سؤالاً واحداً فقط. أقصى 2-3 جمل. ${isFemale ? "أبقي" : "أبقِ"} الرد أقل من 80 كلمة.
+- لا ${isFemale ? "تلخصي" : "تلخص"} إجابة المرشح. لا ${isFemale ? "تكرري" : "تكرر"} ما قاله.
+- ${isFemale ? "عدّلي" : "عدّل"} الصعوبة ديناميكياً بناءً على جودة الإجابة.
+- لا ${isFemale ? "تساعدي" : "تساعد"} المرشح. لا ${isFemale ? "تقدمي" : "تقدم"} تلميحات.
+- ${isFemale ? "نوّعي" : "نوّع"} أسلوبك: أحياناً ${isFemale ? "اسألي" : "اسأل"} مباشرة، أحياناً ${isFemale ? "اطرحي" : "اطرح"} موقف.
 
-هيكل المقابلة (التزم بهذا الترتيب بدقة):
-1. البداية (أول سؤالين): تعارف وكسر جمود. نوّع بين:
+هيكل المقابلة (${isFemale ? "التزمي" : "التزم"} بهذا الترتيب بدقة):
+1. البداية (أول سؤالين): تعارف وكسر جمود. ${isFemale ? "نوّعي" : "نوّع"} بين:
    - طلب التعريف بالنفس بأساليب مختلفة
    - استكشاف الدافع بطريقة مرتبطة بالوظيفة أو بخلفية المرشح
-   - لا تستخدم نفس الصياغة في كل مقابلة
+   - لا ${isFemale ? "تستخدمي" : "تستخدم"} نفس الصياغة في كل مقابلة
 
 2. الوسط (السؤال 3 إلى ${totalQuestions - 2}): أسئلة تقنية وسلوكية مخصصة للوظيفة:
-   - اسأل عن الشهادات والدورات بأسلوب طبيعي
-   - اسأل عن المهارات التقنية مع أمثلة عملية
-   - اسأل عن الخبرات السابقة وأبرز المشاريع
-   - وزّع هذه الأسئلة طبيعياً
+   - ${isFemale ? "اسألي" : "اسأل"} عن الشهادات والدورات بأسلوب طبيعي
+   - ${isFemale ? "اسألي" : "اسأل"} عن المهارات التقنية مع أمثلة عملية
+   - ${isFemale ? "اسألي" : "اسأل"} عن الخبرات السابقة وأبرز المشاريع
+   - ${isFemale ? "وزّعي" : "وزّع"} هذه الأسئلة طبيعياً
 
 3. النهاية (آخر سؤالين: ${totalQuestions - 1} و ${totalQuestions}): أسئلة عملية ولوجستية:
    - التوقعات المالية والمزايا
    - الجاهزية والالتزام
    - فتح المجال للمرشح
-   - لا تسأل نفس الأسئلة كل مرة
+   - لا ${isFemale ? "تسألي" : "تسأل"} نفس الأسئلة كل مرة
 
 إجمالي الأسئلة: ${totalQuestions}.`;
 
@@ -809,10 +819,12 @@ export const useLiveInterview = ({
           body: {
             messages: [
               { role: "system", content: systemPrompt },
-              { role: "user", content: `ابدأ المقابلة بتحية ودية ومختلفة كل مرة. عرّف نفسك (اسمك أحمد، محاور واكب الذكي)، اذكر الوظيفة (${jobPosition})، وعدد الأسئلة (${totalQuestions}). اجعلها دافئة وطبيعية. لا تكرر نفس الصيغة.` },
+              { role: "user", content: `ابدأ المقابلة بتحية ودية ومختلفة كل مرة. عرّف نفسك (اسمك ${interviewerName}، ${isFemale ? "محاورة" : "محاور"} واكب ${isFemale ? "الذكية" : "الذكي"})، اذكر الوظيفة (${jobPosition})، وعدد الأسئلة (${totalQuestions}). اجعلها دافئة وطبيعية. لا تكرر نفس الصيغة.` },
             ],
             job_position: jobPosition,
             interview_type: type,
+            interviewer_name: interviewerName,
+            interviewer_gender: interviewerGender,
           },
         });
         if (!greetErr && greetData?.choices?.[0]?.message?.content) {
@@ -821,7 +833,7 @@ export const useLiveInterview = ({
       } catch {}
       
       if (!firstMessage) {
-        firstMessage = `هلا والله! أنا أحمد من محاور واكب الذكي، بكون معك اليوم في المقابلة لوظيفة ${jobPosition}. عندنا ${totalQuestions} أسئلة، خلّها دردشة عادية. جاهز نبدأ؟`;
+        firstMessage = `هلا والله! أنا ${interviewerName} من ${isFemale ? "محاورة" : "محاور"} واكب ${isFemale ? "الذكية" : "الذكي"}، بكون معك اليوم في المقابلة لوظيفة ${jobPosition}. عندنا ${totalQuestions} أسئلة، خلّها دردشة عادية. جاهز نبدأ؟`;
       }
 
       conversationRef.current.push({ role: "assistant", content: firstMessage });

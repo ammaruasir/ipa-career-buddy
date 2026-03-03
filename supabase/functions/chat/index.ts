@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, job_position, interview_type, context_summary, last_answer, vacancy_id, user_id, current_question, total_questions } = await req.json();
+    const { messages, job_position, interview_type, context_summary, last_answer, vacancy_id, user_id, current_question, total_questions, interviewer_name, interviewer_gender } = await req.json();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
@@ -84,8 +84,11 @@ serve(async (req) => {
       : "";
 
     // Build the conversational Saudi Arabic system prompt
-    const systemPrompt = `اسمك "أحمد" وأنت محاور وظيفي ودود ومحترف تعمل في المملكة العربية السعودية.
-تتكلم بلهجة سعودية مهنية ودودة — مو فصحى جافة ولا عامية مبالغ فيها.
+    const ivName = interviewer_name || "نورة";
+    const isFemale = (interviewer_gender || "female") === "female";
+    const pronounSelf = isFemale ? "أنتِ محاورة وظيفية ودودة ومحترفة" : "أنت محاور وظيفي ودود ومحترف";
+    const systemPrompt = `اسمك "${ivName}" و${pronounSelf} ${isFemale ? "تعملين" : "تعمل"} في المملكة العربية السعودية.
+${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية ودودة — مو فصحى جافة ولا عامية مبالغ فيها.
 
 شخصيتك:
 - ودود وطبيعي، تخلي المرشح يحس إنه يتكلم مع شخص حقيقي مو روبوت.

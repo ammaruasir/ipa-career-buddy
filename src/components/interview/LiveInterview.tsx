@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useLiveInterview } from "@/hooks/useLiveInterview";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
 import { useCheatCamera } from "@/hooks/useCheatCamera";
+import { useSystemSettings } from "@/hooks/useSystemSettings";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
 import {
@@ -35,11 +36,17 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
   const [showExit, setShowExit] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const { tabSwitchCount, showWarning } = useAntiCheat({ enableTabDetection: true });
+  const { settings } = useSystemSettings();
+
+  const iv = settings.interviewer_voice;
 
   const live = useLiveInterview({
     type,
     jobPosition,
     totalQuestions,
+    interviewerName: iv.name,
+    interviewerGender: iv.gender,
+    interviewerVoiceId: iv.voice_id,
   });
 
   // Cheat camera for voice mode (video mode already has camera via useLiveInterview)
@@ -94,7 +101,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
       return (
         <Badge variant="default" className="gap-2 px-4 py-2 text-sm animate-fade-in">
           <Volume2 className="w-4 h-4 animate-pulse" />
-          المحاور يتحدث...
+          {iv.gender === "female" ? "المحاورة تتحدث..." : "المحاور يتحدث..."}
         </Badge>
       );
     }
@@ -102,7 +109,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
       return (
         <Badge variant="secondary" className="gap-2 px-4 py-2 text-sm animate-fade-in">
           <Mic className="w-4 h-4 animate-pulse" />
-          يستمع إليك...
+          {iv.gender === "female" ? "تستمع إليك..." : "يستمع إليك..."}
         </Badge>
       );
     }
@@ -163,7 +170,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 gap-6">
         {/* AI Avatar + Candidate Camera */}
         <div className="relative w-full max-w-md h-64 rounded-2xl overflow-hidden shadow-xl border">
-          <AIAvatarScene avatarState={avatarState} />
+          <AIAvatarScene avatarState={avatarState} name={iv.name} gender={iv.gender} avatarUrl={iv.avatar_url || undefined} />
           {/* Candidate PiP Camera - video mode */}
           {type === "video" && (
             <div className="absolute bottom-3 left-3 w-28 h-20 rounded-xl overflow-hidden border-2 border-background shadow-lg bg-black">
@@ -227,7 +234,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
                     }`}
                   >
                     <span className="text-xs font-bold text-muted-foreground block mb-1">
-                      {entry.role === "assistant" ? "المحاور" : "أنت"}
+                      {entry.role === "assistant" ? (iv.gender === "female" ? "المحاورة" : "المحاور") : "أنت"}
                     </span>
                     {entry.text}
                   </div>

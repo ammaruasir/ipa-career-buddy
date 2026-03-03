@@ -475,6 +475,7 @@ export type Database = {
           filler_words: Json
           id: string
           interview_engine: string
+          interviewer_voice: Json
           job_positions: Json
           maintenance_mode: boolean
           questions_per_type: Json
@@ -490,6 +491,7 @@ export type Database = {
           filler_words?: Json
           id?: string
           interview_engine?: string
+          interviewer_voice?: Json
           job_positions?: Json
           maintenance_mode?: boolean
           questions_per_type?: Json
@@ -505,6 +507,7 @@ export type Database = {
           filler_words?: Json
           id?: string
           interview_engine?: string
+          interviewer_voice?: Json
           job_positions?: Json
           maintenance_mode?: boolean
           questions_per_type?: Json
