@@ -181,42 +181,47 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
 
   const confirmEnd = useCallback(async () => {
     if (!interviewId || !user) return;
-    
 
+    setIsCompleted(true);
+    completedRef.current = true;
+    toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم في الخلفية...");
+    navigate("/dashboard");
+
+    // Fire-and-forget: update DB and run evaluation in background
+    (async () => {
+      try {
+        await supabase
+          .from("interviews")
+          .update({ status: "completed" as any })
+          .eq("id", interviewId);
+
+        const vacancyId = searchParams.get("vacancy_id");
+        if (vacancyId) {
+          await supabase
+            .from("job_applications")
+            .update({ status: "interviewed" } as any)
+            .eq("vacancy_id", vacancyId)
+            .eq("user_id", user.id);
+        }
+
+        await supabase.functions.invoke("evaluate-interview", {
+          body: { interview_id: interviewId },
+        });
+      } catch (err) {
+        console.error("Background evaluation failed:", err);
+      }
+    })();
+  }, [interviewId, user, searchParams, navigate]);
+
+  const abort = useCallback(async () => {
+    if (!interviewId) return;
+    completedRef.current = true;
     await supabase
       .from("interviews")
       .update({ status: "completed" as any })
       .eq("id", interviewId);
-
-    const vacancyId = searchParams.get("vacancy_id");
-    if (vacancyId) {
-      await supabase
-        .from("job_applications")
-        .update({ status: "interviewed" } as any)
-        .eq("vacancy_id", vacancyId)
-        .eq("user_id", user.id);
-    }
-
-    setIsCompleted(true);
-    completedRef.current = true;
-    toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم...");
-
-    setIsEvaluating(true);
-    try {
-      const evalResp = await supabase.functions.invoke("evaluate-interview", {
-        body: { interview_id: interviewId },
-      });
-      if (evalResp.error) {
-        toast.error("حدث خطأ في التقييم، يمكنك المحاولة لاحقاً");
-      } else {
-        toast.success("تم إعداد التقييم بنجاح!");
-        navigate("/dashboard");
-      }
-    } catch {
-      toast.error("حدث خطأ في التقييم");
-    }
-    setIsEvaluating(false);
-  }, [interviewId, user, searchParams, navigate]);
+    navigate("/dashboard");
+  }, [interviewId, navigate]);
 
   return {
     user,
@@ -234,6 +239,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     startInterview,
     sendAnswer,
     confirmEnd,
+    abort,
     setMessages,
   };
 };
