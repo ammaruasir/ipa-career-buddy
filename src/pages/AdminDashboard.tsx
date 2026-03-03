@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import UserManagement from "@/components/admin/UserManagement";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -304,6 +305,9 @@ const AdminDashboard = () => {
             </TableBody>
           </Table>
         </Card>
+
+        {/* User Management */}
+        <UserManagement />
 
         {/* Analytics */}
         <h3 className="text-xl font-bold text-foreground">التحليلات</h3>
