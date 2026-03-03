@@ -42,6 +42,8 @@ export const useLiveInterview = ({
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [interviewId, setInterviewId] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState(0);
+  const [currentPhase, setCurrentPhase] = useState<"intro" | "core" | "closing" | "end">("intro");
+  const [coreQuestionCount, setCoreQuestionCount] = useState(0);
 
   const interviewIdRef = useRef<string | null>(null);
   const transcriptRef = useRef<TranscriptEntry[]>([]);
@@ -63,6 +65,7 @@ export const useLiveInterview = ({
   const stoppedManuallyRef = useRef(false);
   const isEndingRef = useRef(false);
   const lastQuestionRef = useRef(false);
+  const endInterviewRef = useRef<(() => Promise<void>) | null>(null);
   
   // Session recording refs
   const sessionRecorderRef = useRef<MediaRecorder | null>(null);
@@ -82,6 +85,11 @@ export const useLiveInterview = ({
   useEffect(() => { interviewIdRef.current = interviewId; }, [interviewId]);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
   useEffect(() => { questionCountRef.current = questionCount; }, [questionCount]);
+
+  const currentPhaseRef = useRef<"intro" | "core" | "closing" | "end">("intro");
+  const coreQuestionCountRef = useRef(0);
+  useEffect(() => { currentPhaseRef.current = currentPhase; }, [currentPhase]);
+  useEffect(() => { coreQuestionCountRef.current = coreQuestionCount; }, [coreQuestionCount]);
 
   // Speak text using ElevenLabs TTS and resolve when done
   // Fallback: use browser SpeechSynthesis
@@ -341,15 +349,8 @@ export const useLiveInterview = ({
       // Update context summary with key points
       contextSummaryRef.current += `\nسؤال ${questionCountRef.current}: ${conversationRef.current.filter(m => m.role === "assistant").pop()?.content?.substring(0, 100) || ""}\nإجابة مختصرة: ${userText.substring(0, 150)}`;
 
-      // Check if this was the last question's answer — auto-end with closing
-      if (lastQuestionRef.current) {
-        lastQuestionRef.current = false;
-        setIsListening(false);
-        await getClosingResponse();
-      } else {
-        // Get next AI response
-        await getNextAIResponse(userText);
-      }
+      // Always get next AI response — the AI handles phase transitions via tags
+      await getNextAIResponse(userText);
 
     } catch (error) {
       console.error("Recording processing error:", error);
@@ -396,7 +397,7 @@ export const useLiveInterview = ({
     }
   }, []);
 
-  // Get next question from AI - latency optimized
+  // Get next question from AI - latency optimized with phase tracking
   const getNextAIResponse = useCallback(async (lastAnswer?: string) => {
     if (!activeRef.current || stoppedManuallyRef.current) return;
     
@@ -411,14 +412,14 @@ export const useLiveInterview = ({
         total_questions: totalQuestions,
         interviewer_name: interviewerName,
         interviewer_gender: interviewerGender,
+        current_phase: currentPhaseRef.current,
+        core_question_count: coreQuestionCountRef.current,
       };
 
       if (lastAnswer && contextSummaryRef.current) {
-        // Optimized: send only summary + last answer
         body.context_summary = contextSummaryRef.current;
         body.last_answer = lastAnswer;
       } else {
-        // First call or fallback: send full messages
         body.messages = conversationRef.current;
       }
 
@@ -429,9 +430,49 @@ export const useLiveInterview = ({
       let aiText = data?.choices?.[0]?.message?.content || data?.content || "";
       if (!aiText) throw new Error("Empty AI response");
 
-      // Handle [NEW_Q]/[FOLLOW_UP] tags
-      const isFollowUp = aiText.startsWith("[FOLLOW_UP]");
-      aiText = aiText.replace(/^\[(NEW_Q|FOLLOW_UP)\]\s*/, "");
+      // Parse phase tag from response
+      const phaseMatch = aiText.match(/^\[(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]/);
+      const phaseTag = phaseMatch ? phaseMatch[1] : null;
+      
+      // Remove phase tag from display text
+      aiText = aiText.replace(/^\[(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]\s*/, "");
+
+      // Handle [END] — interview complete
+      if (phaseTag === "END") {
+        setIsProcessing(false);
+        const endEntry: TranscriptEntry = { role: "assistant", text: aiText };
+        setTranscript(prev => [...prev, endEntry]);
+        conversationRef.current.push({ role: "assistant", content: aiText });
+        setCurrentPhase("end");
+        await speakText(aiText);
+        if (endInterviewRef.current) await endInterviewRef.current();
+        return;
+      }
+
+      // Update phase tracking
+      if (phaseTag === "INTRO") {
+        setCurrentPhase("intro");
+      } else if (phaseTag === "CORE") {
+        setCurrentPhase("core");
+        const newCoreCount = coreQuestionCountRef.current + 1;
+        setCoreQuestionCount(newCoreCount);
+        coreQuestionCountRef.current = newCoreCount;
+        
+        // If all core questions done, next response should be closing
+        if (newCoreCount >= totalQuestions) {
+          lastQuestionRef.current = true;
+        }
+      } else if (phaseTag === "CLOSING") {
+        setCurrentPhase("closing");
+      }
+
+      // Increment general question count for non-follow-ups
+      const isFollowUp = phaseTag === "FOLLOW_UP";
+      if (!isFollowUp) {
+        const newCount = questionCountRef.current + 1;
+        setQuestionCount(newCount);
+        questionCountRef.current = newCount;
+      }
 
       setIsProcessing(false);
 
@@ -461,18 +502,6 @@ export const useLiveInterview = ({
 
       conversationRef.current.push({ role: "assistant", content: aiText });
 
-      // Only increment question count for new questions
-      if (!isFollowUp) {
-        const newCount = questionCountRef.current + 1;
-        setQuestionCount(newCount);
-        questionCountRef.current = newCount;
-
-        if (newCount >= totalQuestions) {
-          // Mark as last question — wait for candidate's answer before closing
-          lastQuestionRef.current = true;
-        }
-      }
-
       // Speak first, then show text after audio finishes
       await speakText(aiText);
       transcriptRef.current = [...transcriptRef.current, { role: "assistant", text: aiText }];
@@ -485,7 +514,7 @@ export const useLiveInterview = ({
       setIsProcessing(false);
       toast.error("حدث خطأ في الحصول على السؤال التالي");
     }
-  }, [jobPosition, type, speakText, startListening]);
+  }, [jobPosition, type, speakText, startListening, totalQuestions]);
 
   // End interview and evaluate
   const endInterview = useCallback(async () => {
@@ -614,7 +643,9 @@ export const useLiveInterview = ({
     navigate("/dashboard");
   }, [navigate, user]);
 
-  // Get closing response from AI before ending
+  // Keep ref in sync so getNextAIResponse can call endInterview
+  useEffect(() => { endInterviewRef.current = endInterview; }, [endInterview]);
+
   const getClosingResponse = useCallback(async () => {
     if (!activeRef.current || stoppedManuallyRef.current) return;
     
@@ -772,41 +803,12 @@ export const useLiveInterview = ({
           .eq("user_id", user.id);
       }
 
-      // Build conversational system prompt - dynamic based on interviewer identity
+      // Build conversational system prompt - uses chat function's prompt, just a lightweight version for greeting
       const isFemale = interviewerGender === "female";
-      const pronounSelf = isFemale ? "أنتِ محاورة وظيفية ودودة ومحترفة" : "أنت محاور وظيفي ودود ومحترف";
       const systemPrompt = `CRITICAL INSTRUCTION: You MUST speak ONLY in Arabic (العربية). Never use English.
-
-اسمك "${interviewerName}" و${pronounSelf} ${isFemale ? "تعملين" : "تعمل"} في السعودية.
-- الوظيفة: ${jobPosition}
-- ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية ودودة.
-- ${isFemale ? "علّقي" : "علّق"} بجملة قصيرة على إجابة المرشح قبل السؤال التالي (مثل: "حلو"، "ممتاز"، "فهمت عليك").
-- ${isFemale ? "استخدمي" : "استخدم"} انتقالات طبيعية: "طيب"، "حلو خلنا نشوف"، "تمام، بسألك الحين عن...".
-- ${isFemale ? "اطرحي" : "اطرح"} سؤالاً واحداً فقط. أقصى 2-3 جمل. ${isFemale ? "أبقي" : "أبقِ"} الرد أقل من 80 كلمة.
-- لا ${isFemale ? "تلخصي" : "تلخص"} إجابة المرشح. لا ${isFemale ? "تكرري" : "تكرر"} ما قاله.
-- ${isFemale ? "عدّلي" : "عدّل"} الصعوبة ديناميكياً بناءً على جودة الإجابة.
-- لا ${isFemale ? "تساعدي" : "تساعد"} المرشح. لا ${isFemale ? "تقدمي" : "تقدم"} تلميحات.
-- ${isFemale ? "نوّعي" : "نوّع"} أسلوبك: أحياناً ${isFemale ? "اسألي" : "اسأل"} مباشرة، أحياناً ${isFemale ? "اطرحي" : "اطرح"} موقف.
-
-هيكل المقابلة (${isFemale ? "التزمي" : "التزم"} بهذا الترتيب بدقة):
-1. البداية (أول سؤالين): تعارف وكسر جمود. ${isFemale ? "نوّعي" : "نوّع"} بين:
-   - طلب التعريف بالنفس بأساليب مختلفة
-   - استكشاف الدافع بطريقة مرتبطة بالوظيفة أو بخلفية المرشح
-   - لا ${isFemale ? "تستخدمي" : "تستخدم"} نفس الصياغة في كل مقابلة
-
-2. الوسط (السؤال 3 إلى ${totalQuestions - 2}): أسئلة تقنية وسلوكية مخصصة للوظيفة:
-   - ${isFemale ? "اسألي" : "اسأل"} عن الشهادات والدورات بأسلوب طبيعي
-   - ${isFemale ? "اسألي" : "اسأل"} عن المهارات التقنية مع أمثلة عملية
-   - ${isFemale ? "اسألي" : "اسأل"} عن الخبرات السابقة وأبرز المشاريع
-   - ${isFemale ? "وزّعي" : "وزّع"} هذه الأسئلة طبيعياً
-
-3. النهاية (آخر سؤالين: ${totalQuestions - 1} و ${totalQuestions}): أسئلة عملية ولوجستية:
-   - التوقعات المالية والمزايا
-   - الجاهزية والالتزام
-   - فتح المجال للمرشح
-   - لا ${isFemale ? "تسألي" : "تسأل"} نفس الأسئلة كل مرة
-
-إجمالي الأسئلة: ${totalQuestions}.`;
+اسمك "${interviewerName}" و${isFemale ? "أنتِ محاورة وظيفية ودودة ومحترفة" : "أنت محاور وظيفي ودود ومحترف"} ${isFemale ? "تعملين" : "تعمل"} في السعودية.
+الوظيفة: ${jobPosition}. ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية ودودة.
+ابدأ ردك بـ [INTRO].`;
 
       // Fetch dynamic opening from AI
       conversationRef.current = [
@@ -819,21 +821,25 @@ export const useLiveInterview = ({
           body: {
             messages: [
               { role: "system", content: systemPrompt },
-              { role: "user", content: `ابدأ المقابلة بتحية ودية ومختلفة كل مرة. عرّف نفسك (اسمك ${interviewerName}، ${isFemale ? "محاورة" : "محاور"} واكب ${isFemale ? "الذكية" : "الذكي"})، اذكر الوظيفة (${jobPosition})، وعدد الأسئلة (${totalQuestions}). اجعلها دافئة وطبيعية. لا تكرر نفس الصيغة.` },
+              { role: "user", content: `ابدأ المقابلة بتحية ودية ومختلفة كل مرة. عرّف نفسك (اسمك ${interviewerName}، ${isFemale ? "محاورة" : "محاور"} واكب ${isFemale ? "الذكية" : "الذكي"})، اذكر الوظيفة (${jobPosition}). لا تذكر عدد الأسئلة. اجعلها دافئة وطبيعية. لا تكرر نفس الصيغة. ابدأ بـ [INTRO].` },
             ],
             job_position: jobPosition,
             interview_type: type,
             interviewer_name: interviewerName,
             interviewer_gender: interviewerGender,
+            current_phase: "intro",
+            core_question_count: 0,
+            total_questions: totalQuestions,
+            user_id: user?.id,
           },
         });
         if (!greetErr && greetData?.choices?.[0]?.message?.content) {
-          firstMessage = greetData.choices[0].message.content.replace(/^\[(NEW_Q|FOLLOW_UP)\]\s*/, "");
+          firstMessage = greetData.choices[0].message.content.replace(/^\[(INTRO|NEW_Q|FOLLOW_UP)\]\s*/, "");
         }
       } catch {}
       
       if (!firstMessage) {
-        firstMessage = `هلا والله! أنا ${interviewerName} من ${isFemale ? "محاورة" : "محاور"} واكب ${isFemale ? "الذكية" : "الذكي"}، بكون معك اليوم في المقابلة لوظيفة ${jobPosition}. عندنا ${totalQuestions} أسئلة، خلّها دردشة عادية. جاهز نبدأ؟`;
+        firstMessage = `هلا والله! أنا ${interviewerName} من ${isFemale ? "محاورة" : "محاور"} واكب ${isFemale ? "الذكية" : "الذكي"}، بكون معك اليوم في المقابلة لوظيفة ${jobPosition}. خلّها دردشة عادية. جاهز نبدأ؟ عرّفني على نفسك.`;
       }
 
       conversationRef.current.push({ role: "assistant", content: firstMessage });
@@ -842,6 +848,9 @@ export const useLiveInterview = ({
       setTranscript([firstEntry]);
       setQuestionCount(1);
       questionCountRef.current = 1;
+      setCurrentPhase("intro");
+      setCoreQuestionCount(0);
+      coreQuestionCountRef.current = 0;
 
       activeRef.current = true;
       setIsActive(true);
@@ -927,6 +936,8 @@ export const useLiveInterview = ({
     transcript,
     interviewId,
     questionCount,
+    currentPhase,
+    coreQuestionCount,
     startCall,
     endCall,
     submitAnswer,

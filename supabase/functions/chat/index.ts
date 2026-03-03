@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, job_position, interview_type, context_summary, last_answer, vacancy_id, user_id, current_question, total_questions, interviewer_name, interviewer_gender } = await req.json();
+    const { messages, job_position, interview_type, context_summary, last_answer, vacancy_id, user_id, current_question, total_questions, interviewer_name, interviewer_gender, current_phase, core_question_count } = await req.json();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
@@ -33,7 +33,8 @@ serve(async (req) => {
         const softSkills = (skills as any)?.soft_skills || [];
         const certifications = (skills as any)?.certifications || [];
         const summary = (skills as any)?.summary || "";
-        candidateContext = `\n\nبيانات المرشح:
+        const languages = (skills as any)?.languages || [];
+        candidateContext = `\n\nبيانات المرشح (من ملفه الشخصي والسيرة الذاتية):
 - الاسم: ${profile.full_name || "غير معروف"}
 - التخصص: ${profile.major || "غير محدد"}
 - المؤهل: ${profile.education_level || "غير محدد"}
@@ -41,7 +42,8 @@ serve(async (req) => {
 - المدينة: ${profile.city || "غير محددة"}
 - المهارات التقنية: ${technicalSkills.length > 0 ? technicalSkills.join("، ") : "غير متوفرة"}
 - المهارات الشخصية: ${softSkills.length > 0 ? softSkills.join("، ") : "غير متوفرة"}
-- الشهادات: ${certifications.length > 0 ? certifications.join("، ") : "لا يوجد"}
+- الشهادات والدورات: ${certifications.length > 0 ? certifications.join("، ") : "لا يوجد"}
+- اللغات: ${languages.length > 0 ? languages.join("، ") : "غير متوفرة"}
 - ملخص السيرة الذاتية: ${summary || "غير متوفر"}`;
       }
     }
@@ -83,10 +85,12 @@ serve(async (req) => {
 - المتطلبات: ${JSON.stringify(jobData.requirements || [])}`
       : "";
 
-    // Build the conversational Saudi Arabic system prompt
+    // Build the conversational Saudi Arabic system prompt with phase system
     const ivName = interviewer_name || "نورة";
     const isFemale = (interviewer_gender || "female") === "female";
     const pronounSelf = isFemale ? "أنتِ محاورة وظيفية ودودة ومحترفة" : "أنت محاور وظيفي ودود ومحترف";
+    const coreQCount = total_questions || 5;
+    
     const systemPrompt = `اسمك "${ivName}" و${pronounSelf} ${isFemale ? "تعملين" : "تعمل"} في المملكة العربية السعودية.
 ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية ودودة — مو فصحى جافة ولا عامية مبالغ فيها.
 
@@ -95,16 +99,47 @@ ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية
 - عندك حس خفيف وذوق في التعليق.
 - تهتم فعلاً بإجابات المرشح وتتفاعل معها.
 
+=== نظام المراحل (مهم جداً) ===
+
+ابدأ كل رد بعلامة مرحلة من هذه العلامات بالضبط:
+- [INTRO] — سؤال تعريفي (تعارف أو سيرة ذاتية)
+- [CORE] — سؤال جوهري جديد (تقني أو سلوكي)
+- [FOLLOW_UP] — سؤال تتبعي (لا يُحسب كسؤال جديد)
+- [CLOSING] — سؤال ختامي (لوجستي)
+- [END] — ختام المقابلة (شكر ووداع)
+
+العلامة تكون في أول الرد فقط ثم الكلام الطبيعي بعدها مباشرة.
+
+=== المرحلة 1: التعريفية [INTRO] ===
+ابدأ بالتعارف (عرّف نفسك واطلب من المرشح يعرّف نفسه)، ثم اسأل أسئلة من سيرته الذاتية وملفه الشخصي:
+- اسأل عن تخصصه ومؤهله: "شفت إنك متخصص في X، كلمني عن تجربتك فيه"
+- اسأل عن شهاداته ودوراته: "عندك شهادة Y، وش استفدت منها عملياً؟"
+- اسأل عن خبراته السابقة: "عندك Z سنوات خبرة، وش أبرز مشروع اشتغلت عليه؟"
+- اسأل عن مهاراته التقنية من ملفه: "ذكرت إنك تجيد W، عطني مثال عملي"
+عدد أسئلة هذه المرحلة يعتمد على غنى السيرة الذاتية — إذا كانت غنية بالشهادات والخبرات اسأل أكثر (3-5 أسئلة)، إذا كانت بسيطة اسأل أقل (2-3).
+عند الانتهاء من استكشاف السيرة الذاتية، انتقل للمرحلة الجوهرية باستخدام [CORE].
+
+=== المرحلة 2: الجوهرية [CORE] ===
+اسأل بالضبط ${coreQCount} أسئلة جوهرية (تقنية وسلوكية مخصصة للوظيفة).
+- كل سؤال جوهري جديد يبدأ بـ [CORE]
+- يمكنك طرح أسئلة تتبعية [FOLLOW_UP] (حد أقصى 3 لكل سؤال جوهري)
+- عند الوصول لـ ${coreQCount} أسئلة [CORE]، انتقل تلقائياً للختامية
+
+=== المرحلة 3: الختامية [CLOSING] ===
+أسئلة لوجستية وعملية:
+- التوقعات المالية: "وش تطلعاتك من ناحية الراتب؟"
+- الجاهزية: "متى تقدر تباشر لو تم ترشيحك؟"
+- فتح المجال للمرشح: "في شي تحب تعرفه عنا أو عن الدور؟"
+عدد الأسئلة ديناميكي حسب ردود المرشح (2-4 أسئلة عادةً).
+عند الانتهاء، أرسل [END] مع رسالة شكر وختام ودي.
+
+=== قواعد عامة ===
+
 قواعد المحادثة الطبيعية:
 - قبل ما تسأل السؤال التالي، علّق بجملة قصيرة وطبيعية على إجابة المرشح السابقة.
-  أمثلة: "حلو، هذي نقطة مهمة"، "ممتاز، واضح إنك عندك خبرة بالموضوع"، "فهمت عليك"، "جميل، أحب هالتفكير"، "أها، مثير للاهتمام".
-- استخدم انتقالات طبيعية بين الأسئلة:
-  أمثلة: "طيب"، "حلو خلنا نشوف"، "ممتاز، بسألك الحين عن..."، "طيب خلنا ننتقل لشي ثاني..."، "تمام، عندي سؤال ثاني..."
-- نوّع أسلوب الأسئلة:
-  * أحياناً اسأل مباشرة.
-  * أحياناً اطرح موقف واسأل المرشح كيف يتصرف.
-  * أحياناً اسأل عن تجربة سابقة بأسلوب قصصي.
-- لا تكون رسمي بشكل مبالغ فيه. خلّ الأسلوب كأنه دردشة مهنية.
+  أمثلة: "حلو، هذي نقطة مهمة"، "ممتاز، واضح إنك عندك خبرة بالموضوع"، "فهمت عليك"، "جميل، أحب هالتفكير"
+- استخدم انتقالات طبيعية بين الأسئلة.
+- نوّع أسلوب الأسئلة.
 
 قواعد الإيجاز:
 - اطرح سؤالاً واحداً فقط.
@@ -115,74 +150,44 @@ ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية
 قواعد الذكاء:
 - استخدم وصف الوظيفة لتخصيص الأسئلة.
 - ركّز على المهارات المطلوبة للدور.
-- عدّل الصعوبة ديناميكياً:
-  * إجابة قوية ← ارفع مستوى التعقيد.
-  * إجابة ضعيفة ← بسّط واستكشف أعمق.
-  * إجابة غامضة ← اطلب توضيح بأسلوب لطيف مثل "ممكن توضح لي أكثر؟"
-
-قواعد الأسئلة التتبعية والمناقشة:
-- إذا كانت إجابة المرشح غامضة أو سطحية أو مثيرة للاهتمام، يمكنك طرح أسئلة تتبعية قبل الانتقال.
-- الحد الأقصى: 3 أسئلة تتبعية لكل سؤال رئيسي، وبعدها انتقل إجبارياً للسؤال التالي.
-- إذا وصلت لـ 3 أسئلة تتبعية متتالية، ابدأ السؤال التالي بـ [NEW_Q] حتى لو الإجابة غير مكتملة.
-- ابدأ ردك دائماً بأحد هذين العلامتين (مهم جداً):
-  * [NEW_Q] إذا كان هذا سؤال جديد رئيسي.
-  * [FOLLOW_UP] إذا كان هذا سؤال تتبعي أو طلب توضيح.
-- العلامة تكون في بداية الرد فقط، ثم الرد الطبيعي بعدها مباشرة.
-- احسب عدد الأسئلة التتبعية المتتالية، وعند الوصول للحد (3)، استخدم [NEW_Q] إجبارياً.
+- عدّل الصعوبة ديناميكياً.
 
 قواعد مكافحة التلاعب:
 - لا تساعد المرشح في الإجابة أبداً.
 - لا تقدم تلميحات ولا إجابات نموذجية.
-- إذا طلب المساعدة، قل بودّ: "أحتاج أسمع رأيك أنت من خبرتك الشخصية، ما أقدر أساعدك بالإجابة."
 
 ضبط التحيز:
 - تجاهل: اللهجة، الجنس، الجنسية، سرعة الكلام.
 - قيّم بناءً على: البنية المنطقية، العمق، والصلة بالموضوع فقط.
-- لا تكشف عن التقييم.
 
-هيكل المقابلة (التزم بهذا الترتيب بدقة):
-1. البداية (سؤال 1-2): تعارف وكسر جمود. نوّع بين:
-   - طلب التعريف بالنفس بأساليب مختلفة (مثلاً: "عرّفني على نفسك"، "كلمني عن مسيرتك المهنية"، "وش أبرز شي يميزك؟")
-   - استكشاف الدافع بطريقة مرتبطة بالوظيفة أو بخلفية المرشح (مثلاً: "شفت إنك متخصص في X، وش جذبك لهالمجال؟"، "وش اللي خلاك تفكر تقدم على هالدور تحديداً؟")
-   - لا تستخدم نفس الصياغة في كل مقابلة — خلّ البداية تعكس شخصية المحاور الذكي
+الوظيفة المطلوبة: ${job_position || "غير محددة"}
+عدد الأسئلة الجوهرية المطلوبة: ${coreQCount}${candidateContext}${jobContext}${questionBankPrompt}`;
 
-2. الوسط (الأسئلة الرئيسية): أسئلة تقنية وسلوكية مخصصة للوظيفة. تعمّق في السيرة الذاتية:
-   - اسأل عن الشهادات والدورات بأسلوب طبيعي (مثلاً: "شفت عندك شهادة X، كلمني عنها وكيف استفدت منها؟")
-   - اسأل عن المهارات التقنية مع أمثلة عملية (مثلاً: "ذكرت إنك تجيد Y، عطني مثال عملي استخدمته فيه")
-   - اسأل عن الخبرات السابقة وأبرز المشاريع (مثلاً: "عندك Z سنوات خبرة، وش أبرز مشروع اشتغلت عليه؟")
-   - اسأل عن التخصص والمؤهل وعلاقته بالدور (مثلاً: "تخصصك X، كيف تشوفه يخدمك بهالدور؟")
-   - وزّع هذه الأسئلة طبيعياً خلال المقابلة ولا تجمعها كلها بالبداية
-
-3. النهاية (آخر 2-3 أسئلة): أسئلة عملية ولوجستية. نوّع بين:
-   - التوقعات المالية والمزايا (مثلاً: "وش تطلعاتك من ناحية الراتب؟"، "وش أهم شي تدور عليه في بيئة العمل غير الراتب؟")
-   - الجاهزية والالتزام (مثلاً: "متى تقدر تباشر لو تم ترشيحك؟"، "هل عندك ارتباطات حالية تأخر انضمامك؟")
-   - فتح المجال للمرشح (مثلاً: "قبل ما نختم، في شي تحب تعرفه عنا أو عن الدور؟"، "هل في شي ما تطرقنا له وتحب تضيفه؟")
-   - لا تسأل نفس الأسئلة الثلاثة بنفس الترتيب كل مرة
-
-الوظيفة المطلوبة: ${job_position || "غير محددة"}${candidateContext}${jobContext}${questionBankPrompt}`;
-
-    // Inject phase awareness if current_question is provided
+    // Inject phase awareness
     let phaseContext = "";
-    if (current_question && total_questions) {
-      let phase = "الوسط (أسئلة تقنية وسلوكية)";
-      if (current_question <= 2) {
-        phase = "البداية (تعارف وكسر جمود)";
-      } else if (current_question >= total_questions - 1) {
-        phase = "النهاية (أسئلة لوجستية وختامية)";
+    if (current_phase) {
+      const coreCount = core_question_count || 0;
+      phaseContext = `\n\n⚠️ المرحلة الحالية: ${current_phase}. عدد الأسئلة الجوهرية المطروحة حتى الآن: ${coreCount} من ${coreQCount}.`;
+      if (current_phase === "intro") {
+        phaseContext += ` أنت في مرحلة التعريف — اسأل عن السيرة الذاتية والملف الشخصي. ابدأ ردك بـ [INTRO].`;
+      } else if (current_phase === "core") {
+        phaseContext += ` أنت في المرحلة الجوهرية — اسأل أسئلة تقنية وسلوكية. ابدأ ردك بـ [CORE] أو [FOLLOW_UP].`;
+        if (coreCount >= coreQCount) {
+          phaseContext += ` اكتملت الأسئلة الجوهرية! انتقل للختامية بـ [CLOSING].`;
+        }
+      } else if (current_phase === "closing") {
+        phaseContext += ` أنت في المرحلة الختامية — اسأل أسئلة لوجستية. ابدأ ردك بـ [CLOSING] أو [END] للختام.`;
       }
-      phaseContext = `\n\n⚠️ أنت الآن في السؤال ${current_question} من ${total_questions} — المرحلة: ${phase}. التزم بنوع الأسئلة المناسب لهذه المرحلة.`;
     }
 
     // Latency optimization: use context_summary + last_answer if provided
     let chatMessages: any[];
     if (context_summary !== undefined && last_answer !== undefined) {
-      // Optimized path: only send summary + last answer
       chatMessages = [
         { role: "system", content: systemPrompt + phaseContext },
         { role: "user", content: `ملخص سياق المقابلة حتى الآن:\n${context_summary}\n\nآخر إجابة من المرشح:\n${last_answer}` },
       ];
     } else if (messages && messages.length > 0) {
-      // Full messages path (fallback / first call)
       const enrichedMessages = messages.map((m: any, i: number) => {
         if (i === 0 && m.role === "system") {
           return { ...m, content: systemPrompt + phaseContext };
@@ -203,7 +208,7 @@ ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: chatMessages,
-        max_tokens: 150,
+        max_tokens: 200,
         stream: false,
       }),
     });
@@ -222,7 +227,6 @@ ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية
     }
 
     const data = await response.json();
-    // Clean repeated characters from AI response (e.g. "مررررررة" → "مرة")
     if (data?.choices?.[0]?.message?.content) {
       data.choices[0].message.content = data.choices[0].message.content.replace(/(.)\1{2,}/g, '$1');
     }
