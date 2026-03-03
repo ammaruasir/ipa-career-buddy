@@ -5,14 +5,23 @@ import fixWebmDuration from "fix-webm-duration";
 interface UseCheatCameraOptions {
   enabled: boolean;
   interviewId: string | null;
-  captureIntervalMs?: number; // local capture interval (default 1s)
-  batchIntervalMs?: number;   // batch send interval (default 10s)
+  captureIntervalMs?: number;
+  batchIntervalMs?: number;
 }
+
+// Convert Blob to base64 data URL
+const blobToDataUrl = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 
 export const useCheatCamera = ({
   enabled,
   interviewId,
-  captureIntervalMs = 1000,
+  captureIntervalMs = 2000,
   batchIntervalMs = 10000,
 }: UseCheatCameraOptions) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -20,16 +29,15 @@ export const useCheatCamera = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const captureIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const batchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const framesBufferRef = useRef<string[]>([]);
+  const framesBufferRef = useRef<Blob[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingStartRef = useRef<number>(0);
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
 
-  // Start camera when enabled and interviewId is set
+  // Start camera
   useEffect(() => {
     if (!enabled || !interviewId) return;
-
     let cancelled = false;
     const startCamera = async () => {
       try {
@@ -46,21 +54,15 @@ export const useCheatCamera = ({
         setCameraError(true);
       }
     };
-
     startCamera();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [enabled, interviewId]);
 
-  // Bind stream to video element + start MediaRecorder for full session recording
+  // Bind stream + start MediaRecorder
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
     }
-
-    // Start MediaRecorder for full session recording
     if (stream && interviewId) {
       try {
         const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
@@ -89,10 +91,10 @@ export const useCheatCamera = ({
     }
   }, [stream, interviewId]);
 
-  // Capture single frame
+  // Capture frame as Blob (not base64)
   const captureFrame = useCallback(() => {
     const video = videoRef.current;
-    if (!video || video.videoWidth === 0) return;
+    if (!video || video.readyState < 2 || video.videoWidth === 0) return;
 
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
@@ -101,95 +103,87 @@ export const useCheatCamera = ({
     if (!ctx) return;
 
     ctx.drawImage(video, 0, 0);
-    const frame = canvas.toDataURL("image/jpeg", 0.4);
-    framesBufferRef.current.push(frame);
+    canvas.toBlob(
+      (blob) => {
+        if (blob) framesBufferRef.current.push(blob);
+      },
+      "image/jpeg",
+      0.6
+    );
   }, []);
 
-  // Send batch of frames for analysis
-  const sendBatch = useCallback(() => {
+  // Send batch — convert Blobs to data URLs only at send time
+  const sendBatch = useCallback(async () => {
     const frames = framesBufferRef.current;
     if (frames.length === 0 || !interviewId) return;
 
-    // Take all buffered frames and clear
     const batch = [...frames];
     framesBufferRef.current = [];
 
-    // Fire and forget
-    supabase.functions
-      .invoke("analyze-video", {
+    try {
+      const dataUrls = await Promise.all(batch.map(blobToDataUrl));
+      await supabase.functions.invoke("analyze-video", {
         body: {
           response_id: null,
-          frames: batch,
+          frames: dataUrls,
           answer_text: "",
           question_text: "",
           interview_id: interviewId,
         },
-      })
-      .catch((err) => console.error("Cheat camera batch analysis failed:", err));
+      });
+    } catch (err) {
+      console.error("Cheat camera batch analysis failed:", err);
+    }
   }, [interviewId]);
 
-  // Start periodic capture (every 1s) and batch send (every 10s)
+  // Periodic capture & batch send
   useEffect(() => {
     if (!stream || !interviewId) return;
-
     captureIntervalRef.current = setInterval(captureFrame, captureIntervalMs);
     batchIntervalRef.current = setInterval(sendBatch, batchIntervalMs);
-
     return () => {
       if (captureIntervalRef.current) clearInterval(captureIntervalRef.current);
       if (batchIntervalRef.current) clearInterval(batchIntervalRef.current);
     };
   }, [stream, interviewId, captureIntervalMs, batchIntervalMs, captureFrame, sendBatch]);
 
-  // Stop recording and upload when interviewId becomes null or component unmounts
+  // Stop and upload — await everything
   const stopAndUpload = useCallback(async () => {
-    // Send remaining frames
-    sendBatch();
+    await sendBatch();
 
-    // Stop MediaRecorder
     if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
+      await new Promise<void>((resolve) => {
+        mediaRecorderRef.current!.onstop = () => resolve();
+        mediaRecorderRef.current!.stop();
+      });
     }
   }, [sendBatch]);
 
-  // Upload recording blob when available
+  // Upload recording blob
   useEffect(() => {
     if (!recordingBlob || !interviewId) return;
-
     const upload = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-
         const fileName = `${user.id}/${interviewId}_cheat_cam.webm`;
         const { error } = await supabase.storage
           .from("interview-recordings")
           .upload(fileName, recordingBlob, { contentType: "video/webm", upsert: true });
-
-        if (error) {
-          console.error("Failed to upload cheat camera recording:", error);
-        } else {
-          console.log("Cheat camera recording uploaded:", fileName);
-        }
+        if (error) console.error("Failed to upload cheat camera recording:", error);
+        else console.log("Cheat camera recording uploaded:", fileName);
       } catch (err) {
         console.error("Error uploading cheat camera recording:", err);
       }
     };
-
     upload();
   }, [recordingBlob, interviewId]);
 
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
-      // Send remaining frames
-      if (framesBufferRef.current.length > 0 && interviewId) {
-        sendBatch();
-      }
-      // Stop recorder
-      if (mediaRecorderRef.current?.state === "recording") {
-        mediaRecorderRef.current.stop();
-      }
+      if (framesBufferRef.current.length > 0 && interviewId) sendBatch();
+      if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
       stream?.getTracks().forEach((t) => t.stop());
       if (captureIntervalRef.current) clearInterval(captureIntervalRef.current);
       if (batchIntervalRef.current) clearInterval(batchIntervalRef.current);
