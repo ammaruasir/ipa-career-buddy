@@ -30,6 +30,9 @@ const Login = () => {
         toast.error(error.message);
       } else {
         toast.success("تم إنشاء الحساب بنجاح! يرجى تأكيد بريدك الإلكتروني");
+        setEmail("");
+        setPassword("");
+        setFullName("");
       }
     } else {
       const { error } = await signIn(email, password);
@@ -180,7 +183,7 @@ const Login = () => {
             )}
             <button
               type="button"
-              onClick={() => setIsSignup(!isSignup)}
+              onClick={() => { setIsSignup(!isSignup); setEmail(""); setPassword(""); setFullName(""); }}
               className="text-sm text-primary hover:underline"
             >
               {isSignup ? "لديك حساب بالفعل؟ تسجيل الدخول" : "ليس لديك حساب؟ إنشاء حساب جديد"}
