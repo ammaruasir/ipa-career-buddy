@@ -1,29 +1,54 @@
 
 
-## إصلاح مشكلة عدم انتهاء المقابلة بعد توديع المحاور
+## تحديث كود تسجيل المقابلة
 
-### المشكلة
-عند انتهاء المحاور الذكي وتوديعه للمرشح، المقابلة تظل عالقة ولا يتم التوجيه للوحة التحكم. السبب:
-
-1. **المقابلة النصية**: دالة `confirmEnd()` تنتظر انتهاء التقييم (`evaluate-interview`) قبل التوجيه. إذا فشل التقييم أو تأخر، المستخدم يعلق.
-2. **المقابلة النصية**: عند الضغط على زر الرجوع أثناء المقابلة المكتملة، `beforeunload` يمنع الخروج لأن `isCompleted` لم يُحدّث بعد.
-3. **زر الخروج**: في المقابلة النصية، حوار تأكيد الخروج يوجّه للوحة التحكم لكن لا يوقف المقابلة رسمياً.
-
-### الحل
-
-**ملف: `src/hooks/useInterviewSession.ts`**
-
-| التعديل | التفاصيل |
-|---------|----------|
-| `confirmEnd()` — التوجيه فوراً | نقل `setIsCompleted(true)` و `navigate("/dashboard")` و `toast.success` قبل استدعاء التقييم، وتشغيل التقييم في الخلفية (fire-and-forget) |
-| إضافة `abort` function | تضيف دالة لإيقاف المقابلة وتحديث الحالة في قاعدة البيانات عند الخروج القسري |
+### التغييرات
 
 **ملف: `src/pages/TextInterview.tsx`**
 
-| التعديل | التفاصيل |
-|---------|----------|
-| تحسين `handleBack` | عند الخروج من المقابلة المكتملة، التوجيه مباشرة بدون حوار تأكيد |
-| تحسين `onConfirm` في ExitDialog | استدعاء `confirmEnd` أو إيقاف المقابلة قبل التوجيه |
+**1. تعديل useEffect لبدء التسجيل (سطر 78-96):**
+- استخدام codec `vp9,opus`
+- إزالة `timeslice` من `recorder.start()`
+- إزالة cleanup `stop` من هذا الـ useEffect
 
-بهذا التعديل، المقابلة تنتهي فوراً بعد توديع المحاور وينتقل المرشح للوحة التحكم بدون انتظار.
+**2. تعديل upload logic (سطر 98-139):**
+- استبدال `setTimeout(500)` بـ `await new Promise` مع `onstop` event
+- انتظار فعلي لانتهاء التسجيل بدلاً من تأخير عشوائي
+
+```typescript
+// useEffect للتسجيل - بدون cleanup stop
+useEffect(() => {
+  if (!cheatCamera.stream || !session.interviewId) return;
+  try {
+    const recorder = new MediaRecorder(cheatCamera.stream, {
+      mimeType: "video/webm;codecs=vp9,opus"
+    });
+    sessionChunksRef.current = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) {
+        sessionChunksRef.current.push(e.data);
+      }
+    };
+    recorder.start(); // بدون timeslice
+    sessionRecorderRef.current = recorder;
+  } catch (err) {
+    console.error("Failed to start session recorder:", err);
+  }
+}, [cheatCamera.stream, session.interviewId]);
+
+// Upload - انتظار onstop بدل setTimeout
+const uploadRecording = async () => {
+  cheatCamera.stopAndUpload();
+
+  if (sessionRecorderRef.current?.state === "recording") {
+    await new Promise((resolve) => {
+      sessionRecorderRef.current!.onstop = resolve;
+      sessionRecorderRef.current!.stop();
+    });
+  }
+
+  const blob = new Blob(sessionChunksRef.current, { type: "video/webm" });
+  // ... باقي الرفع كما هو
+};
+```
 
