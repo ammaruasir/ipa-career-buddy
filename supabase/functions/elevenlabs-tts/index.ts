@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text } = await req.json();
+    const { text, voiceId } = await req.json();
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 
     if (!ELEVENLABS_API_KEY) {
@@ -22,10 +22,10 @@ serve(async (req) => {
       });
     }
 
-    const voiceId = "SAz9YHcvj6GT2YYXdXww"; // River - natural male voice with Arabic support
+    const selectedVoiceId = voiceId || "SAz9YHcvj6GT2YYXdXww"; // Default: River
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}?output_format=mp3_44100_128`,
       {
         method: "POST",
         headers: {

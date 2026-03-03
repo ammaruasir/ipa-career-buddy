@@ -1,13 +1,28 @@
 import interviewerAvatar from "@/assets/interviewer-avatar.png";
+import interviewerFemaleAvatar from "@/assets/interviewer-female-avatar.png";
 
 type AvatarState = "idle" | "speaking" | "listening";
 
 interface AIAvatarSceneProps {
   avatarState: AvatarState;
   audioAnalyser?: AnalyserNode | null;
+  name?: string;
+  gender?: "male" | "female";
+  avatarUrl?: string;
 }
 
-const AIAvatarScene = ({ avatarState }: AIAvatarSceneProps) => {
+const AIAvatarScene = ({ avatarState, name, gender = "female", avatarUrl }: AIAvatarSceneProps) => {
+  const displayName = name || (gender === "female" ? "نورة" : "أحمد");
+  const isFemale = gender === "female";
+
+  // Determine which avatar image to use
+  const avatarSrc = avatarUrl || (isFemale ? interviewerFemaleAvatar : interviewerAvatar);
+
+  const speakingLabel = isFemale ? "تتحدث..." : "يتحدث...";
+  const listeningLabel = isFemale ? "تستمع..." : "يستمع...";
+  const readyLabel = isFemale ? "جاهزة" : "جاهز";
+  const titleLabel = isFemale ? `محاورة واكب الذكية` : `محاور واكب الذكي`;
+
   return (
     <div className="w-full h-full rounded-2xl overflow-hidden bg-gradient-to-b from-muted/60 to-muted relative flex items-center justify-center">
       {/* Speaking pulse rings */}
@@ -30,8 +45,8 @@ const AIAvatarScene = ({ avatarState }: AIAvatarSceneProps) => {
         } ${avatarState === "speaking" ? "scale-[1.02]" : ""}`}
       >
         <img
-          src={interviewerAvatar}
-          alt="محاور واكب الذكي"
+          src={avatarSrc}
+          alt={titleLabel}
           className="w-full h-full object-cover rounded-2xl"
           draggable={false}
         />
@@ -55,9 +70,9 @@ const AIAvatarScene = ({ avatarState }: AIAvatarSceneProps) => {
 
       {/* Label */}
       <div className="absolute bottom-3 left-0 right-0 flex flex-col items-center pointer-events-none z-10">
-        <span className="text-xs font-bold text-foreground/80 bg-background/60 backdrop-blur-sm px-2 py-0.5 rounded">محاور واكب الذكي</span>
+        <span className="text-xs font-bold text-foreground/80 bg-background/60 backdrop-blur-sm px-2 py-0.5 rounded">{titleLabel}</span>
         <span className="text-[10px] text-muted-foreground bg-background/60 backdrop-blur-sm px-2 rounded">
-          {avatarState === "speaking" ? "يتحدث..." : avatarState === "listening" ? "يستمع..." : "جاهز"}
+          {avatarState === "speaking" ? speakingLabel : avatarState === "listening" ? listeningLabel : readyLabel}
         </span>
       </div>
     </div>

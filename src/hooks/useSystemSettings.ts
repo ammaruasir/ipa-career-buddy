@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+export interface InterviewerVoice {
+  name: string;
+  gender: "male" | "female";
+  voice_id: string;
+  avatar_url: string;
+}
+
 export interface SystemSettings {
   id: string;
   scoring_weights: { technical: number; communication: number; cultural_fit: number; [key: string]: number };
@@ -13,6 +20,7 @@ export interface SystemSettings {
   evaluation_thresholds: { highly_recommended: number; recommended: number };
   filler_words: string[];
   interview_engine: "built_in" | "vapi";
+  interviewer_voice: InterviewerVoice;
 }
 
 const DEFAULT_SETTINGS: SystemSettings = {
@@ -27,6 +35,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
   evaluation_thresholds: { highly_recommended: 80, recommended: 60 },
   filler_words: ["ممم", "يعني", "أحس", "كدا", "طبعاً", "بصراحة", "الله يعطيك العافية"],
   interview_engine: "built_in",
+  interviewer_voice: { name: "نورة", gender: "female", voice_id: "SAz9YHcvj6GT2YYXdXww", avatar_url: "" },
 };
 
 export const useSystemSettings = () => {
@@ -52,6 +61,7 @@ export const useSystemSettings = () => {
         evaluation_thresholds: data.evaluation_thresholds as any,
         filler_words: data.filler_words as any,
         interview_engine: (data as any).interview_engine || "built_in",
+        interviewer_voice: (data as any).interviewer_voice || DEFAULT_SETTINGS.interviewer_voice,
       });
     }
     setLoading(false);

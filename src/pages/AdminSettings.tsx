@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowRight, Palette, BookOpen, SlidersHorizontal, Key, Users, Settings,
   Plus, Pencil, X, Loader2, Shield, Download, Server, Briefcase, Clock,
-  MapPin, Building2, ToggleLeft, ToggleRight
+  MapPin, Building2, ToggleLeft, ToggleRight, Mic
 } from "lucide-react";
 
 interface QuestionTemplate {
@@ -558,6 +558,69 @@ const AdminSettings = () => {
                 </CardHeader>
                 <CardContent>
                   <Button variant="outline" className="font-tajawal w-full">تصدير البيانات</Button>
+                </CardContent>
+              </Card>
+
+              {/* Interviewer Voice Settings */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-base font-tajawal flex items-center gap-2"><Mic className="w-4 h-4" /> صوت المحاور/ة</CardTitle>
+                  <CardDescription className="font-tajawal">تخصيص هوية المحاور الذكي (الاسم والجنس والصوت)</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label className="font-tajawal">اسم المحاور/ة</Label>
+                      <Input
+                        value={settings.interviewer_voice?.name || "نورة"}
+                        onChange={(e) => updateSettings({ interviewer_voice: { ...settings.interviewer_voice, name: e.target.value } as any })}
+                        placeholder="مثال: نورة"
+                        className="font-tajawal"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-tajawal">الجنس</Label>
+                      <Select
+                        value={settings.interviewer_voice?.gender || "female"}
+                        onValueChange={(v) => updateSettings({ interviewer_voice: { ...settings.interviewer_voice, gender: v } as any })}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="female">أنثى</SelectItem>
+                          <SelectItem value="male">ذكر</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-tajawal">صوت ElevenLabs</Label>
+                      <Select
+                        value={settings.interviewer_voice?.voice_id || "SAz9YHcvj6GT2YYXdXww"}
+                        onValueChange={(v) => updateSettings({ interviewer_voice: { ...settings.interviewer_voice, voice_id: v } as any })}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SAz9YHcvj6GT2YYXdXww">River (أنثوي)</SelectItem>
+                          <SelectItem value="EXAVITQu4vr4xnSDxMaL">Sarah (أنثوي)</SelectItem>
+                          <SelectItem value="FGY2WhTYpPnrIDTdsKH5">Laura (أنثوي)</SelectItem>
+                          <SelectItem value="Xb7hH8MSUJpSbSDYk0k2">Alice (أنثوي)</SelectItem>
+                          <SelectItem value="pFZP5JQG7iQjIQuC4Bku">Lily (أنثوي)</SelectItem>
+                          <SelectItem value="cgSgspJ2msm6clMCkdW9">Jessica (أنثوي)</SelectItem>
+                          <SelectItem value="XrExE9yKIg1WjnnlVkGX">Matilda (أنثوي)</SelectItem>
+                          <SelectItem value="CwhRBWXzGAHq8TQ4Fs17">Roger (ذكوري)</SelectItem>
+                          <SelectItem value="JBFqnCBsd6RMkjVDRZzb">George (ذكوري)</SelectItem>
+                          <SelectItem value="TX3LPaxmHKxFdv7VOQHJ">Liam (ذكوري)</SelectItem>
+                          <SelectItem value="onwK4e9ZLuTAKqWW03F9">Daniel (ذكوري)</SelectItem>
+                          <SelectItem value="nPczCjzI2devNBz1zQrb">Brian (ذكوري)</SelectItem>
+                          <SelectItem value="IKne3meq5aSn9XLyUdCD">Charlie (ذكوري)</SelectItem>
+                          <SelectItem value="cjVigY5qzO86Huf0OWal">Eric (ذكوري)</SelectItem>
+                          <SelectItem value="N2lVS1w4EtoT3dr4eOWO">Callum (ذكوري)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-tajawal">
+                    التغييرات ستُطبّق تلقائياً على المقابلات الجديدة. الاسم والجنس يحددان البرومبت والضمائر والصورة.
+                  </p>
                 </CardContent>
               </Card>
             </div>
