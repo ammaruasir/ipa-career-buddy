@@ -1,41 +1,35 @@
 
 
-## فصل الأسئلة التعريفية والختامية عن الجوهرية — بعدد ديناميكي
+## Fix: WebM Recording Only Plays ~15 Seconds
 
-### المشكلة
-حالياً العدد الذي يختاره المرشح يشمل كل شيء (تعريفية + جوهرية + ختامية). المطلوب أن العدد المختار = الأسئلة الجوهرية فقط، وتُضاف أسئلة تعريفية وختامية تلقائياً بعدد ديناميكي يحدده الذكاء الاصطناعي بناءً على حجم السيرة الذاتية وردود المرشح.
+### Root Cause
+This is a well-known browser bug: `MediaRecorder` generates WebM files **without duration metadata** in the file header. When played back, the browser can't determine the total length, so it only plays the first cluster (~15 seconds) and the seek bar doesn't work properly.
 
-### الحل
+### Solution
+Use the `fix-webm-duration` library to patch the WebM blob with correct duration metadata before uploading to storage. This fixes both the session recording and the cheat camera recording.
 
-بدلاً من تثبيت عدد الأسئلة التعريفية/الختامية، نعطي الذكاء الاصطناعي حرية تحديد متى ينتقل من مرحلة لأخرى عبر تعليمات واضحة في البرومبت، مع استخدام علامات `[INTRO]`, `[CORE]`, `[CLOSING]` لتتبع المرحلة.
+### Files to Change
 
-| الملف | التعديل |
-|-------|---------|
-| `src/hooks/useLiveInterview.ts` | تحديث البرومبت ليوضح أن العدد المختار للجوهرية فقط، إضافة تتبع المراحل عبر العلامات، تعديل منطق إنهاء المقابلة |
-| `supabase/functions/chat/index.ts` | تحديث هيكل المراحل والبرومبت ليعكس الفصل الديناميكي، تعزيز مرحلة التعريف بالسيرة الذاتية |
-| `src/components/interview/JobSelector.tsx` | توضيح أن العدد المختار هو للأسئلة الجوهرية فقط |
-| `src/components/interview/LiveInterview.tsx` | تحديث شريط التقدم ليعرض المرحلة الحالية بدل العدد الثابت |
+| File | Change |
+|------|--------|
+| `package.json` | Add `fix-webm-duration` dependency |
+| `src/hooks/useLiveInterview.ts` | Patch session recording blob with duration before upload |
+| `src/hooks/useCheatCamera.ts` | Patch cheat camera blob with duration before upload |
 
-### التفاصيل
+### How It Works
+1. Track recording start time when `MediaRecorder.start()` is called
+2. When recording stops, calculate `duration = Date.now() - startTime`
+3. Run `fixWebmDuration(blob, duration)` to inject correct metadata into the WebM header
+4. Upload the fixed blob instead of the raw one
 
-**1. البرومبت (في `useLiveInterview.ts` و `chat/index.ts`):**
-- هيكل جديد بـ 3 مراحل:
-  - **التعريفية**: تبدأ بتعريف المرشح بنفسه، ثم أسئلة عن سيرته الذاتية (شهادات، مهارات، خبرات من الملف). عدد الأسئلة يعتمد على غنى السيرة — قد تكون 2 أو 5+. عند الانتهاء يُرسل `[CORE]` للانتقال
-  - **الجوهرية**: العدد الذي اختاره المرشح بالضبط. أسئلة تقنية وسلوكية مخصصة للوظيفة. تُحسب بعلامة `[NEW_Q]`
-  - **الختامية**: أسئلة لوجستية (راتب، جاهزية، أسئلة المرشح). عددها ديناميكي حسب ردود المرشح. عند الانتهاء يُرسل `[END]`
-- كل رد يبدأ بعلامة: `[INTRO]`, `[CORE]`, `[CLOSING]`, `[FOLLOW_UP]`, أو `[END]`
+```typescript
+import fixWebmDuration from "fix-webm-duration";
 
-**2. منطق العداد (`useLiveInterview.ts`):**
-- العداد يحسب فقط الأسئلة التي تبدأ بـ `[CORE]` (الجوهرية)
-- عند وصول عداد `[CORE]` للعدد المختار → ينتقل تلقائياً للختامية
-- المقابلة تنتهي عند استلام `[END]` أو عندما يقرر المرشح الإنهاء
-- `[INTRO]` و `[CLOSING]` لا تُحسب في شريط التقدم
+// Before upload:
+const duration = Date.now() - recordingStartTime;
+const fixedBlob = await fixWebmDuration(sessionBlob, duration);
+// Upload fixedBlob instead of sessionBlob
+```
 
-**3. واجهة اختيار الأسئلة (`JobSelector.tsx`):**
-- النص يوضح: "٥ أسئلة جوهرية" بدل "٥ أسئلة"
-- إضافة توضيح صغير: "يُضاف إليها أسئلة تعريفية وختامية تلقائياً"
-
-**4. شريط التقدم (`LiveInterview.tsx`):**
-- عرض المرحلة الحالية (تعريفية / جوهرية / ختامية) بدل العدد الإجمالي
-- شريط التقدم يعتمد على عداد الأسئلة الجوهرية فقط
+This is a small, targeted fix — no UI changes needed. Existing recordings won't be affected, but all new recordings will have proper duration and full seekable playback.
 
