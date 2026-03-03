@@ -95,7 +95,7 @@ const Index = () => {
           <Link to="/" className="flex items-center gap-3 group">
             <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="w-11 h-11 rounded-xl object-contain shadow-md group-hover:shadow-lg transition-shadow" />
             <div className="hidden sm:block">
-              <h2 className="text-base font-bold text-foreground leading-tight">منصة المقابلات الذكية</h2>
+              <h2 className="text-base font-bold text-foreground leading-tight">منصة المقابلات الذكية - معهد الإدارة العامة</h2>
               <p className="text-[11px] text-muted-foreground">مدعومة بمحرك واكب للذكاء الاصطناعي</p>
             </div>
           </Link>
@@ -496,7 +496,7 @@ const Index = () => {
               <div className="flex items-center gap-3">
                 <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="w-10 h-10 rounded-xl object-contain" />
                 <div>
-                  <h3 className="font-bold text-foreground">منصة المقابلات الذكية</h3>
+                  <h3 className="font-bold text-foreground">منصة المقابلات الذكية - معهد الإدارة العامة</h3>
                   <p className="text-xs text-muted-foreground">مدعومة بالذكاء الاصطناعي</p>
                 </div>
               </div>
@@ -529,7 +529,7 @@ const Index = () => {
 
           <div className="border-t border-border pt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} منصة المقابلات الذكية - جميع الحقوق محفوظة
+              © {new Date().getFullYear()} منصة المقابلات الذكية - معهد الإدارة العامة - جميع الحقوق محفوظة
             </p>
           </div>
         </div>
