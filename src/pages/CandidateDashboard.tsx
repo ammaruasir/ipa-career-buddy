@@ -11,7 +11,7 @@ import {
   MessageSquare, Mic, Video, LogOut, Briefcase,
   BarChart3, Clock, CheckCircle2, Loader2, TrendingUp,
   ChevronDown, ChevronUp, Settings, FileText,
-  MapPin, Building2, Send, GraduationCap,
+  MapPin, Building2, Send, GraduationCap, XCircle,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import {
@@ -19,6 +19,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import TrainingSection from "@/components/training/TrainingSection";
+import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
+import { toast } from "sonner";
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pending: { label: "قيد الانتظار", variant: "outline" },
@@ -42,6 +44,8 @@ const CandidateDashboard = () => {
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null);
+  const [endingInterviewId, setEndingInterviewId] = useState<string | null>(null);
+  const [forceEndLoading, setForceEndLoading] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) { navigate("/login"); return; }
@@ -95,8 +99,33 @@ const CandidateDashboard = () => {
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || "المرشح";
 
+  const handleForceEnd = async () => {
+    if (!endingInterviewId) return;
+    setForceEndLoading(true);
+    try {
+      const { error } = await supabase.functions.invoke("complete-interview", {
+        body: { interview_id: endingInterviewId },
+      });
+      if (error) throw error;
+      setInterviews((prev) =>
+        prev.map((i) => i.id === endingInterviewId ? { ...i, status: "completed" } : i)
+      );
+      toast.success("تم إنهاء المقابلة بنجاح");
+    } catch (e: any) {
+      toast.error("فشل إنهاء المقابلة: " + (e.message || "خطأ غير معروف"));
+    } finally {
+      setForceEndLoading(false);
+      setEndingInterviewId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      <ExitConfirmationDialog
+        open={!!endingInterviewId}
+        onOpenChange={(open) => { if (!open) setEndingInterviewId(null); }}
+        onConfirm={handleForceEnd}
+      />
       {/* Header */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto flex items-center justify-between py-4 px-4">
@@ -370,6 +399,18 @@ const CandidateDashboard = () => {
                       <div className="flex items-center gap-3">
                         {ev && <Badge variant="secondary" className="rounded-full">{ev.overall_score}%</Badge>}
                         <Badge variant={status.variant}>{status.label}</Badge>
+                        {interview.status === "in_progress" && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="rounded-xl"
+                            disabled={forceEndLoading}
+                            onClick={() => setEndingInterviewId(interview.id)}
+                          >
+                            <XCircle className="w-4 h-4 ml-1" />
+                            إنهاء المقابلة
+                          </Button>
+                        )}
                         {interview.status === "completed" && (
                           <Button size="sm" variant="ghost" className="rounded-xl" asChild>
                             <Link to={`/interview/${interview.id}/results`}>عرض النتائج</Link>
