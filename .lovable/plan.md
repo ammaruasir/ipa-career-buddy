@@ -1,54 +1,22 @@
 
 
-## تحديث كود تسجيل المقابلة
+## تحسين كود كشف الغش — إصلاح 3 مشاكل
 
-### التغييرات
+### الملف: `src/hooks/useCheatCamera.ts`
 
-**ملف: `src/pages/TextInterview.tsx`**
+| المشكلة | الإصلاح |
+|---------|---------|
+| **Memory Explosion** — تخزين base64 strings في الذاكرة (كل إطار ~100KB) | تخزين `Blob` في الـ buffer بدل base64، وتحويل إلى base64 فقط عند الإرسال (الـ edge function تتطلب data URLs) |
+| **sendBatch بدون حماية** — لا try/catch ولا await في stopAndUpload | إضافة try/catch + جعل `stopAndUpload` ينتظر `sendBatch` بـ await |
+| **التقاط كل ثانية زيادة** — استهلاك عالي بدون فائدة | تغيير الافتراضي إلى 2 ثانية + إضافة `readyState < 2` check |
 
-**1. تعديل useEffect لبدء التسجيل (سطر 78-96):**
-- استخدام codec `vp9,opus`
-- إزالة `timeslice` من `recorder.start()`
-- إزالة cleanup `stop` من هذا الـ useEffect
+### التعديلات بالتفصيل
 
-**2. تعديل upload logic (سطر 98-139):**
-- استبدال `setTimeout(500)` بـ `await new Promise` مع `onstop` event
-- انتظار فعلي لانتهاء التسجيل بدلاً من تأخير عشوائي
+1. **`framesBufferRef`** → `Blob[]` بدل `string[]`
+2. **`captureFrame`** → `canvas.toBlob(blob => push, "image/jpeg", 0.6)` + فحص `readyState`
+3. **`sendBatch`** → async مع try/catch، يحوّل Blobs إلى base64 data URLs قبل الإرسال
+4. **`stopAndUpload`** → `await sendBatch()` ثم `await new Promise(onstop)`
+5. **`captureIntervalMs`** الافتراضي → `2000` بدل `1000`
 
-```typescript
-// useEffect للتسجيل - بدون cleanup stop
-useEffect(() => {
-  if (!cheatCamera.stream || !session.interviewId) return;
-  try {
-    const recorder = new MediaRecorder(cheatCamera.stream, {
-      mimeType: "video/webm;codecs=vp9,opus"
-    });
-    sessionChunksRef.current = [];
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) {
-        sessionChunksRef.current.push(e.data);
-      }
-    };
-    recorder.start(); // بدون timeslice
-    sessionRecorderRef.current = recorder;
-  } catch (err) {
-    console.error("Failed to start session recorder:", err);
-  }
-}, [cheatCamera.stream, session.interviewId]);
-
-// Upload - انتظار onstop بدل setTimeout
-const uploadRecording = async () => {
-  cheatCamera.stopAndUpload();
-
-  if (sessionRecorderRef.current?.state === "recording") {
-    await new Promise((resolve) => {
-      sessionRecorderRef.current!.onstop = resolve;
-      sessionRecorderRef.current!.stop();
-    });
-  }
-
-  const blob = new Blob(sessionChunksRef.current, { type: "video/webm" });
-  // ... باقي الرفع كما هو
-};
-```
+> ملاحظة: الـ edge function `analyze-video` تتوقع `image_url` كـ data URL string، لذلك التحويل يتم عند الإرسال فقط وليس عند التخزين.
 
