@@ -247,7 +247,7 @@ const CandidateDetail = () => {
             <Card className="rounded-2xl shadow-lg">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">تحليل الذكاء الاصطناعي</CardTitle>
+                  <CardTitle className="text-base">تحليل محرك واكب للذكاء الاصطناعي</CardTitle>
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-bold text-foreground">{evaluation.overall_score}%</span>
                     {evaluation.recommendation && (
@@ -355,7 +355,7 @@ const CandidateDetail = () => {
 
             {evaluation.ai_feedback_ar && (
               <Card className="rounded-2xl shadow-lg">
-                <CardHeader><CardTitle className="text-base">ملاحظات الذكاء الاصطناعي</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-base">ملاحظات محرك واكب للذكاء الاصطناعي</CardTitle></CardHeader>
                 <CardContent>
                   <p className="text-foreground leading-relaxed">{evaluation.ai_feedback_ar}</p>
                 </CardContent>

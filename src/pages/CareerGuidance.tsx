@@ -113,7 +113,7 @@ const CareerGuidance = () => {
             <Sparkles className="w-12 h-12 mx-auto mb-4 text-primary" />
             <h1 className="text-2xl font-bold text-foreground mb-2">اكتشف مسارك المهني</h1>
             <p className="text-muted-foreground mb-6 max-w-lg mx-auto">
-              سيحلل الذكاء الاصطناعي مهاراتك وخبراتك من سيرتك الذاتية ليقترح لك المسارات المهنية الأنسب والمهارات التي تحتاج تطويرها
+              سيحلل محرك واكب للذكاء الاصطناعي مهاراتك وخبراتك من سيرتك الذاتية ليقترح لك المسارات المهنية الأنسب والمهارات التي تحتاج تطويرها
             </p>
             {!hasSkills && (
               <p className="text-sm text-warning mb-4">⚠️ لم يتم استخراج مهارات من سيرتك الذاتية بعد. ارفع سيرتك الذاتية أولاً من الملف الشخصي.</p>

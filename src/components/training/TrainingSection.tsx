@@ -72,7 +72,7 @@ const TrainingSection = ({ interviews, evaluations }: TrainingSectionProps) => {
           <Sparkles className="w-6 h-6 text-secondary" />
           <div>
             <p className="font-bold text-foreground">وضع التدريب</p>
-            <p className="text-sm text-muted-foreground">تدرب على مقابلات وهمية مع الذكاء الاصطناعي</p>
+            <p className="text-sm text-muted-foreground">تدرب على مقابلات وهمية مع محرك واكب للذكاء الاصطناعي</p>
           </div>
         </div>
 

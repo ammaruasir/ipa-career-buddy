@@ -152,7 +152,7 @@ serve(async (req) => {
 
   ${evaluation.ai_feedback_ar ? `
   <div class="section">
-    <h2>ملاحظات الذكاء الاصطناعي</h2>
+    <h2>ملاحظات محرك واكب للذكاء الاصطناعي</h2>
     <p>${evaluation.ai_feedback_ar}</p>
   </div>` : ""}
 

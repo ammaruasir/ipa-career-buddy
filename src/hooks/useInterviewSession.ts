@@ -85,7 +85,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
       setMessages([{ role: "assistant", content: aiReply }]);
       setQuestionCount(1);
     } catch {
-      toast.error("حدث خطأ في الاتصال بالذكاء الاصطناعي");
+      toast.error("حدث خطأ في الاتصال بمحرك واكب للذكاء الاصطناعي");
     }
     setIsLoading(false);
   }, [user, type, totalQuestions, searchParams]);
