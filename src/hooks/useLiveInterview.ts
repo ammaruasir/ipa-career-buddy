@@ -64,7 +64,10 @@ export const useLiveInterview = ({
   const partialUploadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastUploadedChunkIndexRef = useRef(0);
 
+  const userRef = useRef(user);
+
   // Sync refs
+  useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { interviewIdRef.current = interviewId; }, [interviewId]);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
   useEffect(() => { questionCountRef.current = questionCount; }, [questionCount]);
@@ -803,12 +806,12 @@ export const useLiveInterview = ({
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/complete-interview`;
         const body = JSON.stringify({ 
           interview_id: id,
-          recording_url: user ? `${user.id}/${id}_partial.webm` : undefined,
+          recording_url: userRef.current ? `${userRef.current.id}/${id}_partial.webm` : undefined,
         });
         navigator.sendBeacon(url, body);
       }
     };
-  }, [isCompleted, user]);
+  }, [isCompleted]);
 
   const submitAnswer = () => {
     if (mediaRecorderRef.current?.state === "recording") {
