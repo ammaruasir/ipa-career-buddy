@@ -78,21 +78,20 @@ const TextInterview = () => {
   useEffect(() => {
     if (!cheatCamera.stream || !session.interviewId) return;
     try {
-      const recorder = new MediaRecorder(cheatCamera.stream, { mimeType: "video/webm" });
+      const recorder = new MediaRecorder(cheatCamera.stream, {
+        mimeType: "video/webm;codecs=vp9,opus"
+      });
       sessionChunksRef.current = [];
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) sessionChunksRef.current.push(e.data);
+        if (e.data && e.data.size > 0) {
+          sessionChunksRef.current.push(e.data);
+        }
       };
-      recorder.start(5000);
+      recorder.start();
       sessionRecorderRef.current = recorder;
     } catch (err) {
       console.error("Failed to start session recorder:", err);
     }
-    return () => {
-      if (sessionRecorderRef.current?.state === "recording") {
-        sessionRecorderRef.current.stop();
-      }
-    };
   }, [cheatCamera.stream, session.interviewId]);
 
   // Upload recording when interview completes
@@ -100,16 +99,14 @@ const TextInterview = () => {
     if (!session.isCompleted || !session.interviewId || !user) return;
 
     const uploadRecording = async () => {
-      // Stop cheat camera
       cheatCamera.stopAndUpload();
 
-      // Stop session recorder
       if (sessionRecorderRef.current?.state === "recording") {
-        sessionRecorderRef.current.stop();
+        await new Promise<void>((resolve) => {
+          sessionRecorderRef.current!.onstop = () => resolve();
+          sessionRecorderRef.current!.stop();
+        });
       }
-
-      // Wait for chunks
-      await new Promise(resolve => setTimeout(resolve, 500));
 
       const blob = new Blob(sessionChunksRef.current, { type: "video/webm" });
       if (blob.size === 0) return;
