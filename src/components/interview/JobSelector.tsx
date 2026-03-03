@@ -199,7 +199,6 @@ const JobSelector = ({ title, onSelect, onBack, isPractice = false, preSelectedJ
                 <span>اختيار عدد الأسئلة</span>
               </div>
               <h2 className="text-2xl font-bold text-foreground">اختر عدد الأسئلة الجوهرية</h2>
-              <p className="text-muted-foreground">يُضاف إليها أسئلة تعريفية وختامية تلقائياً</p>
 
               <div className="flex justify-center gap-3">
                 {QUICK_COUNTS.map((count) => (

@@ -556,82 +556,15 @@ export const useLiveInterview = ({
         recorder.stop();
       });
     }
-    
-    const rawSessionBlob = new Blob(sessionChunksRef.current, { type: "video/webm" });
-    console.log(`[Recording] Session blob size: ${rawSessionBlob.size} bytes, chunks: ${sessionChunksRef.current.length}`);
-    
-    if (rawSessionBlob.size > 0 && user) {
-      // Fix WebM duration metadata before upload
-      const duration = Date.now() - (sessionRecordingStartRef.current || Date.now());
-      let sessionBlob = rawSessionBlob;
-      try {
-        sessionBlob = await fixWebmDuration(rawSessionBlob, duration);
-        console.log(`[Recording] Fixed WebM duration: ${duration}ms`);
-      } catch (e) {
-        console.warn("[Recording] fixWebmDuration failed, uploading raw blob:", e);
-      }
 
-      const fileName = `${user.id}/${currentId}_full.webm`;
-      let uploaded = false;
-      
-      for (let attempt = 0; attempt < 2 && !uploaded; attempt++) {
-        try {
-          const { error: uploadErr } = await supabase.storage
-            .from("interview-recordings")
-            .upload(fileName, sessionBlob, { contentType: "video/webm", upsert: true });
-          
-          if (uploadErr) {
-            console.error(`[Recording] Upload attempt ${attempt + 1} failed:`, uploadErr);
-          } else {
-            console.log("[Recording] Upload successful:", fileName);
-            await supabase
-              .from("interviews")
-              .update({ recording_url: fileName } as any)
-              .eq("id", currentId);
-            uploaded = true;
-            // Delete partial file since full is uploaded
-            await supabase.storage
-              .from("interview-recordings")
-              .remove([`${user.id}/${currentId}_partial.webm`]);
-          }
-        } catch (err) {
-          console.error(`[Recording] Upload attempt ${attempt + 1} error:`, err);
-        }
-      }
-      
-      // If full upload failed, set recording_url to partial
-      if (!uploaded) {
-        await supabase
-          .from("interviews")
-          .update({ recording_url: `${user.id}/${currentId}_partial.webm` } as any)
-          .eq("id", currentId);
-      }
-    } else {
-      console.warn("[Recording] No recording data to upload — blob size:", rawSessionBlob.size);
-      // Try to set partial as fallback
-      if (user) {
-        await supabase
-          .from("interviews")
-          .update({ recording_url: `${user.id}/${currentId}_partial.webm` } as any)
-          .eq("id", currentId);
-      }
-    }
-
-    // Now stop streams after upload is complete
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    videoStreamRef.current?.getTracks().forEach(t => t.stop());
-    audioContextRef.current?.close().catch(() => {});
-    mixingCtxRef.current?.close().catch(() => {});
-    mixingCtxRef.current = null;
-    mixedDestRef.current = null;
-
+    // Mark interview as completed immediately
     await supabase
       .from("interviews")
       .update({ status: "completed" as any })
       .eq("id", currentId);
 
     // Update job application status
-    if (vacancyIdRef.current) {
+    if (vacancyIdRef.current && user) {
       await supabase
         .from("job_applications")
         .update({ status: "interviewed" } as any)
@@ -639,23 +572,85 @@ export const useLiveInterview = ({
         .eq("user_id", user.id);
     }
 
-    toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم...");
+    toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم في الخلفية...");
 
-    setIsEvaluating(true);
-    try {
-      const resp = await supabase.functions.invoke("evaluate-interview", {
-        body: { interview_id: currentId },
-      });
-      if (resp.error) {
-        toast.error("حدث خطأ في التقييم");
-      } else {
-        toast.success("تم إعداد التقييم بنجاح!");
-      }
-    } catch {
-      toast.error("حدث خطأ في التقييم");
-    }
-    setIsEvaluating(false);
+    // Navigate immediately — don't wait for upload/evaluation
     navigate("/dashboard");
+
+    // Run upload + evaluation in background (fire-and-forget)
+    const bgUser = user;
+    const bgChunks = [...sessionChunksRef.current];
+    const bgDuration = Date.now() - (sessionRecordingStartRef.current || Date.now());
+
+    (async () => {
+      try {
+        // Stop streams
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        videoStreamRef.current?.getTracks().forEach(t => t.stop());
+        audioContextRef.current?.close().catch(() => {});
+        mixingCtxRef.current?.close().catch(() => {});
+        mixingCtxRef.current = null;
+        mixedDestRef.current = null;
+
+        const rawSessionBlob = new Blob(bgChunks, { type: "video/webm" });
+        
+        if (rawSessionBlob.size > 0 && bgUser) {
+          let sessionBlob = rawSessionBlob;
+          try {
+            sessionBlob = await fixWebmDuration(rawSessionBlob, bgDuration);
+          } catch (e) {
+            console.warn("[Recording] fixWebmDuration failed, uploading raw blob:", e);
+          }
+
+          const fileName = `${bgUser.id}/${currentId}_full.webm`;
+          let uploaded = false;
+          
+          for (let attempt = 0; attempt < 2 && !uploaded; attempt++) {
+            try {
+              const { error: uploadErr } = await supabase.storage
+                .from("interview-recordings")
+                .upload(fileName, sessionBlob, { contentType: "video/webm", upsert: true });
+              
+              if (uploadErr) {
+                console.error(`[Recording] Upload attempt ${attempt + 1} failed:`, uploadErr);
+              } else {
+                console.log("[Recording] Upload successful:", fileName);
+                await supabase
+                  .from("interviews")
+                  .update({ recording_url: fileName } as any)
+                  .eq("id", currentId);
+                uploaded = true;
+                await supabase.storage
+                  .from("interview-recordings")
+                  .remove([`${bgUser.id}/${currentId}_partial.webm`]);
+              }
+            } catch (err) {
+              console.error(`[Recording] Upload attempt ${attempt + 1} error:`, err);
+            }
+          }
+          
+          if (!uploaded) {
+            await supabase
+              .from("interviews")
+              .update({ recording_url: `${bgUser.id}/${currentId}_partial.webm` } as any)
+              .eq("id", currentId);
+          }
+        } else if (bgUser) {
+          await supabase
+            .from("interviews")
+            .update({ recording_url: `${bgUser.id}/${currentId}_partial.webm` } as any)
+            .eq("id", currentId);
+        }
+
+        // Evaluate
+        await supabase.functions.invoke("evaluate-interview", {
+          body: { interview_id: currentId },
+        });
+        console.log("[Interview] Background evaluation completed");
+      } catch (err) {
+        console.error("[Interview] Background upload/evaluation error:", err);
+      }
+    })();
   }, [navigate, user]);
 
   // Keep ref in sync so getNextAIResponse can call endInterview
