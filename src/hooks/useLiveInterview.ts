@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import fixWebmDuration from "fix-webm-duration";
 
 interface TranscriptEntry {
   role: "assistant" | "user";
@@ -77,6 +78,9 @@ export const useLiveInterview = ({
   // Audio mixing refs — to merge candidate mic + TTS into one recording stream
   const mixingCtxRef = useRef<AudioContext | null>(null);
   const mixedDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+
+  // Track recording start time for WebM duration fix
+  const sessionRecordingStartRef = useRef<number>(0);
 
   const userRef = useRef(user);
 
@@ -552,10 +556,20 @@ export const useLiveInterview = ({
       });
     }
     
-    const sessionBlob = new Blob(sessionChunksRef.current, { type: "video/webm" });
-    console.log(`[Recording] Session blob size: ${sessionBlob.size} bytes, chunks: ${sessionChunksRef.current.length}`);
+    const rawSessionBlob = new Blob(sessionChunksRef.current, { type: "video/webm" });
+    console.log(`[Recording] Session blob size: ${rawSessionBlob.size} bytes, chunks: ${sessionChunksRef.current.length}`);
     
-    if (sessionBlob.size > 0 && user) {
+    if (rawSessionBlob.size > 0 && user) {
+      // Fix WebM duration metadata before upload
+      const duration = Date.now() - (sessionRecordingStartRef.current || Date.now());
+      let sessionBlob = rawSessionBlob;
+      try {
+        sessionBlob = await fixWebmDuration(rawSessionBlob, duration);
+        console.log(`[Recording] Fixed WebM duration: ${duration}ms`);
+      } catch (e) {
+        console.warn("[Recording] fixWebmDuration failed, uploading raw blob:", e);
+      }
+
       const fileName = `${user.id}/${currentId}_full.webm`;
       let uploaded = false;
       
@@ -592,7 +606,7 @@ export const useLiveInterview = ({
           .eq("id", currentId);
       }
     } else {
-      console.warn("[Recording] No recording data to upload — blob size:", sessionBlob.size);
+      console.warn("[Recording] No recording data to upload — blob size:", rawSessionBlob.size);
       // Try to set partial as fallback
       if (user) {
         await supabase
@@ -768,6 +782,7 @@ export const useLiveInterview = ({
           };
           sessionRecorder.start(5000);
           sessionRecorderRef.current = sessionRecorder;
+          sessionRecordingStartRef.current = Date.now();
           console.log("[AudioMix] Session recorder started with mixed stream");
         } catch (err) {
           console.error("Failed to start session recorder:", err);

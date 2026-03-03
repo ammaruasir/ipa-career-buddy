@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import fixWebmDuration from "fix-webm-duration";
 
 interface UseCheatCameraOptions {
   enabled: boolean;
@@ -22,6 +23,7 @@ export const useCheatCamera = ({
   const framesBufferRef = useRef<string[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingStartRef = useRef<number>(0);
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
 
   // Start camera when enabled and interviewId is set
@@ -66,11 +68,20 @@ export const useCheatCamera = ({
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) recordedChunksRef.current.push(e.data);
         };
-        recorder.onstop = () => {
-          const blob = new Blob(recordedChunksRef.current, { type: "video/webm" });
-          if (blob.size > 0) setRecordingBlob(blob);
+        recorder.onstop = async () => {
+          const rawBlob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+          if (rawBlob.size > 0) {
+            const duration = Date.now() - (recordingStartRef.current || Date.now());
+            try {
+              const fixedBlob = await fixWebmDuration(rawBlob, duration);
+              setRecordingBlob(fixedBlob);
+            } catch {
+              setRecordingBlob(rawBlob);
+            }
+          }
         };
-        recorder.start(5000); // collect data every 5s
+        recorder.start(5000);
+        recordingStartRef.current = Date.now();
         mediaRecorderRef.current = recorder;
       } catch (err) {
         console.error("Failed to start cheat camera MediaRecorder:", err);
