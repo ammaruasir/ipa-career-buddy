@@ -139,7 +139,9 @@ const TextInterview = () => {
   }, [session.isCompleted, session.interviewId, user]);
 
   const handleBack = () => {
-    if (session.interviewId) {
+    if (session.isCompleted) {
+      navigate("/dashboard");
+    } else if (session.interviewId) {
       setShowExit(true);
     } else {
       navigate("/dashboard");
@@ -261,7 +263,7 @@ const TextInterview = () => {
         </div>
       )}
 
-      <ExitConfirmationDialog open={showExit} onOpenChange={setShowExit} onConfirm={() => navigate("/dashboard")} />
+      <ExitConfirmationDialog open={showExit} onOpenChange={setShowExit} onConfirm={() => { session.abort(); }} />
 
     </div>
   );
