@@ -74,7 +74,6 @@ Deno.serve(async (req) => {
     );
 
     if (action === "delete") {
-      // Delete profile, roles, and auth user
       await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
       await supabaseAdmin.from("profiles").delete().eq("user_id", userId);
       const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -87,6 +86,36 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (action === "reset_candidate") {
+      // Get all interview IDs for this user
+      const { data: interviews } = await supabaseAdmin
+        .from("interviews")
+        .select("id")
+        .eq("user_id", userId);
+
+      const interviewIds = (interviews || []).map((i: any) => i.id);
+
+      if (interviewIds.length > 0) {
+        // Delete child records first
+        await supabaseAdmin.from("cheat_events").delete().in("interview_id", interviewIds);
+        await supabaseAdmin.from("hr_notes").delete().in("interview_id", interviewIds);
+        await supabaseAdmin.from("responses").delete().in("interview_id", interviewIds);
+        await supabaseAdmin.from("evaluations").delete().in("interview_id", interviewIds);
+      }
+
+      // Delete job applications & notifications
+      await supabaseAdmin.from("job_applications").delete().eq("user_id", userId);
+      await supabaseAdmin.from("notifications").delete().eq("user_id", userId);
+
+      // Delete interviews
+      await supabaseAdmin.from("interviews").delete().eq("user_id", userId);
+
+      return new Response(
+        JSON.stringify({ success: true, deleted_interviews: interviewIds.length }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(JSON.stringify({ error: "Unknown action" }), {
