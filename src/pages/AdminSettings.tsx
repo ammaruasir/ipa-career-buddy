@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowRight, Palette, BookOpen, SlidersHorizontal, Key, Users, Settings,
-  Plus, Pencil, Trash2, Loader2, Shield, Download, Server, Briefcase, Clock,
+  Plus, Pencil, X, Loader2, Shield, Download, Server, Briefcase, Clock,
   MapPin, Building2, ToggleLeft, ToggleRight
 } from "lucide-react";
 
@@ -291,7 +291,7 @@ const AdminSettings = () => {
                           <TableCell>
                             <div className="flex gap-2">
                               <Button size="icon" variant="ghost" onClick={() => openEditQ(q)}><Pencil className="w-4 h-4" /></Button>
-                              <Button size="icon" variant="ghost" onClick={() => deleteQuestion(q.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                              <Button size="icon" variant="ghost" onClick={() => deleteQuestion(q.id)}><X className="w-4 h-4 text-destructive" /></Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -439,7 +439,7 @@ const AdminSettings = () => {
                     <Badge key={i} variant="secondary" className="font-tajawal text-sm py-2 px-3 gap-2">
                       {job}
                       <button onClick={() => removeJobPosition(i)} className="hover:text-destructive">
-                        <Trash2 className="w-3 h-3" />
+                        <X className="w-3 h-3" />
                       </button>
                     </Badge>
                   ))}
@@ -488,7 +488,7 @@ const AdminSettings = () => {
                             {v.is_active ? <ToggleRight className="w-5 h-5 text-primary" /> : <ToggleLeft className="w-5 h-5" />}
                           </Button>
                           <Button size="icon" variant="ghost" onClick={() => openEditVacancy(v)}><Pencil className="w-4 h-4" /></Button>
-                          <Button size="icon" variant="ghost" onClick={() => deleteVacancy(v.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => deleteVacancy(v.id)}><X className="w-4 h-4 text-destructive" /></Button>
                         </div>
                       </div>
                     </CardContent>
