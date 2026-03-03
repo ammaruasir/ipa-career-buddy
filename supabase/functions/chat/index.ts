@@ -91,7 +91,13 @@ serve(async (req) => {
     const pronounSelf = isFemale ? "أنتِ محاورة وظيفية ودودة ومحترفة" : "أنت محاور وظيفي ودود ومحترف";
     const coreQCount = total_questions || 5;
     
-    const systemPrompt = `اسمك "${ivName}" و${pronounSelf} ${isFemale ? "تعملين" : "تعمل"} في المملكة العربية السعودية.
+    // Extract candidate name for prominent placement in prompt
+    const candidateName = candidateContext ? (candidateContext.match(/الاسم:\s*(.+)/)?.[1] || "").trim() : "";
+    const candidateNameInstruction = candidateName && candidateName !== "غير معروف"
+      ? `\n\n⚠️ تنبيه مهم: اسم المرشح هو "${candidateName}". عند مخاطبته استخدم اسمه "${candidateName}" — ولا تستخدم اسمك "${ivName}" عند مناداته أبداً.`
+      : "";
+    
+    const systemPrompt = `اسمك "${ivName}" و${pronounSelf} ${isFemale ? "تعملين" : "تعمل"} في المملكة العربية السعودية.${candidateNameInstruction}
 ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية ودودة — مو فصحى جافة ولا عامية مبالغ فيها.
 
 شخصيتك:

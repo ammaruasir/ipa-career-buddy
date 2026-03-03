@@ -434,12 +434,13 @@ export const useLiveInterview = ({
       let aiText = data?.choices?.[0]?.message?.content || data?.content || "";
       if (!aiText) throw new Error("Empty AI response");
 
-      // Parse phase tag from response
-      const phaseMatch = aiText.match(/^\[(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]/);
-      const phaseTag = phaseMatch ? phaseMatch[1] : null;
+      // Parse phase tag from response (case-insensitive, flexible format)
+      const phaseMatch = aiText.match(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i);
+      const phaseTag = phaseMatch ? phaseMatch[1].toUpperCase() : null;
       
-      // Remove phase tag from display text
-      aiText = aiText.replace(/^\[(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]\s*/, "");
+      // Remove phase tag and any remaining phase keywords from display text
+      aiText = aiText.replace(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i, "");
+      aiText = aiText.replace(/\b(INTRO|CORE|FOLLOW_UP|CLOSING|END)\b\s*:?\s*/gi, "").trim();
 
       // Handle [END] — interview complete
       if (phaseTag === "END") {
@@ -836,7 +837,7 @@ export const useLiveInterview = ({
           body: {
             messages: [
               { role: "system", content: systemPrompt },
-              { role: "user", content: `ابدأ المقابلة بتحية ودية ومختلفة كل مرة. عرّف نفسك (اسمك ${interviewerName}، ${isFemale ? "محاورة" : "محاور"} واكب ${isFemale ? "الذكية" : "الذكي"})، اذكر الوظيفة (${jobPosition}). لا تذكر عدد الأسئلة. اجعلها دافئة وطبيعية. لا تكرر نفس الصيغة. ابدأ بـ [INTRO].` },
+              { role: "user", content: `ابدأ المقابلة بتحية ودية ومختلفة كل مرة. عرّف نفسك (اسمك ${interviewerName}، ${isFemale ? "محاورة" : "محاور"} واكب ${isFemale ? "الذكية" : "الذكي"})، اذكر الوظيفة (${jobPosition}). خاطب المرشح باسمه إذا توفر في بياناته. لا تذكر عدد الأسئلة. اجعلها دافئة وطبيعية. لا تكرر نفس الصيغة. ابدأ بـ [INTRO].` },
             ],
             job_position: jobPosition,
             interview_type: type,
@@ -849,7 +850,9 @@ export const useLiveInterview = ({
           },
         });
         if (!greetErr && greetData?.choices?.[0]?.message?.content) {
-          firstMessage = greetData.choices[0].message.content.replace(/^\[(INTRO|NEW_Q|FOLLOW_UP)\]\s*/, "");
+          firstMessage = greetData.choices[0].message.content
+            .replace(/^\[?(INTRO|CORE|NEW_Q|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i, "")
+            .replace(/\b(INTRO|CORE|NEW_Q|FOLLOW_UP|CLOSING|END)\b\s*:?\s*/gi, "").trim();
         }
       } catch {}
       
