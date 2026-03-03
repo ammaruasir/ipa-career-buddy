@@ -64,6 +64,10 @@ export const useLiveInterview = ({
   const partialUploadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastUploadedChunkIndexRef = useRef(0);
 
+  // Audio mixing refs — to merge candidate mic + TTS into one recording stream
+  const mixingCtxRef = useRef<AudioContext | null>(null);
+  const mixedDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+
   const userRef = useRef(user);
 
   // Sync refs
@@ -121,7 +125,20 @@ export const useLiveInterview = ({
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioUrl);
+        audio.crossOrigin = "anonymous";
         currentAudioRef.current = audio;
+
+        // Connect TTS audio to the mixed recording destination (if available)
+        let ttsSource: MediaElementAudioSourceNode | null = null;
+        if (mixingCtxRef.current && mixedDestRef.current) {
+          try {
+            ttsSource = mixingCtxRef.current.createMediaElementSource(audio);
+            ttsSource.connect(mixedDestRef.current); // → recording
+            ttsSource.connect(mixingCtxRef.current.destination); // → speakers
+          } catch (e) {
+            console.warn("[AudioMix] Could not connect TTS to mixing context:", e);
+          }
+        }
 
         const cleanup = () => {
           URL.revokeObjectURL(audioUrl);
@@ -544,6 +561,9 @@ export const useLiveInterview = ({
     streamRef.current?.getTracks().forEach(t => t.stop());
     videoStreamRef.current?.getTracks().forEach(t => t.stop());
     audioContextRef.current?.close().catch(() => {});
+    mixingCtxRef.current?.close().catch(() => {});
+    mixingCtxRef.current = null;
+    mixedDestRef.current = null;
 
     await supabase
       .from("interviews")
@@ -662,14 +682,37 @@ export const useLiveInterview = ({
       setInterviewId(interview.id);
       interviewIdRef.current = interview.id;
 
-      // Start session recording
-      const recordingStream = type === "video" && videoStreamRef.current
+      // --- Create audio mixing context for recording ---
+      const mixingCtx = new AudioContext();
+      mixingCtxRef.current = mixingCtx;
+      const mixedDest = mixingCtx.createMediaStreamDestination();
+      mixedDestRef.current = mixedDest;
+
+      // Get recording source stream
+      const rawRecordingStream = type === "video" && videoStreamRef.current
         ? videoStreamRef.current
         : await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
-      
-      if (recordingStream) {
+
+      if (rawRecordingStream) {
+        // Connect mic/camera audio tracks to the mixed destination
         try {
-          const sessionRecorder = new MediaRecorder(recordingStream, { 
+          const micSource = mixingCtx.createMediaStreamSource(rawRecordingStream);
+          micSource.connect(mixedDest);
+        } catch (e) {
+          console.warn("[AudioMix] Could not connect mic to mixing context:", e);
+        }
+
+        // Build the combined stream: mixed audio tracks + video tracks (if any)
+        const combinedStream = new MediaStream();
+        // Add mixed audio tracks
+        mixedDest.stream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
+        // Add video tracks from original stream (for video interviews)
+        if (type === "video") {
+          rawRecordingStream.getVideoTracks().forEach(t => combinedStream.addTrack(t));
+        }
+
+        try {
+          const sessionRecorder = new MediaRecorder(combinedStream, { 
             mimeType: type === "video" ? "video/webm" : "audio/webm" 
           });
           sessionChunksRef.current = [];
@@ -678,6 +721,7 @@ export const useLiveInterview = ({
           };
           sessionRecorder.start(5000);
           sessionRecorderRef.current = sessionRecorder;
+          console.log("[AudioMix] Session recorder started with mixed stream");
         } catch (err) {
           console.error("Failed to start session recorder:", err);
         }
@@ -803,6 +847,7 @@ export const useLiveInterview = ({
       streamRef.current?.getTracks().forEach(t => t.stop());
       videoStreamRef.current?.getTracks().forEach(t => t.stop());
       audioContextRef.current?.close().catch(() => {});
+      mixingCtxRef.current?.close().catch(() => {});
       cancelAnimationFrame(rafRef.current);
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
 
