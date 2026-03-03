@@ -90,7 +90,18 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
     navigate("/dashboard");
   };
 
-  const progress = Math.min((live.questionCount / totalQuestions) * 100, 100);
+  const progress = Math.min((live.coreQuestionCount / totalQuestions) * 100, 100);
+
+  // Phase label for display
+  const getPhaseLabel = () => {
+    switch (live.currentPhase) {
+      case "intro": return "المرحلة التعريفية";
+      case "core": return "الأسئلة الجوهرية";
+      case "closing": return "المرحلة الختامية";
+      case "end": return "اكتملت المقابلة";
+      default: return "";
+    }
+  };
 
   // Determine avatar state
   const avatarState = live.isSpeaking ? "speaking" : live.isListening ? "listening" : "idle";
@@ -153,8 +164,9 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
       <InterviewHeader
         timerFormatted="مباشر"
         isWarning={false}
-        questionCount={live.questionCount}
+        questionCount={live.coreQuestionCount}
         totalQuestions={totalQuestions}
+        phaseLabel={getPhaseLabel()}
         onBack={handleBack}
       />
 
@@ -212,9 +224,15 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
         {live.isCallActive && (
           <div className="w-full max-w-md space-y-2">
             <Progress value={progress} className="h-2" />
-            <p className="text-xs text-muted-foreground text-center">
-              السؤال {Math.min(live.questionCount, totalQuestions)} من {totalQuestions}
-            </p>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{getPhaseLabel()}</span>
+              <span>
+                {live.currentPhase === "core" 
+                  ? `سؤال جوهري ${Math.min(live.coreQuestionCount, totalQuestions)} من ${totalQuestions}`
+                  : live.currentPhase === "intro" ? "أسئلة تعريفية" : "أسئلة ختامية"
+                }
+              </span>
+            </div>
           </div>
         )}
 

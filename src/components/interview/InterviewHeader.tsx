@@ -9,6 +9,7 @@ interface InterviewHeaderProps {
   isWarning: boolean;
   questionCount: number;
   totalQuestions: number;
+  phaseLabel?: string;
   onBack: () => void;
 }
 
@@ -18,6 +19,7 @@ const InterviewHeader = ({
   isWarning,
   questionCount,
   totalQuestions,
+  phaseLabel,
   onBack,
 }: InterviewHeaderProps) => {
   const progress = (Math.min(questionCount, totalQuestions) / totalQuestions) * 100;
@@ -81,7 +83,10 @@ const InterviewHeader = ({
         <div className="flex items-center gap-3">
           <Progress value={progress} className="flex-1 h-2" />
           <span className="text-xs text-muted-foreground whitespace-nowrap">
-            السؤال {Math.min(questionCount, totalQuestions)} من {totalQuestions}
+            {phaseLabel 
+              ? `${phaseLabel} • ${Math.min(questionCount, totalQuestions)}/${totalQuestions}`
+              : `السؤال ${Math.min(questionCount, totalQuestions)} من ${totalQuestions}`
+            }
           </span>
         </div>
       </div>

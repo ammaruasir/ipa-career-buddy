@@ -198,8 +198,8 @@ const JobSelector = ({ title, onSelect, onBack, isPractice = false, preSelectedJ
                 <ChevronRight className="w-4 h-4 rotate-180" />
                 <span>اختيار عدد الأسئلة</span>
               </div>
-              <h2 className="text-2xl font-bold text-foreground">اختر عدد الأسئلة للمقابلة</h2>
-              <p className="text-muted-foreground">يمكنك تخصيص عدد الأسئلة لأغراض العرض التوضيحي</p>
+              <h2 className="text-2xl font-bold text-foreground">اختر عدد الأسئلة الجوهرية</h2>
+              <p className="text-muted-foreground">يُضاف إليها أسئلة تعريفية وختامية تلقائياً</p>
 
               <div className="flex justify-center gap-3">
                 {QUICK_COUNTS.map((count) => (
@@ -225,7 +225,7 @@ const JobSelector = ({ title, onSelect, onBack, isPractice = false, preSelectedJ
                 />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>1</span>
-                  <span className="text-base font-bold text-primary">{questionCount} أسئلة</span>
+                  <span className="text-base font-bold text-primary">{questionCount} أسئلة جوهرية</span>
                   <span>15</span>
                 </div>
               </div>
