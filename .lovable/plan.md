@@ -1,37 +1,43 @@
 
 
-## تحليل المشكلة
+## التعديلات المطلوبة
 
-بعد فحص قاعدة البيانات والكود، المشكلة واضحة:
-
-1. **المقابلة الحالية** (`b58b2ad5`) حالتها `in_progress` و`recording_url` فارغ — يعني المقابلة لم تُكمل بشكل طبيعي (المرشح خرج أو انقطع الاتصال)، فلم يتم رفع التسجيل.
-
-2. **مقابلات أخرى لنفس المرشح** فيها تسجيلات مرفوعة (مثل `92c168eb` و`df9453fa`) وتعمل بشكل طبيعي.
-
-3. **المشكلة الجذرية**: عندما يغادر المرشح المقابلة فجأة (إغلاق المتصفح، انقطاع الإنترنت)، كود الـ cleanup يستخدم `navigator.sendBeacon` فقط لتحديث الحالة، لكن **لا يرفع التسجيل** لأن `sendBeacon` لا يدعم رفع ملفات كبيرة.
-
-### الحل: آليتان لضمان وجود التسجيل
-
-#### 1. رفع التسجيل بشكل دوري أثناء المقابلة (Incremental Upload)
+### 1. تغيير الاسم من "المحاور الذكي" إلى "محاور واكب الذكي"
 
 | الملف | التعديل |
 |-------|---------|
-| `src/hooks/useLiveInterview.ts` | إضافة `setInterval` كل 60 ثانية يأخذ الـ chunks المتراكمة ويرفعها كـ blob مؤقت `{userId}/{interviewId}_partial.webm` باستخدام `upsert: true`. هذا يضمن وجود نسخة حتى لو انقطع المرشح فجأة. عند الانتهاء الطبيعي، يُرفع الملف النهائي `_full.webm` ويُحذف `_partial` |
+| `src/components/interview/AIAvatarScene.tsx` | تغيير النص في سطر 34 (`alt`) وسطر 58 (التسمية) |
 
-#### 2. تعديل VideoPlayback ليبحث عن `_partial` كاحتياط
+### 2. إزالة نافذة "متابعة أو إنهاء" — المقابلة تنتهي تلقائياً
 
-| الملف | التعديل |
-|-------|---------|
-| `src/components/interview/VideoPlayback.tsx` | إضافة بحث عن ملف `_partial.webm` في حالة عدم وجود `_full.webm` أو `recording_url`، وعرضه بتسمية "تسجيل جزئي" |
-
-#### 3. تحسين الـ cleanup عند الخروج المفاجئ
+المشكلة: عند اكتمال عدد الأسئلة، يظهر `AlertDialog` يسأل المرشح "هل تريد المتابعة أم الإنهاء؟" — هذا يجب ألا يكون خيار المرشح. بدلاً من ذلك، عند اكتمال الأسئلة التقنية، يجب أن ينتقل المحاور تلقائياً لأسئلة الختام ثم ينهي المقابلة.
 
 | الملف | التعديل |
 |-------|---------|
-| `src/hooks/useLiveInterview.ts` | في `beforeunload` event، محاولة رفع الـ chunks المتاحة باستخدام `navigator.sendBeacon` كـ blob صغير إن أمكن، أو على الأقل تحديث `recording_url` للإشارة للنسخة الجزئية المرفوعة سابقاً |
+| `src/hooks/useLiveInterview.ts` | في سطر 320-325: بدلاً من `setAwaitingEndConfirmation(true)`، استدعي `getClosingResponse()` مباشرة. حذف `awaitingEndConfirmation`, `confirmEnd`, `continueInterview` |
+| `src/hooks/useInterviewSession.ts` | نفس التعديل: في سطر 164-169 استدعي `confirmEnd()` مباشرة بدل `setAwaitingEndConfirmation`. حذف `awaitingEndConfirmation`, `continueInterview` |
+| `src/components/interview/LiveInterview.tsx` | حذف `AlertDialog` الخاص بـ `awaitingEndConfirmation` (سطر 315-333) |
+| `src/pages/TextInterview.tsx` | حذف `AlertDialog` الخاص بـ `awaitingEndConfirmation` (سطر 266-282) |
 
-### النتيجة
-- كل مقابلة سيكون لها تسجيل حتى لو انقطع المرشح
-- HR يشوف "تسجيل جزئي" بدل "لا يوجد تسجيل"
-- المقابلات المكتملة تعرض التسجيل الكامل كالمعتاد
+### 3. جعل الجملة الافتتاحية ديناميكية (Live Interview)
+
+| الملف | التعديل |
+|-------|---------|
+| `src/hooks/useLiveInterview.ts` | سطر 730: بدلاً من رسالة ثابتة (`هلا والله! أنا أحمد...`)، استدعي `/chat` بدون رسائل سابقة ليولّد AI رسالة افتتاحية ديناميكية بناءً على الـ prompt الموجود الذي يوجهه لتنويع البداية |
+
+### تفاصيل تقنية
+
+**إزالة نافذة التأكيد — التدفق الجديد:**
+```
+الأسئلة تكتمل → lastQuestionRef = true
+المرشح يجيب على آخر سؤال → 
+  بدلاً من: setAwaitingEndConfirmation(true) ← يُحذف
+  الجديد: getClosingResponse() ← ينتقل مباشرة لأسئلة الختام ثم ينهي المقابلة
+```
+
+**الجملة الافتتاحية الديناميكية:**
+```
+بدلاً من: firstMessage = "هلا والله! أنا أحمد..." (ثابت)
+الجديد: استدعاء chat API بـ messages فارغة + system prompt → AI يولّد تحية مختلفة كل مرة
+```
 
