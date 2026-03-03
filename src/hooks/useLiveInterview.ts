@@ -63,6 +63,7 @@ export const useLiveInterview = ({
   const sessionChunksRef = useRef<Blob[]>([]);
   const partialUploadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastUploadedChunkIndexRef = useRef(0);
+  const partialUploadFnRef = useRef<(() => Promise<void>) | null>(null);
 
   // Audio mixing refs — to merge candidate mic + TTS into one recording stream
   const mixingCtxRef = useRef<AudioContext | null>(null);
@@ -498,6 +499,11 @@ export const useLiveInterview = ({
     const currentId = interviewIdRef.current;
     if (!currentId) return;
 
+    // Safety: upload partial immediately before stopping recorder
+    if (partialUploadFnRef.current) {
+      try { await partialUploadFnRef.current(); } catch (e) { console.error("[Recording] Safety partial upload error:", e); }
+    }
+
     // Stop session recorder and wait for onstop event to ensure all chunks are collected
     if (sessionRecorderRef.current?.state === "recording") {
       await new Promise<void>((resolve) => {
@@ -744,7 +750,8 @@ export const useLiveInterview = ({
           console.error("[Recording] Partial upload error:", err);
         }
       };
-      partialUploadIntervalRef.current = setInterval(partialUploadFn, 60000);
+      partialUploadFnRef.current = partialUploadFn;
+      partialUploadIntervalRef.current = setInterval(partialUploadFn, 20000);
 
       // Link to job application if vacancy_id present
       if (vacancyId) {
@@ -850,6 +857,11 @@ export const useLiveInterview = ({
       mixingCtxRef.current?.close().catch(() => {});
       cancelAnimationFrame(rafRef.current);
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+      // Last-chance partial upload before abandoning
+      if (partialUploadFnRef.current) {
+        try { partialUploadFnRef.current(); } catch (e) { console.error("[Recording] Cleanup partial upload error:", e); }
+      }
 
       const id = interviewIdRef.current;
       if (id && !isCompleted) {
