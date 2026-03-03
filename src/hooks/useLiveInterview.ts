@@ -572,35 +572,40 @@ export const useLiveInterview = ({
         .eq("user_id", user.id);
     }
 
+    // Stop streams immediately
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    videoStreamRef.current?.getTracks().forEach(t => t.stop());
+    audioContextRef.current?.close().catch(() => {});
+    mixingCtxRef.current?.close().catch(() => {});
+    mixingCtxRef.current = null;
+    mixedDestRef.current = null;
+
+    // Fix WebM duration BEFORE navigating (~1s operation)
+    const bgUser = user;
+    const bgChunks = [...sessionChunksRef.current];
+    const bgDuration = Date.now() - (sessionRecordingStartRef.current || Date.now());
+    const mimeType = type === "video" ? "video/webm" : "audio/webm";
+    const rawSessionBlob = new Blob(bgChunks, { type: mimeType });
+    
+    let fixedBlob = rawSessionBlob;
+    if (rawSessionBlob.size > 0) {
+      try {
+        fixedBlob = await fixWebmDuration(rawSessionBlob, bgDuration);
+        console.log("[Recording] Duration fixed before navigation");
+      } catch (e) {
+        console.warn("[Recording] fixWebmDuration failed, will upload raw blob:", e);
+      }
+    }
+
     toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم في الخلفية...");
 
     // Navigate immediately — don't wait for upload/evaluation
     navigate("/dashboard");
 
     // Run upload + evaluation in background (fire-and-forget)
-    const bgUser = user;
-    const bgChunks = [...sessionChunksRef.current];
-    const bgDuration = Date.now() - (sessionRecordingStartRef.current || Date.now());
-
     (async () => {
       try {
-        // Stop streams
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        videoStreamRef.current?.getTracks().forEach(t => t.stop());
-        audioContextRef.current?.close().catch(() => {});
-        mixingCtxRef.current?.close().catch(() => {});
-        mixingCtxRef.current = null;
-        mixedDestRef.current = null;
-
-        const rawSessionBlob = new Blob(bgChunks, { type: "video/webm" });
-        
-        if (rawSessionBlob.size > 0 && bgUser) {
-          let sessionBlob = rawSessionBlob;
-          try {
-            sessionBlob = await fixWebmDuration(rawSessionBlob, bgDuration);
-          } catch (e) {
-            console.warn("[Recording] fixWebmDuration failed, uploading raw blob:", e);
-          }
+        if (fixedBlob.size > 0 && bgUser) {
 
           const fileName = `${bgUser.id}/${currentId}_full.webm`;
           let uploaded = false;
@@ -609,7 +614,7 @@ export const useLiveInterview = ({
             try {
               const { error: uploadErr } = await supabase.storage
                 .from("interview-recordings")
-                .upload(fileName, sessionBlob, { contentType: "video/webm", upsert: true });
+                .upload(fileName, fixedBlob, { contentType: mimeType, upsert: true });
               
               if (uploadErr) {
                 console.error(`[Recording] Upload attempt ${attempt + 1} failed:`, uploadErr);
