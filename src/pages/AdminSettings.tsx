@@ -271,7 +271,7 @@ const AdminSettings = () => {
                 {loadingQ ? (
                   <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
                 ) : questions.length === 0 ? (
-                  <p className="p-8 text-center text-muted-foreground font-tajawal">لا توجد أسئلة بعد — سيقوم الذكاء الاصطناعي بتوليد الأسئلة تلقائياً</p>
+                  <p className="p-8 text-center text-muted-foreground font-tajawal">لا توجد أسئلة بعد — سيقوم محرك واكب للذكاء الاصطناعي بتوليد الأسئلة تلقائياً</p>
                 ) : (
                   <Table>
                     <TableHeader>

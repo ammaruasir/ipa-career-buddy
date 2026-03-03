@@ -75,7 +75,7 @@ ${resume_skills && Object.keys(resume_skills).length > 0 ? JSON.stringify(resume
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "يرجى شحن رصيد الذكاء الاصطناعي" }), {
+        return new Response(JSON.stringify({ error: "يرجى شحن رصيد محرك واكب للذكاء الاصطناعي" }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

@@ -260,7 +260,7 @@ const InterviewResults = () => {
 
         {/* AI Feedback */}
         <Card className="rounded-2xl shadow-lg">
-          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Eye className="w-5 h-5 text-primary" />ملاحظات الذكاء الاصطناعي</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Eye className="w-5 h-5 text-primary" />ملاحظات محرك واكب للذكاء الاصطناعي</CardTitle></CardHeader>
           <CardContent>
             <p className="text-sm text-foreground leading-relaxed">{evaluation.ai_feedback_ar}</p>
           </CardContent>

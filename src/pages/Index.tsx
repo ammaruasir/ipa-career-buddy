@@ -96,7 +96,7 @@ const Index = () => {
             <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="w-11 h-11 rounded-xl object-contain shadow-md group-hover:shadow-lg transition-shadow" />
             <div className="hidden sm:block">
               <h2 className="text-base font-bold text-foreground leading-tight">منصة المقابلات الذكية</h2>
-              <p className="text-[11px] text-muted-foreground">مدعومة بالذكاء الاصطناعي</p>
+              <p className="text-[11px] text-muted-foreground">مدعومة بمحرك واكب للذكاء الاصطناعي</p>
             </div>
           </Link>
 
@@ -206,7 +206,7 @@ const Index = () => {
           <div className="max-w-4xl mx-auto text-center space-y-8">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-5 py-2.5 rounded-full text-sm font-semibold border border-primary/20">
               <Shield className="w-4 h-4" />
-              مدعوم بالذكاء الاصطناعي المتقدم
+              مدعوم بمحرك واكب للذكاء الاصطناعي
             </div>
 
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold text-foreground leading-[1.15] tracking-tight">
@@ -216,7 +216,7 @@ const Index = () => {
             </h1>
 
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              منصة متطورة باستخدام الذكاء الاصطناعي لإعداد المرشحين وتقييمهم في المقابلات الوظيفية
+              منصة متطورة باستخدام محرك واكب للذكاء الاصطناعي لإعداد المرشحين وتقييمهم في المقابلات الوظيفية
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
@@ -279,7 +279,7 @@ const Index = () => {
                 </div>
                 <h3 className="text-xl font-bold text-foreground">مقابلات فيديو ذكية</h3>
                 <p className="text-muted-foreground leading-relaxed text-sm">
-                  سجّل مقابلتك بالفيديو واحصل على تحليل فوري يشمل المحتوى ونبرة الصوت والثقة بالنفس باستخدام الذكاء الاصطناعي
+                  سجّل مقابلتك بالفيديو واحصل على تحليل فوري يشمل المحتوى ونبرة الصوت والثقة بالنفس باستخدام محرك واكب للذكاء الاصطناعي
                 </p>
                 <div className="flex flex-wrap gap-2 pt-1">
                   <span className="text-xs bg-primary/5 text-primary px-3 py-1 rounded-full font-medium">تحليل الفيديو</span>
@@ -339,7 +339,7 @@ const Index = () => {
             {[
               { step: "١", icon: LogIn, title: "سجل الدخول", desc: "أنشئ حسابك أو سجل الدخول للبدء" },
               { step: "٢", icon: MessageSquare, title: "اختر نوع المقابلة", desc: "اختر بين المقابلة الكتابية أو الصوتية أو الفيديو" },
-              { step: "٣", icon: Mic, title: "أجب على الأسئلة", desc: "أجب على أسئلة الذكاء الاصطناعي المخصصة لمجالك" },
+              { step: "٣", icon: Mic, title: "أجب على الأسئلة", desc: "أجب على أسئلة محرك واكب للذكاء الاصطناعي المخصصة لمجالك" },
               { step: "٤", icon: Award, title: "احصل على تقييمك", desc: "استلم تقييماً مفصلاً مع شهادة إتمام المقابلة" },
             ].map((item, i) => (
               <div key={i} className="relative text-center group">
@@ -421,7 +421,7 @@ const Index = () => {
               {
                 name: "أحمد الغامدي",
                 role: "مرشح - إدارة أعمال",
-                quote: "المنصة ساعدتني على اجتياز مقابلتي الأولى بثقة. التقييم الفوري من الذكاء الاصطناعي أظهر لي نقاط ضعفي قبل المقابلة الحقيقية.",
+                quote: "المنصة ساعدتني على اجتياز مقابلتي الأولى بثقة. التقييم الفوري من محرك واكب للذكاء الاصطناعي أظهر لي نقاط ضعفي قبل المقابلة الحقيقية.",
               },
               {
                 name: "نورة القحطاني",
@@ -469,7 +469,7 @@ const Index = () => {
             <div className="relative z-10 space-y-6">
               <h2 className="text-2xl md:text-3xl font-bold text-primary-foreground">جاهز لخوض تجربة المقابلة الذكية؟</h2>
               <p className="text-primary-foreground/80 text-base max-w-md mx-auto">
-                سجل الآن وابدأ بالتدريب على مقابلاتك الوظيفية مع تقنيات الذكاء الاصطناعي
+                سجل الآن وابدأ بالتدريب على مقابلاتك الوظيفية مع محرك واكب للذكاء الاصطناعي
               </p>
               <Button
                 size="lg"

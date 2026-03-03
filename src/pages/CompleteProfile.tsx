@@ -420,7 +420,7 @@ const CompleteProfile = () => {
               {analyzing && (
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
                   <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                  <p className="font-tajawal text-sm text-primary">جاري تحليل السيرة الذاتية بالذكاء الاصطناعي...</p>
+                  <p className="font-tajawal text-sm text-primary">جاري تحليل السيرة الذاتية بمحرك واكب للذكاء الاصطناعي...</p>
                 </div>
               )}
 

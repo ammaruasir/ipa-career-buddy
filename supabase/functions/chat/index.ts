@@ -221,7 +221,7 @@ ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      return new Response(JSON.stringify({ error: "خطأ في الذكاء الاصطناعي" }), {
+      return new Response(JSON.stringify({ error: "خطأ في محرك واكب للذكاء الاصطناعي" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
