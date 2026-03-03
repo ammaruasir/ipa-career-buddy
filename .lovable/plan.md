@@ -1,31 +1,23 @@
 
 
-## Add Fallback "End Interview" Button on Candidate Dashboard
+## Auto-evaluate after fallback end
 
 ### Problem
-When auto-closure fails, interviews remain stuck as "in_progress" (جارية) on the dashboard with no way for the candidate to manually close them.
+The fallback "End Interview" button calls `complete-interview` which only sets `status = 'completed'`. It does not call `evaluate-interview`, so the interview remains ungraded.
 
 ### Solution
-Add an "إنهاء المقابلة" button next to interviews with `status === "in_progress"` in the interview history section of `CandidateDashboard.tsx`. The button calls the `complete-interview` edge function to mark it as completed.
+In `src/pages/CandidateDashboard.tsx`, after the `complete-interview` call succeeds, immediately invoke `evaluate-interview` with the same `interview_id`.
 
 ### File: `src/pages/CandidateDashboard.tsx`
 
-| Change | Details |
-|--------|---------|
-| Add state for loading/confirmation | Track which interview is being ended + confirmation dialog |
-| Add `handleForceEnd` function | Calls `complete-interview` edge function, then refreshes the interview list |
-| Add button in interview history | Shows a destructive "إنهاء المقابلة" button next to any `in_progress` interview |
-| Add `ExitConfirmationDialog` | Reuse existing confirmation dialog to prevent accidental clicks |
-
-```text
-┌──────────────────────────────────────────────────┐
-│ 📝 محلل أعمال   |  مقابلة نصية                   │
-│                  |  [جارية]  [🔴 إنهاء المقابلة]  │
-└──────────────────────────────────────────────────┘
+**Change in `handleForceEnd`:**
+After `complete-interview` succeeds, add:
+```typescript
+// Trigger evaluation
+await supabase.functions.invoke("evaluate-interview", {
+  body: { interview_id: endingInterviewId },
+});
 ```
 
-The button will:
-1. Show a confirmation dialog first
-2. Call `supabase.functions.invoke("complete-interview", { body: { interview_id } })`
-3. Update local state to reflect the change immediately
+The evaluation may take a few seconds (AI processing). A toast message will inform the candidate that grading is in progress. If evaluation fails, the interview is still marked completed — the candidate just won't see results immediately (HR can trigger re-evaluation from their side).
 
