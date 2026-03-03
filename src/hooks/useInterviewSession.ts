@@ -25,7 +25,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
   const [questionCount, setQuestionCount] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [awaitingEndConfirmation, setAwaitingEndConfirmation] = useState(false);
+  
 
   const contextSummaryRef = useRef<string>("");
   const interviewIdRef = useRef<string | null>(null);
@@ -161,11 +161,11 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
         setQuestionCount((c) => c + 1);
       }
 
-      // Check if the PREVIOUS question was the last — set awaitingEndConfirmation
+      // Auto-end when last question is answered
       if (lastQuestionRef.current) {
         lastQuestionRef.current = false;
-        setAwaitingEndConfirmation(true);
         setIsLoading(false);
+        await confirmEnd();
         return;
       }
 
@@ -181,7 +181,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
 
   const confirmEnd = useCallback(async () => {
     if (!interviewId || !user) return;
-    setAwaitingEndConfirmation(false);
+    
 
     await supabase
       .from("interviews")
@@ -218,11 +218,6 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     setIsEvaluating(false);
   }, [interviewId, user, searchParams, navigate]);
 
-  const continueInterview = useCallback(() => {
-    setAwaitingEndConfirmation(false);
-    lastQuestionRef.current = false;
-  }, []);
-
   return {
     user,
     navigate,
@@ -236,11 +231,9 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     isCompleted,
     isEvaluating,
     settingsLoading,
-    awaitingEndConfirmation,
     startInterview,
     sendAnswer,
     confirmEnd,
-    continueInterview,
     setMessages,
   };
 };
