@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, job_position, interview_type, context_summary, last_answer, vacancy_id, user_id } = await req.json();
+    const { messages, job_position, interview_type, context_summary, last_answer, vacancy_id, user_id, current_question, total_questions } = await req.json();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
@@ -158,25 +158,37 @@ serve(async (req) => {
 
 الوظيفة المطلوبة: ${job_position || "غير محددة"}${candidateContext}${jobContext}${questionBankPrompt}`;
 
+    // Inject phase awareness if current_question is provided
+    let phaseContext = "";
+    if (current_question && total_questions) {
+      let phase = "الوسط (أسئلة تقنية وسلوكية)";
+      if (current_question <= 2) {
+        phase = "البداية (تعارف وكسر جمود)";
+      } else if (current_question >= total_questions - 1) {
+        phase = "النهاية (أسئلة لوجستية وختامية)";
+      }
+      phaseContext = `\n\n⚠️ أنت الآن في السؤال ${current_question} من ${total_questions} — المرحلة: ${phase}. التزم بنوع الأسئلة المناسب لهذه المرحلة.`;
+    }
+
     // Latency optimization: use context_summary + last_answer if provided
     let chatMessages: any[];
     if (context_summary !== undefined && last_answer !== undefined) {
       // Optimized path: only send summary + last answer
       chatMessages = [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: systemPrompt + phaseContext },
         { role: "user", content: `ملخص سياق المقابلة حتى الآن:\n${context_summary}\n\nآخر إجابة من المرشح:\n${last_answer}` },
       ];
     } else if (messages && messages.length > 0) {
       // Full messages path (fallback / first call)
       const enrichedMessages = messages.map((m: any, i: number) => {
         if (i === 0 && m.role === "system") {
-          return { ...m, content: systemPrompt };
+          return { ...m, content: systemPrompt + phaseContext };
         }
         return m;
       });
       chatMessages = enrichedMessages;
     } else {
-      chatMessages = [{ role: "system", content: systemPrompt }];
+      chatMessages = [{ role: "system", content: systemPrompt + phaseContext }];
     }
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
