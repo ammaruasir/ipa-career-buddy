@@ -4,7 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Briefcase, Loader2 } from "lucide-react";
+import { Briefcase, Loader2, Shield, GraduationCap } from "lucide-react";
+
+const QUICK_ACCOUNTS = [
+  { label: "مسؤول", email: "admin@test.com", password: "00000000", role: "admin" as const },
+  { label: "مرشح", email: "student1@test.com", password: "00000000", role: "candidate" as const },
+  { label: "مرشح", email: "ammar@admin.com", password: "00000000", role: "candidate" as const },
+];
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,6 +50,18 @@ const Login = () => {
       }
     }
     setLoading(false);
+  };
+
+  const handleQuickLogin = async (email: string, password: string) => {
+    setLoading(true);
+    const { error } = await signIn(email, password);
+    if (error) {
+      toast.error("فشل تسجيل الدخول السريع");
+      setLoading(false);
+    } else {
+      const redirect = searchParams.get("redirect");
+      navigate(redirect || "/dashboard");
+    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -189,6 +207,40 @@ const Login = () => {
               {isSignup ? "لديك حساب بالفعل؟ تسجيل الدخول" : "ليس لديك حساب؟ إنشاء حساب جديد"}
             </button>
           </div>
+
+          {!isSignup && (
+            <div className="mt-6">
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-card px-2 text-muted-foreground">دخول سريع للتجربة</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {QUICK_ACCOUNTS.map((acc) => {
+                  const Icon = acc.role === "admin" ? Shield : GraduationCap;
+                  return (
+                    <Button
+                      key={acc.email}
+                      type="button"
+                      variant="outline"
+                      className="w-full rounded-xl justify-between py-5"
+                      disabled={loading}
+                      onClick={() => handleQuickLogin(acc.email, acc.password)}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Icon className="w-4 h-4" />
+                        <span className="font-medium">{acc.label}</span>
+                      </span>
+                      <span className="text-xs text-muted-foreground" dir="ltr">{acc.email}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
