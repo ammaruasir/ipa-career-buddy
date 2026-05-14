@@ -147,15 +147,21 @@ export const useLiveInterview = ({
         audio.crossOrigin = "anonymous";
         currentAudioRef.current = audio;
 
-        // Connect TTS audio to the mixed recording destination (if available)
-        let ttsSource: MediaElementAudioSourceNode | null = null;
+        // Try to wire TTS into the mixing graph so it gets recorded.
+        // If this fails (e.g. context suspended or element already attached),
+        // we still play the audio normally through default speakers.
+        let mixed = false;
         if (mixingCtxRef.current && mixedDestRef.current) {
           try {
-            ttsSource = mixingCtxRef.current.createMediaElementSource(audio);
+            if (mixingCtxRef.current.state === "suspended") {
+              await mixingCtxRef.current.resume().catch(() => {});
+            }
+            const ttsSource = mixingCtxRef.current.createMediaElementSource(audio);
             ttsSource.connect(mixedDestRef.current); // → recording
             ttsSource.connect(mixingCtxRef.current.destination); // → speakers
+            mixed = true;
           } catch (e) {
-            console.warn("[AudioMix] Could not connect TTS to mixing context:", e);
+            console.warn("[AudioMix] Could not connect TTS to mixing context, playing direct:", e);
           }
         }
 
@@ -184,6 +190,10 @@ export const useLiveInterview = ({
         audio.onended = () => { cleanup(); resolve(); };
         audio.onerror = () => { cleanup(); resolve(); };
 
+        // Final guard: ensure mixing context is running before play (audio routes through it when mixed)
+        if (mixed && mixingCtxRef.current?.state === "suspended") {
+          await mixingCtxRef.current.resume().catch(() => {});
+        }
         await audio.play();
       } catch (error) {
         console.error("ElevenLabs TTS failed, falling back to browser TTS:", error);
@@ -747,6 +757,8 @@ export const useLiveInterview = ({
       // --- Create audio mixing context for recording ---
       const mixingCtx = new AudioContext();
       mixingCtxRef.current = mixingCtx;
+      // Ensure context is running so MediaElementSource audio is audible
+      await mixingCtx.resume().catch(() => {});
       const mixedDest = mixingCtx.createMediaStreamDestination();
       mixedDestRef.current = mixedDest;
 

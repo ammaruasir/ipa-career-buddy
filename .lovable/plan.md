@@ -1,40 +1,47 @@
-## Add Quick-Login Buttons on Login Page
+## Fix: ElevenLabs voice silent in voice/video interviews
 
-### Problem
-Testers/demo users want a one-click way to log in with existing accounts instead of typing email + password every time.
+### Diagnosis
+The edge function `elevenlabs-tts` works correctly — direct test returned 200 with valid MP3 bytes. The issue is client-side in `src/hooks/useLiveInterview.ts`.
 
-### Solution
-Add a "دخول سريع" section under the existing login form on `src/pages/Login.tsx` showing one button per pre-configured existing account. Clicking a button auto-fills the credentials and calls `signIn` immediately, then redirects to `/dashboard`.
+When the interview starts, the code creates an `AudioContext` (`mixingCtx`) for recording (line 748). Then in `speakText` it wires the TTS `<audio>` element through `createMediaElementSource(audio)` and connects it to both `mixedDest` (recording) and `mixingCtx.destination` (speakers).
 
-### File: `src/pages/Login.tsx`
+**The problem**: once an `HTMLMediaElement` is bound to a `MediaElementAudioSourceNode`, all its sound is routed through the `AudioContext` and **stops playing through the default output**. If the `AudioContext` is in `suspended` state (browser autoplay policy — common when the context is created inside an async chain rather than directly in the click handler), `audio.play()` succeeds but **no audio is heard**.
 
-**Accounts to include** (visible in all environments, per your choice):
+That's exactly why the user hears nothing during voice/video interviews but text-mode/`AdminSettings` preview works fine.
 
-| Email | Role | Password |
-|---|---|---|
-| `admin@test.com` | مسؤول (Admin) | `00000000` |
-| `ammar@admin.com` | مرشح (Candidate) | `00000000` |
-| `student1@test.com` | مرشح (Candidate) | `00000000` |
+### Fix
+In `src/hooks/useLiveInterview.ts`:
 
-> Other emails in the DB (`marwan@gmail.com`, `ammar@wakeb.com`, `wakeb@wakeb.tech`) are excluded since their passwords aren't on file. If you want them included, share the passwords or pick a uniform default.
-
-### Implementation
-
-1. Add a `QUICK_ACCOUNTS` array constant at top of the file with `{ label, email, password, role }` entries.
-2. Add a `handleQuickLogin(email, password)` function that:
-   - Sets `loading = true`
-   - Calls `signIn(email, password)`
-   - On success → `navigate(redirect || "/dashboard")`
-   - On error → `toast.error("فشل تسجيل الدخول السريع")`
-3. Render a section **below the form**, only when `!isSignup && !isForgotPassword`:
-   ```text
-   ─────────  دخول سريع للتجربة  ─────────
-   [ 👤 مسؤول — admin@test.com ]
-   [ 🎓 مرشح — student1@test.com ]
-   [ 🎓 مرشح — ammar@admin.com ]
+1. **After creating the mixing context** (line ~749), immediately call:
+   ```ts
+   await mixingCtx.resume().catch(() => {});
    ```
-   Each button uses `variant="outline"`, full width, rounded, with role icon (`Shield` / `GraduationCap`) and shows email as secondary text.
-4. Buttons are disabled while `loading`.
 
-### Security note
-These buttons expose test credentials to anyone visiting `/login` in production. You confirmed you want them visible in all environments — acknowledged. If you change your mind later, we can wrap the section in `import.meta.env.DEV && (...)`.
+2. **Inside `speakText`**, before `audio.play()`, resume the context if it's still suspended:
+   ```ts
+   if (mixingCtxRef.current?.state === "suspended") {
+     await mixingCtxRef.current.resume().catch(() => {});
+   }
+   ```
+
+3. **Set `audio.crossOrigin = "anonymous"` BEFORE** the `new Audio(audioUrl)` line is moot for blob URLs, but also wrap the `createMediaElementSource` call so that if it throws (e.g., element already attached), we fall back to playing the audio without mixing — that way at least the candidate hears the AI even if the recording loses the TTS track:
+   ```ts
+   let mixedSuccessfully = false;
+   if (mixingCtxRef.current && mixedDestRef.current) {
+     try {
+       const ttsSource = mixingCtxRef.current.createMediaElementSource(audio);
+       ttsSource.connect(mixedDestRef.current);
+       ttsSource.connect(mixingCtxRef.current.destination);
+       mixedSuccessfully = true;
+     } catch (e) {
+       console.warn("[AudioMix] mix failed, playing direct:", e);
+     }
+   }
+   // If mixing failed, audio still plays through default output normally.
+   ```
+
+### Files touched
+- `src/hooks/useLiveInterview.ts` (only)
+
+### Verification
+After the fix, start a voice interview as `student1@test.com` → AI greeting should be audible. Recording should still capture both mic and TTS.
