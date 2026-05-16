@@ -1,47 +1,35 @@
-## Fix: ElevenLabs voice silent in voice/video interviews
+## إضافة إدارة كاملة (CRUD) لسجل المقابلات في لوحة الإدارة
 
-### Diagnosis
-The edge function `elevenlabs-tts` works correctly — direct test returned 200 with valid MP3 bytes. The issue is client-side in `src/hooks/useLiveInterview.ts`.
+سأضيف للمسؤول إمكانية عرض، تعديل، وحذف سجلات المقابلات مباشرة من لوحة الإدارة، بالإضافة إلى عرض التفاصيل الكاملة.
 
-When the interview starts, the code creates an `AudioContext` (`mixingCtx`) for recording (line 748). Then in `speakText` it wires the TTS `<audio>` element through `createMediaElementSource(audio)` and connects it to both `mixedDest` (recording) and `mixingCtx.destination` (speakers).
+### الميزات
+1. **عرض (Read)** — موجود حالياً في الجدول؛ سأضيف صفحة تفاصيل كاملة للمقابلة (الأسئلة، الردود، التقييم، أحداث الغش، التسجيل).
+2. **تعديل (Update)** — حوار (Dialog) لتعديل: المنصب الوظيفي، النوع (نصية/صوتية/فيديو)، الحالة (قيد الانتظار/جارية/مكتملة/ملغاة).
+3. **حذف (Delete)** — زر حذف مع تأكيد، يحذف المقابلة وكل السجلات المرتبطة بها (الردود، التقييمات، ملاحظات HR، أحداث الغش، طلبات التوظيف المرتبطة).
+4. **إجراءات جماعية** — تحديد عدة مقابلات وحذفها دفعة واحدة.
+5. **تصدير CSV** — تصدير المقابلات المفلترة.
 
-**The problem**: once an `HTMLMediaElement` is bound to a `MediaElementAudioSourceNode`, all its sound is routed through the `AudioContext` and **stops playing through the default output**. If the `AudioContext` is in `suspended` state (browser autoplay policy — common when the context is created inside an async chain rather than directly in the click handler), `audio.play()` succeeds but **no audio is heard**.
+### التغييرات التقنية
 
-That's exactly why the user hears nothing during voice/video interviews but text-mode/`AdminSettings` preview works fine.
+**صفحة جديدة:** `src/pages/AdminInterviews.tsx`
+- جدول كامل بكل المقابلات مع البحث/الفلترة/الترتيب
+- أعمدة: تحديد، الاسم، المنصب، النوع، الحالة، الدرجة، التاريخ، الإجراءات (عرض/تعديل/حذف)
+- أزرار: حذف المحدد، تصدير CSV
 
-### Fix
-In `src/hooks/useLiveInterview.ts`:
+**Edge Function جديدة:** `supabase/functions/admin-interview/index.ts`
+- يتحقق من صلاحية admin
+- `action: "update"` — يحدّث حقول المقابلة
+- `action: "delete"` — يحذف المقابلة + السجلات الفرعية (responses, evaluations, hr_notes, cheat_events, job_applications)
+- `action: "bulk_delete"` — حذف متعدد
+- يستخدم service role key لتجاوز قيود RLS عند الحذف المتسلسل
 
-1. **After creating the mixing context** (line ~749), immediately call:
-   ```ts
-   await mixingCtx.resume().catch(() => {});
-   ```
+**تحديث:** `src/pages/AdminDashboard.tsx`
+- إضافة زر "إدارة المقابلات" في الهيدر يوجّه إلى `/admin/interviews`
+- إبقاء الجدول الحالي كملخص سريع (آخر 50)
 
-2. **Inside `speakText`**, before `audio.play()`, resume the context if it's still suspended:
-   ```ts
-   if (mixingCtxRef.current?.state === "suspended") {
-     await mixingCtxRef.current.resume().catch(() => {});
-   }
-   ```
+**تحديث:** `src/App.tsx`
+- إضافة المسار `/admin/interviews` (محمي للأدمن فقط)
 
-3. **Set `audio.crossOrigin = "anonymous"` BEFORE** the `new Audio(audioUrl)` line is moot for blob URLs, but also wrap the `createMediaElementSource` call so that if it throws (e.g., element already attached), we fall back to playing the audio without mixing — that way at least the candidate hears the AI even if the recording loses the TTS track:
-   ```ts
-   let mixedSuccessfully = false;
-   if (mixingCtxRef.current && mixedDestRef.current) {
-     try {
-       const ttsSource = mixingCtxRef.current.createMediaElementSource(audio);
-       ttsSource.connect(mixedDestRef.current);
-       ttsSource.connect(mixingCtxRef.current.destination);
-       mixedSuccessfully = true;
-     } catch (e) {
-       console.warn("[AudioMix] mix failed, playing direct:", e);
-     }
-   }
-   // If mixing failed, audio still plays through default output normally.
-   ```
-
-### Files touched
-- `src/hooks/useLiveInterview.ts` (only)
-
-### Verification
-After the fix, start a voice interview as `student1@test.com` → AI greeting should be audible. Recording should still capture both mic and TTS.
+### ملاحظات أمنية
+- جميع عمليات التعديل/الحذف تمرّ عبر Edge Function تتحقق من دور admin قبل التنفيذ.
+- الحذف يحافظ على سلامة البيانات بحذف السجلات الفرعية أولاً.

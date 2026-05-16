@@ -43,6 +43,7 @@ const ResetPassword = lazyRetry(() => import("./pages/ResetPassword"));
 const ProfileSettings = lazyRetry(() => import("./pages/ProfileSettings"));
 const InterviewSettings = lazyRetry(() => import("./pages/InterviewSettings"));
 const AdminSettings = lazyRetry(() => import("./pages/AdminSettings"));
+const AdminInterviews = lazyRetry(() => import("./pages/AdminInterviews"));
 const CompleteProfile = lazyRetry(() => import("./pages/CompleteProfile"));
 const HiringPipeline = lazyRetry(() => import("./pages/HiringPipeline"));
 const CandidateCompare = lazyRetry(() => import("./pages/CandidateCompare"));
@@ -85,6 +86,7 @@ const App = () => (
               <Route path="/settings/profile" element={<ProfileSettings />} />
               <Route path="/settings/interview" element={<InterviewSettings />} />
               <Route path="/admin/settings" element={<AdminSettings />} />
+              <Route path="/admin/interviews" element={<AdminInterviews />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
