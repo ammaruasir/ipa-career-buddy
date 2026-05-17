@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import AIAvatarScene from "@/components/interview/AIAvatarScene";
 import {
   ArrowRight, Palette, BookOpen, SlidersHorizontal, Key, Users, Settings,
   Plus, Pencil, X, Loader2, Shield, Download, Server, Briefcase, Clock,
@@ -630,60 +631,86 @@ const AdminSettings = () => {
                   <CardDescription className="font-tajawal">عدّل الاسم والجنس والصوت ثم اضغط "حفظ وتفعيل" — لن تُطبّق التغييرات إلا بعد الحفظ.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-4 md:grid-cols-[160px_1fr]">
                     <div className="space-y-2">
-                      <Label className="font-tajawal">اسم المحاور/ة</Label>
-                      <Input
-                        value={voiceDraft?.name ?? ""}
-                        onChange={(e) => setVoiceDraft((d) => d ? { ...d, name: e.target.value } : d)}
-                        placeholder="مثال: نورة"
-                        className="font-tajawal"
-                      />
+                      <Label className="font-tajawal text-xs text-muted-foreground">معاينة الشكل</Label>
+                      <div className="aspect-square w-full rounded-xl overflow-hidden border">
+                        <AIAvatarScene
+                          avatarState="idle"
+                          name={voiceDraft?.name}
+                          gender={(voiceDraft?.gender as "male" | "female") ?? "female"}
+                          avatarUrl={voiceDraft?.avatar_url || undefined}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground font-tajawal text-center">
+                        يتغير الشكل حسب الجنس المختار
+                      </p>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="font-tajawal">الجنس</Label>
-                      <Select
-                        value={voiceDraft?.gender ?? "female"}
-                        onValueChange={(v) => setVoiceDraft((d) => d ? { ...d, gender: v } : d)}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="female">أنثى</SelectItem>
-                          <SelectItem value="male">ذكر</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="font-tajawal">صوت ElevenLabs</Label>
-                      <Select
-                        value={voiceDraft?.voice_id ?? "QsV9PCczMIklRM6xLPAS"}
-                        onValueChange={(v) => setVoiceDraft((d) => d ? { ...d, voice_id: v } : d)}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="QsV9PCczMIklRM6xLPAS">هبة منصوري — أنثى سعودية (محادثة/خدمة عملاء) ⭐</SelectItem>
-                          <SelectItem value="IK7YYZcSpmlkjKrQxbSn">رائد — ذكر سعودي (رسمي/سرد)</SelectItem>
-                          <SelectItem value="yXEnnEln9armDCyhkXcA">جدّاوي — ذكر سعودي شاب (هادئ/عميق)</SelectItem>
-                          <SelectItem value="IES4nrmZdUBHByLBde0P">هيثم — عربي (لكنة مصرية)</SelectItem>
-                          <SelectItem value="mRdG9GYEjJmIzqbYTidv">سناء — عربي أصلي (أنثوي)</SelectItem>
-                          <SelectItem value="tavIIPLplRB883FzWU0V">منى — لهجة خليجية (أنثوي)</SelectItem>
-                          <SelectItem value="SAz9YHcvj6GT2YYXdXww">River (أنثوي)</SelectItem>
-                          <SelectItem value="EXAVITQu4vr4xnSDxMaL">Sarah (أنثوي)</SelectItem>
-                          <SelectItem value="FGY2WhTYpPnrIDTdsKH5">Laura (أنثوي)</SelectItem>
-                          <SelectItem value="Xb7hH8MSUJpSbSDYk0k2">Alice (أنثوي)</SelectItem>
-                          <SelectItem value="pFZP5JQG7iQjIQuC4Bku">Lily (أنثوي)</SelectItem>
-                          <SelectItem value="cgSgspJ2msm6clMCkdW9">Jessica (أنثوي)</SelectItem>
-                          <SelectItem value="XrExE9yKIg1WjnnlVkGX">Matilda (أنثوي)</SelectItem>
-                          <SelectItem value="CwhRBWXzGAHq8TQ4Fs17">Roger (ذكوري)</SelectItem>
-                          <SelectItem value="JBFqnCBsd6RMkjVDRZzb">George (ذكوري)</SelectItem>
-                          <SelectItem value="TX3LPaxmHKxFdv7VOQHJ">Liam (ذكوري)</SelectItem>
-                          <SelectItem value="onwK4e9ZLuTAKqWW03F9">Daniel (ذكوري)</SelectItem>
-                          <SelectItem value="nPczCjzI2devNBz1zQrb">Brian (ذكوري)</SelectItem>
-                          <SelectItem value="IKne3meq5aSn9XLyUdCD">Charlie (ذكوري)</SelectItem>
-                          <SelectItem value="cjVigY5qzO86Huf0OWal">Eric (ذكوري)</SelectItem>
-                          <SelectItem value="N2lVS1w4EtoT3dr4eOWO">Callum (ذكوري)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="font-tajawal">اسم المحاور/ة</Label>
+                        <Input
+                          value={voiceDraft?.name ?? ""}
+                          onChange={(e) => setVoiceDraft((d) => d ? { ...d, name: e.target.value } : d)}
+                          placeholder="مثال: نورة"
+                          className="font-tajawal"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="font-tajawal">جنس الأفتار</Label>
+                        <Select
+                          value={voiceDraft?.gender ?? "female"}
+                          onValueChange={(v) => setVoiceDraft((d) => d ? { ...d, gender: v } : d)}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="female">أنثى (حجاب)</SelectItem>
+                            <SelectItem value="male">ذكر (ثوب وغترة)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label className="font-tajawal">رابط صورة مخصصة (اختياري)</Label>
+                        <Input
+                          value={voiceDraft?.avatar_url ?? ""}
+                          onChange={(e) => setVoiceDraft((d) => d ? { ...d, avatar_url: e.target.value } : d)}
+                          placeholder="https://... — اتركه فارغًا لاستخدام الشكل الافتراضي"
+                          className="font-tajawal"
+                          dir="ltr"
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label className="font-tajawal">صوت ElevenLabs</Label>
+                        <Select
+                          value={voiceDraft?.voice_id ?? "QsV9PCczMIklRM6xLPAS"}
+                          onValueChange={(v) => setVoiceDraft((d) => d ? { ...d, voice_id: v } : d)}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="QsV9PCczMIklRM6xLPAS">هبة منصوري — أنثى سعودية (محادثة/خدمة عملاء) ⭐</SelectItem>
+                            <SelectItem value="IK7YYZcSpmlkjKrQxbSn">رائد — ذكر سعودي (رسمي/سرد)</SelectItem>
+                            <SelectItem value="yXEnnEln9armDCyhkXcA">جدّاوي — ذكر سعودي شاب (هادئ/عميق)</SelectItem>
+                            <SelectItem value="IES4nrmZdUBHByLBde0P">هيثم — عربي (لكنة مصرية)</SelectItem>
+                            <SelectItem value="mRdG9GYEjJmIzqbYTidv">سناء — عربي أصلي (أنثوي)</SelectItem>
+                            <SelectItem value="tavIIPLplRB883FzWU0V">منى — لهجة خليجية (أنثوي)</SelectItem>
+                            <SelectItem value="SAz9YHcvj6GT2YYXdXww">River (أنثوي)</SelectItem>
+                            <SelectItem value="EXAVITQu4vr4xnSDxMaL">Sarah (أنثوي)</SelectItem>
+                            <SelectItem value="FGY2WhTYpPnrIDTdsKH5">Laura (أنثوي)</SelectItem>
+                            <SelectItem value="Xb7hH8MSUJpSbSDYk0k2">Alice (أنثوي)</SelectItem>
+                            <SelectItem value="pFZP5JQG7iQjIQuC4Bku">Lily (أنثوي)</SelectItem>
+                            <SelectItem value="cgSgspJ2msm6clMCkdW9">Jessica (أنثوي)</SelectItem>
+                            <SelectItem value="XrExE9yKIg1WjnnlVkGX">Matilda (أنثوي)</SelectItem>
+                            <SelectItem value="CwhRBWXzGAHq8TQ4Fs17">Roger (ذكوري)</SelectItem>
+                            <SelectItem value="JBFqnCBsd6RMkjVDRZzb">George (ذكوري)</SelectItem>
+                            <SelectItem value="TX3LPaxmHKxFdv7VOQHJ">Liam (ذكوري)</SelectItem>
+                            <SelectItem value="onwK4e9ZLuTAKqWW03F9">Daniel (ذكوري)</SelectItem>
+                            <SelectItem value="nPczCjzI2devNBz1zQrb">Brian (ذكوري)</SelectItem>
+                            <SelectItem value="IKne3meq5aSn9XLyUdCD">Charlie (ذكوري)</SelectItem>
+                            <SelectItem value="cjVigY5qzO86Huf0OWal">Eric (ذكوري)</SelectItem>
+                            <SelectItem value="N2lVS1w4EtoT3dr4eOWO">Callum (ذكوري)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-3 flex-wrap">
