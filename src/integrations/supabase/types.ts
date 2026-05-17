@@ -71,6 +71,7 @@ export type Database = {
           recommendation: string | null
           red_flags: Json | null
           review_status: string | null
+          scope: string
           sentiment: string | null
           speech_pace: number | null
           strengths: Json | null
@@ -97,6 +98,7 @@ export type Database = {
           recommendation?: string | null
           red_flags?: Json | null
           review_status?: string | null
+          scope?: string
           sentiment?: string | null
           speech_pace?: number | null
           strengths?: Json | null
@@ -123,6 +125,7 @@ export type Database = {
           recommendation?: string | null
           red_flags?: Json | null
           review_status?: string | null
+          scope?: string
           sentiment?: string | null
           speech_pace?: number | null
           strengths?: Json | null
@@ -178,34 +181,46 @@ export type Database = {
           created_at: string
           id: string
           job_position: string
+          mode: string
+          persona: string | null
           questions: Json | null
           recording_url: string | null
           status: Database["public"]["Enums"]["interview_status"]
+          track: string | null
           type: Database["public"]["Enums"]["interview_type"]
           updated_at: string
           user_id: string
+          visibility: string
         }
         Insert: {
           created_at?: string
           id?: string
           job_position: string
+          mode?: string
+          persona?: string | null
           questions?: Json | null
           recording_url?: string | null
           status?: Database["public"]["Enums"]["interview_status"]
+          track?: string | null
           type: Database["public"]["Enums"]["interview_type"]
           updated_at?: string
           user_id: string
+          visibility?: string
         }
         Update: {
           created_at?: string
           id?: string
           job_position?: string
+          mode?: string
+          persona?: string | null
           questions?: Json | null
           recording_url?: string | null
           status?: Database["public"]["Enums"]["interview_status"]
+          track?: string | null
           type?: Database["public"]["Enums"]["interview_type"]
           updated_at?: string
           user_id?: string
+          visibility?: string
         }
         Relationships: []
       }
@@ -398,30 +413,57 @@ export type Database = {
       question_templates: {
         Row: {
           category: string
+          competency: string | null
           created_at: string
           created_by: string
           difficulty: string | null
+          gov_context: boolean
           id: string
           interview_type: Database["public"]["Enums"]["interview_type"]
+          is_scenario: boolean
+          language: string
+          model_answer_ar: string | null
           question_text: string
+          reviewed_by: string | null
+          star_rubric: Json | null
+          status: string
+          track: string | null
         }
         Insert: {
           category?: string
+          competency?: string | null
           created_at?: string
           created_by: string
           difficulty?: string | null
+          gov_context?: boolean
           id?: string
           interview_type: Database["public"]["Enums"]["interview_type"]
+          is_scenario?: boolean
+          language?: string
+          model_answer_ar?: string | null
           question_text: string
+          reviewed_by?: string | null
+          star_rubric?: Json | null
+          status?: string
+          track?: string | null
         }
         Update: {
           category?: string
+          competency?: string | null
           created_at?: string
           created_by?: string
           difficulty?: string | null
+          gov_context?: boolean
           id?: string
           interview_type?: Database["public"]["Enums"]["interview_type"]
+          is_scenario?: boolean
+          language?: string
+          model_answer_ar?: string | null
           question_text?: string
+          reviewed_by?: string | null
+          star_rubric?: Json | null
+          status?: string
+          track?: string | null
         }
         Relationships: []
       }
@@ -429,30 +471,39 @@ export type Database = {
         Row: {
           ai_analysis: Json | null
           answer_text: string | null
+          coaching: Json | null
           created_at: string
+          duration_ms: number | null
           id: string
           interview_id: string
           media_url: string | null
+          question_index: number | null
           question_text: string
           scores: Json | null
         }
         Insert: {
           ai_analysis?: Json | null
           answer_text?: string | null
+          coaching?: Json | null
           created_at?: string
+          duration_ms?: number | null
           id?: string
           interview_id: string
           media_url?: string | null
+          question_index?: number | null
           question_text: string
           scores?: Json | null
         }
         Update: {
           ai_analysis?: Json | null
           answer_text?: string | null
+          coaching?: Json | null
           created_at?: string
+          duration_ms?: number | null
           id?: string
           interview_id?: string
           media_url?: string | null
+          question_index?: number | null
           question_text?: string
           scores?: Json | null
         }
@@ -538,6 +589,264 @@ export type Database = {
         }
         Relationships: []
       }
+      cohorts: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_date: string | null
+          id: string
+          instructor_id: string
+          name: string
+          start_date: string | null
+          status: string
+          track: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          instructor_id: string
+          name: string
+          start_date?: string | null
+          status?: string
+          track?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          instructor_id?: string
+          name?: string
+          start_date?: string | null
+          status?: string
+          track?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      enrollments: {
+        Row: {
+          cohort_id: string
+          enrolled_at: string
+          id: string
+          status: string
+          student_id: string
+        }
+        Insert: {
+          cohort_id: string
+          enrolled_at?: string
+          id?: string
+          status?: string
+          student_id: string
+        }
+        Update: {
+          cohort_id?: string
+          enrolled_at?: string
+          id?: string
+          status?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollments_cohort_id_fkey"
+            columns: ["cohort_id"]
+            isOneToOne: false
+            referencedRelation: "cohorts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assignments: {
+        Row: {
+          cohort_id: string
+          created_at: string
+          description: string | null
+          due_at: string | null
+          id: string
+          interview_type: string | null
+          required_questions: number | null
+          target_track: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          cohort_id: string
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          interview_type?: string | null
+          required_questions?: number | null
+          target_track?: string | null
+          title: string
+          type: string
+        }
+        Update: {
+          cohort_id?: string
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          interview_type?: string | null
+          required_questions?: number | null
+          target_track?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignments_cohort_id_fkey"
+            columns: ["cohort_id"]
+            isOneToOne: false
+            referencedRelation: "cohorts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assignment_submissions: {
+        Row: {
+          assignment_id: string
+          cv_document_id: string | null
+          id: string
+          interview_id: string | null
+          status: string
+          student_id: string
+          submitted_at: string | null
+        }
+        Insert: {
+          assignment_id: string
+          cv_document_id?: string | null
+          id?: string
+          interview_id?: string | null
+          status?: string
+          student_id: string
+          submitted_at?: string | null
+        }
+        Update: {
+          assignment_id?: string
+          cv_document_id?: string | null
+          id?: string
+          interview_id?: string | null
+          status?: string
+          student_id?: string
+          submitted_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_submissions_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instructor_feedback: {
+        Row: {
+          annotation_text: string
+          created_at: string
+          id: string
+          instructor_id: string
+          target_id: string
+          target_type: string
+          timestamp_ms: number | null
+        }
+        Insert: {
+          annotation_text: string
+          created_at?: string
+          id?: string
+          instructor_id: string
+          target_id: string
+          target_type: string
+          timestamp_ms?: number | null
+        }
+        Update: {
+          annotation_text?: string
+          created_at?: string
+          id?: string
+          instructor_id?: string
+          target_id?: string
+          target_type?: string
+          timestamp_ms?: number | null
+        }
+        Relationships: []
+      }
+      cv_documents: {
+        Row: {
+          created_at: string
+          id: string
+          language: string
+          parsed: Json | null
+          scores: Json | null
+          source_path: string | null
+          source_type: string
+          suggestions: Json | null
+          target_role: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          language?: string
+          parsed?: Json | null
+          scores?: Json | null
+          source_path?: string | null
+          source_type?: string
+          suggestions?: Json | null
+          target_role?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          language?: string
+          parsed?: Json | null
+          scores?: Json | null
+          source_path?: string | null
+          source_type?: string
+          suggestions?: Json | null
+          target_role?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cv_drafts: {
+        Row: {
+          created_at: string
+          id: string
+          language: string
+          name: string
+          sections: Json
+          template: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          language?: string
+          name?: string
+          sections?: Json
+          template?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          language?: string
+          name?: string
+          sections?: Json
+          template?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -554,9 +863,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_instructor_for_student: {
+        Args: {
+          _instructor_id: string
+          _student_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      app_role: "student" | "admin" | "hr" | "candidate"
+      app_role: "student" | "admin" | "hr" | "candidate" | "instructor"
       interview_status: "pending" | "in_progress" | "completed" | "cancelled"
       interview_type: "text" | "voice" | "video"
     }
@@ -686,7 +1002,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["student", "admin", "hr", "candidate"],
+      app_role: ["student", "admin", "hr", "candidate", "instructor"],
       interview_status: ["pending", "in_progress", "completed", "cancelled"],
       interview_type: ["text", "voice", "video"],
     },

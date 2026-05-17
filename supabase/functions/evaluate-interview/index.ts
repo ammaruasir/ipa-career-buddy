@@ -7,6 +7,119 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Per-response STAR coaching using Lovable AI (cheaper Gemini Flash).
+async function coachResponses(
+  responses: any[],
+  jobPosition: string,
+  jobContext: string,
+  fillerPatterns: string[],
+  lovableKey: string | undefined,
+  supabase: any,
+) {
+  if (!lovableKey || responses.length === 0) return;
+
+  await Promise.all(
+    responses.map(async (r) => {
+      const answer = r.answer_text || "";
+      if (!answer.trim()) return;
+
+      // Inline filler-word marks (no timestamps yet — Whisper integration is P1)
+      const fillerMarks: { word: string; offset: number }[] = [];
+      for (const w of fillerPatterns) {
+        let idx = -1;
+        const re = new RegExp(w, "g");
+        let m;
+        while ((m = re.exec(answer)) !== null) {
+          fillerMarks.push({ word: w, offset: m.index });
+        }
+      }
+
+      try {
+        const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              {
+                role: "system",
+                content: `أنت مدرّب مقابلات وظيفية للقطاع الحكومي السعودي. مهمّتك: تحليل إجابة طالب وتقديم تغذية راجعة تعليمية وفق منهج STAR (Situation / Task / Action / Result). الإجابة قد تكون بالعربية الفصحى أو لهجة سعودية — قيّم بنفس اللغة. لا تجامل ولا تقسو؛ كن تعليمياً.`,
+              },
+              {
+                role: "user",
+                content: `الوظيفة: ${jobPosition}${jobContext}\n\nالسؤال: ${r.question_text}\n\nإجابة الطالب:\n${answer}\n\nحلّل وفق STAR ثم قدّم إعادة كتابة محسّنة وإجابة نموذجية قصيرة.`,
+              },
+            ],
+            tools: [
+              {
+                type: "function",
+                function: {
+                  name: "coach_answer",
+                  description: "Return STAR coaching for the answer",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      star: {
+                        type: "object",
+                        properties: {
+                          s: { type: "number", description: "Situation coverage 0-3" },
+                          t: { type: "number", description: "Task coverage 0-3" },
+                          a: { type: "number", description: "Action coverage 0-3" },
+                          r: { type: "number", description: "Result coverage 0-3" },
+                        },
+                        required: ["s", "t", "a", "r"],
+                      },
+                      coverage_score: { type: "number", description: "Overall coverage 0-100" },
+                      rewrite_ar: {
+                        type: "string",
+                        description: "نسخة محسّنة من إجابة الطالب نفسه بنفس المعنى لكن بصياغة STAR قوية بالعربية الفصحى",
+                      },
+                      exemplar_ar: {
+                        type: "string",
+                        description: "إجابة نموذجية قصيرة (4-6 أسطر) على نفس السؤال — مثال على ما تبدو عليه الإجابة القوية",
+                      },
+                      tips: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "2-4 نصائح محددة قابلة للتنفيذ في الجلسة التالية",
+                      },
+                      strengths_in_answer: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "نقاط قوة فعلية في إجابة الطالب (مرتبطة بنصّ الطالب)",
+                      },
+                    },
+                    required: ["star", "coverage_score", "rewrite_ar", "exemplar_ar", "tips"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+            ],
+            tool_choice: { type: "function", function: { name: "coach_answer" } },
+          }),
+        });
+
+        if (!res.ok) {
+          console.error("coach response failed", res.status);
+          return;
+        }
+        const data = await res.json();
+        const tool = data.choices?.[0]?.message?.tool_calls?.[0];
+        if (!tool?.function?.arguments) return;
+
+        const parsed = JSON.parse(tool.function.arguments);
+        const coaching = {
+          ...parsed,
+          filler_marks: fillerMarks,
+        };
+        await supabase.from("responses").update({ coaching }).eq("id", r.id);
+      } catch (err) {
+        console.error("coachResponses error", err);
+      }
+    }),
+  );
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -14,10 +127,10 @@ serve(async (req) => {
     const { interview_id } = await req.json();
     if (!interview_id) throw new Error("interview_id is required");
 
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -34,32 +147,38 @@ serve(async (req) => {
     const responses = responsesRes.data || [];
     const settings = settingsRes.data;
 
+    // Decide model + scope by mode (P0.1: practice uses cheap model + formative scope)
+    const isPractice = interview.mode === "practice";
+    const isMockFinal = interview.mode === "mock_final";
+    const useGpt = !isPractice && OPENAI_API_KEY;
+    const scope = isPractice ? "formative" : "summative";
+
     // Load job data from DB
-    let jobData: any = null;
-    // Try to find vacancy by matching job_position title
     const { data: vacancy } = await supabase
       .from("job_vacancies")
       .select("title, description, requirements, department")
       .eq("title", interview.job_position)
       .limit(1)
       .maybeSingle();
-    jobData = vacancy;
+    const jobData = vacancy;
 
-    const weights = settings?.scoring_weights as any || { technical: 40, communication: 30, cultural_fit: 30 };
+    const weights = (settings?.scoring_weights as any) || { technical: 40, communication: 30, cultural_fit: 30 };
     const totalWeight = (weights.technical || 40) + (weights.communication || 30) + (weights.cultural_fit || 30);
     const wTech = (weights.technical || 40) / totalWeight;
     const wComm = (weights.communication || 30) / totalWeight;
     const wCult = (weights.cultural_fit || 30) / totalWeight;
 
-    const thresholds = settings?.evaluation_thresholds as any || { highly_recommended: 80, recommended: 60 };
-    const fillerPatterns: string[] = (settings?.filler_words as any) || ["ممم", "يعني", "أحس", "كدا", "طبعاً", "بصراحة"];
+    const fillerPatterns: string[] = (settings?.filler_words as any) || [
+      "ممم", "يعني", "أحس", "كدا", "طبعاً", "بصراحة",
+    ];
 
-    // Build transcript
     const transcript = responses
-      .map((r: any, i: number) => `سؤال ${i + 1}: ${r.question_text}\nإجابة: ${r.answer_text || "(لم يتم الإجابة)"}`)
+      .map(
+        (r: any, i: number) =>
+          `سؤال ${i + 1}: ${r.question_text}\nإجابة: ${r.answer_text || "(لم يتم الإجابة)"}`,
+      )
       .join("\n\n");
 
-    // Count filler words
     const allAnswers = responses.map((r: any) => r.answer_text || "").join(" ");
     let fillerCount = 0;
     for (const filler of fillerPatterns) {
@@ -72,19 +191,20 @@ serve(async (req) => {
     const avgWordsPerResponse = totalResponses > 0 ? totalWords / totalResponses : 0;
     const estimatedPace = Math.round(avgWordsPerResponse * 2);
 
-    // Video analysis aggregation
     const videoAnalyses = responses
       .filter((r: any) => r.ai_analysis && typeof r.ai_analysis === "object")
       .map((r: any) => r.ai_analysis);
 
     let videoAnalysisSummary = "";
-    let avgEyeContact = 0, avgVideoConfidence = 0, avgEngagement = 0, avgProfAppearance = 0;
-
+    let avgEyeContact = 0,
+      avgVideoConfidence = 0,
+      avgEngagement = 0,
+      avgProfAppearance = 0;
     if (videoAnalyses.length > 0) {
-      avgEyeContact = Math.round(videoAnalyses.reduce((sum: number, a: any) => sum + (a.eye_contact_score || 0), 0) / videoAnalyses.length);
-      avgVideoConfidence = Math.round(videoAnalyses.reduce((sum: number, a: any) => sum + (a.confidence_score || 0), 0) / videoAnalyses.length);
-      avgEngagement = Math.round(videoAnalyses.reduce((sum: number, a: any) => sum + (a.engagement_score || 0), 0) / videoAnalyses.length);
-      avgProfAppearance = Math.round(videoAnalyses.reduce((sum: number, a: any) => sum + (a.professional_appearance || 0), 0) / videoAnalyses.length);
+      avgEyeContact = Math.round(videoAnalyses.reduce((s: number, a: any) => s + (a.eye_contact_score || 0), 0) / videoAnalyses.length);
+      avgVideoConfidence = Math.round(videoAnalyses.reduce((s: number, a: any) => s + (a.confidence_score || 0), 0) / videoAnalyses.length);
+      avgEngagement = Math.round(videoAnalyses.reduce((s: number, a: any) => s + (a.engagement_score || 0), 0) / videoAnalyses.length);
+      avgProfAppearance = Math.round(videoAnalyses.reduce((s: number, a: any) => s + (a.professional_appearance || 0), 0) / videoAnalyses.length);
 
       videoAnalysisSummary = `
 تحليل الفيديو:
@@ -102,9 +222,15 @@ serve(async (req) => {
 - المتطلبات: ${JSON.stringify(jobData.requirements || [])}`
       : "";
 
-    const systemPrompt = `أنت خبير تقييم مقابلات وظيفية. قم بتحليل نص المقابلة وتقييم المرشح بشكل شامل.
+    const modeNote = isPractice
+      ? "\n\n(ملاحظة: هذه جلسة تدريب — ركّز التوصيات على التعلّم لا على قرار التوظيف.)"
+      : isMockFinal
+        ? "\n\n(ملاحظة: هذه مقابلة محاكاة نهائية — قيّم كأنها مقابلة حقيقية.)"
+        : "";
 
-الوظيفة: ${interview.job_position}${jobContext}
+    const systemPrompt = `أنت خبير تقييم مقابلات وظيفية في القطاع الحكومي السعودي. قم بتحليل نص المقابلة وتقييم المتدرّب بشكل شامل.
+
+الوظيفة: ${interview.job_position}${jobContext}${modeNote}
 
 معايير التقييم:
 1. مهارات التواصل (0-100) — الوزن: ${Math.round(wComm * 100)}%
@@ -114,7 +240,7 @@ serve(async (req) => {
 5. التوافق الثقافي (0-100) — الوزن: ${Math.round(wCult * 100)}%
 6. نوع الشخصية DISC
 7. نقاط القوة (3-5)
-8. مجالات التطوير (2-3)
+8. مجالات التطوير (2-3) — صياغة تعليمية محددة قابلة للتنفيذ
 9. إشارات تحذيرية (إن وجدت)
 10. التوصية النهائية: "توصية قوية بالتوظيف" / "توصية مشروطة" / "غير موصى بالتوظيف"
 11. مستوى الثقة (نسبة مئوية)
@@ -122,84 +248,110 @@ serve(async (req) => {
 كلمات الحشو: ${fillerCount} | سرعة الكلام: ${estimatedPace} ك/د
 ${videoAnalysisSummary}`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `نص المقابلة:\n\n${transcript}` },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "submit_evaluation",
-              description: "Submit the complete interview evaluation",
-              parameters: {
-                type: "object",
-                properties: {
-                  communication_score: { type: "number", description: "Communication skills 0-100" },
-                  technical_score: { type: "number", description: "Technical competency 0-100" },
-                  problem_solving: { type: "number", description: "Problem solving 0-100" },
-                  leadership: { type: "number", description: "Leadership 0-100" },
-                  culture_alignment: { type: "number", description: "Cultural alignment 0-100" },
-                  personality_type: { type: "string", enum: ["D", "I", "S", "C"] },
-                  sentiment: { type: "string", enum: ["إيجابي", "محايد", "سلبي"] },
-                  confidence_score: { type: "number", description: "Confidence level 0-100" },
-                  strengths: { type: "array", items: { type: "string" } },
-                  development_areas: { type: "array", items: { type: "string" } },
-                  red_flags: { type: "array", items: { type: "string" } },
-                  final_recommendation: { type: "string", enum: ["توصية قوية بالتوظيف", "توصية مشروطة", "غير موصى بالتوظيف"] },
-                  confidence_level: { type: "string", description: "Confidence percentage e.g. 85%" },
-                  ai_feedback: { type: "string", description: "Comprehensive Arabic feedback" },
-                },
-                required: [
-                  "communication_score", "technical_score", "problem_solving", "leadership",
-                  "culture_alignment", "personality_type", "sentiment", "confidence_score",
-                  "strengths", "development_areas", "red_flags", "final_recommendation",
-                  "confidence_level", "ai_feedback"
-                ],
-                additionalProperties: false,
-              },
+    const toolDef = {
+      type: "function" as const,
+      function: {
+        name: "submit_evaluation",
+        description: "Submit the complete interview evaluation",
+        parameters: {
+          type: "object",
+          properties: {
+            communication_score: { type: "number" },
+            technical_score: { type: "number" },
+            problem_solving: { type: "number" },
+            leadership: { type: "number" },
+            culture_alignment: { type: "number" },
+            personality_type: { type: "string", enum: ["D", "I", "S", "C"] },
+            sentiment: { type: "string", enum: ["إيجابي", "محايد", "سلبي"] },
+            confidence_score: { type: "number" },
+            strengths: { type: "array", items: { type: "string" } },
+            development_areas: { type: "array", items: { type: "string" } },
+            red_flags: { type: "array", items: { type: "string" } },
+            final_recommendation: {
+              type: "string",
+              enum: ["توصية قوية بالتوظيف", "توصية مشروطة", "غير موصى بالتوظيف"],
             },
+            confidence_level: { type: "string" },
+            ai_feedback: { type: "string" },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "submit_evaluation" } },
-        stream: false,
-      }),
-    });
+          required: [
+            "communication_score", "technical_score", "problem_solving", "leadership",
+            "culture_alignment", "personality_type", "sentiment", "confidence_score",
+            "strengths", "development_areas", "red_flags", "final_recommendation",
+            "confidence_level", "ai_feedback",
+          ],
+          additionalProperties: false,
+        },
+      },
+    };
 
-    if (!response.ok) {
-      const t = await response.text();
-      console.error("OpenAI API error:", response.status, t);
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "تم تجاوز الحد المسموح" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    let aiData: any;
+    if (useGpt) {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-4.1",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `نص المقابلة:\n\n${transcript}` },
+          ],
+          tools: [toolDef],
+          tool_choice: { type: "function", function: { name: "submit_evaluation" } },
+          stream: false,
+        }),
+      });
+      if (!response.ok) {
+        const t = await response.text();
+        console.error("OpenAI API error:", response.status, t);
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: "تم تجاوز الحد المسموح" }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        throw new Error("AI evaluation failed");
       }
-      throw new Error("AI evaluation failed");
+      aiData = await response.json();
+    } else {
+      // Practice mode (or no OpenAI key) → use Lovable Gemini
+      if (!LOVABLE_API_KEY) throw new Error("No AI key available");
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `نص المقابلة:\n\n${transcript}` },
+          ],
+          tools: [toolDef],
+          tool_choice: { type: "function", function: { name: "submit_evaluation" } },
+        }),
+      });
+      if (!response.ok) {
+        const t = await response.text();
+        console.error("Lovable AI error:", response.status, t);
+        throw new Error("AI evaluation failed");
+      }
+      aiData = await response.json();
     }
 
-    const aiData = await response.json();
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall?.function?.arguments) throw new Error("No evaluation returned from AI");
 
     const evaluation = JSON.parse(toolCall.function.arguments);
     const overallScore = Math.round(
-      (evaluation.communication_score * wComm) +
-      (evaluation.technical_score * wTech) +
-      (evaluation.culture_alignment * wCult)
+      evaluation.communication_score * wComm +
+        evaluation.technical_score * wTech +
+        evaluation.culture_alignment * wCult,
     );
 
-    // Map final_recommendation to legacy recommendation field
-    const legacyRec = evaluation.final_recommendation === "توصية قوية بالتوظيف" ? "موصى به بشدة"
-      : evaluation.final_recommendation === "توصية مشروطة" ? "موصى به"
-      : "غير موصى به";
+    const legacyRec =
+      evaluation.final_recommendation === "توصية قوية بالتوظيف"
+        ? "موصى به بشدة"
+        : evaluation.final_recommendation === "توصية مشروطة"
+          ? "موصى به"
+          : "غير موصى به";
 
     const evalRecord: Record<string, any> = {
       interview_id,
@@ -222,7 +374,8 @@ ${videoAnalysisSummary}`;
       confidence_score: evaluation.confidence_score,
       confidence_level: evaluation.confidence_level,
       red_flags: evaluation.red_flags || [],
-      review_status: "pending_review",
+      review_status: isPractice ? "auto_released" : "pending_review",
+      scope,
       detailed_scores: {
         communication: evaluation.communication_score,
         technical: evaluation.technical_score,
@@ -233,15 +386,17 @@ ${videoAnalysisSummary}`;
         filler_words: fillerCount,
         speech_pace: estimatedPace,
         weights: { technical: wTech, communication: wComm, cultural_fit: wCult },
-        ...(videoAnalyses.length > 0 ? {
-          video_analysis: {
-            eye_contact: avgEyeContact,
-            video_confidence: avgVideoConfidence,
-            engagement: avgEngagement,
-            professional_appearance: avgProfAppearance,
-            analyses_count: videoAnalyses.length,
-          },
-        } : {}),
+        ...(videoAnalyses.length > 0
+          ? {
+              video_analysis: {
+                eye_contact: avgEyeContact,
+                video_confidence: avgVideoConfidence,
+                engagement: avgEngagement,
+                professional_appearance: avgProfAppearance,
+                analyses_count: videoAnalyses.length,
+              },
+            }
+          : {}),
       },
     };
 
@@ -256,6 +411,13 @@ ${videoAnalysisSummary}`;
       throw new Error("Failed to save evaluation");
     }
 
+    // P0.2 — fire per-response STAR coaching in background.
+    // In practice mode, always coach (educational priority).
+    // In assessment mode, coach too — student review value high.
+    coachResponses(responses, interview.job_position, jobContext, fillerPatterns, LOVABLE_API_KEY, supabase).catch(
+      (e) => console.error("background coaching error", e),
+    );
+
     return new Response(JSON.stringify(savedEval), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -263,7 +425,7 @@ ${videoAnalysisSummary}`;
     console.error("evaluate-interview error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

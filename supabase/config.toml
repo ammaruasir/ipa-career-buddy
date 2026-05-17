@@ -35,3 +35,18 @@ verify_jwt = false
 
 [functions.manage-user]
 verify_jwt = false
+
+[functions.coach-response]
+verify_jwt = false
+
+[functions.review-cv]
+verify_jwt = false
+
+[functions.generate-cv-bullets]
+verify_jwt = false
+
+[functions.cv-job-alignment]
+verify_jwt = false
+
+[functions.admin-cohort]
+verify_jwt = false
