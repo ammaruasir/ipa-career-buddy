@@ -29,6 +29,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import CVChatPanel from "@/components/cv-builder/CVChatPanel";
 
 interface Weakness {
   section: string;
@@ -294,6 +295,9 @@ const CVReview = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* P0.4: AI chat about this CV */}
+        <CVChatPanel cvDocumentId={doc.id} language="ar" />
 
         {/* Saudi compliance */}
         {compliance && (

@@ -27,6 +27,47 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // SECURITY: verify the caller owns the interview / response before processing video frames
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const isServerCall = authHeader === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`;
+
+    // Load owner + mode upfront (we need mode anyway for anti-cheat scoping)
+    let interviewOwnerId: string | null = null;
+    let interviewMode: string | null = null;
+    let lookupInterviewId = interview_id;
+    if (!lookupInterviewId && response_id) {
+      const { data: r } = await supabase
+        .from("responses")
+        .select("interview_id")
+        .eq("id", response_id)
+        .single();
+      lookupInterviewId = (r as any)?.interview_id ?? null;
+    }
+    if (lookupInterviewId) {
+      const { data: iv } = await supabase
+        .from("interviews")
+        .select("user_id, mode")
+        .eq("id", lookupInterviewId)
+        .single();
+      interviewOwnerId = (iv as any)?.user_id ?? null;
+      interviewMode = (iv as any)?.mode ?? null;
+    }
+
+    if (!isServerCall) {
+      const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user } } = await userClient.auth.getUser(token);
+      if (!user || user.id !== interviewOwnerId) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Build multimodal content with frames as inline images
     const imageContent = frames.map((frame: string) => ({
       type: "image_url" as const,
@@ -150,7 +191,11 @@ serve(async (req) => {
       actualInterviewId = respRow?.interview_id;
     }
 
-    if (actualInterviewId) {
+    // SECURITY/UX: anti-cheat events are meaningful only for assessment mode.
+    // Practice sessions must be safe-to-fail; don't log cheat events for them.
+    const skipCheatLogging = interviewMode === "practice";
+
+    if (actualInterviewId && !skipCheatLogging) {
       const events: { event_type: string; details: string }[] = [];
 
       if (analysis.phone_detected) {
