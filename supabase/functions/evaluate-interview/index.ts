@@ -34,16 +34,23 @@ serve(async (req) => {
     const responses = responsesRes.data || [];
     const settings = settingsRes.data;
 
-    // Load job data from DB
+    // P0.1: mode-conditional behavior
+    // practice: cheaper model, no HR notification, no job lookup required
+    // assessment / mock_final: full evaluation + HR pipeline updates
+    const mode = (interview as any).mode || "assessment";
+    const isPractice = mode === "practice";
+
+    // Load job data only when relevant
     let jobData: any = null;
-    // Try to find vacancy by matching job_position title
-    const { data: vacancy } = await supabase
-      .from("job_vacancies")
-      .select("title, description, requirements, department")
-      .eq("title", interview.job_position)
-      .limit(1)
-      .maybeSingle();
-    jobData = vacancy;
+    if (!isPractice && interview.job_position) {
+      const { data: vacancy } = await supabase
+        .from("job_vacancies")
+        .select("title, description, requirements, department")
+        .eq("title", interview.job_position)
+        .limit(1)
+        .maybeSingle();
+      jobData = vacancy;
+    }
 
     const weights = settings?.scoring_weights as any || { technical: 40, communication: 30, cultural_fit: 30 };
     const totalWeight = (weights.technical || 40) + (weights.communication || 30) + (weights.cultural_fit || 30);
@@ -100,11 +107,17 @@ serve(async (req) => {
 - الوصف: ${jobData.description || "—"}
 - القسم: ${jobData.department || "—"}
 - المتطلبات: ${JSON.stringify(jobData.requirements || [])}`
-      : "";
+      : isPractice
+        ? "\nهذه جلسة تدريب حرّة — ركّز على الكفاءات السلوكية العامة (STAR) وليس على مطابقة وظيفة محدّدة."
+        : "";
 
-    const systemPrompt = `أنت خبير تقييم مقابلات وظيفية. قم بتحليل نص المقابلة وتقييم المرشح بشكل شامل.
+    const roleDescriptor = isPractice
+      ? "أنت مدرّب مقابلات تكويني (formative coach). الهدف تعليمي، ليس تقييمياً."
+      : "أنت خبير تقييم مقابلات وظيفية رسمي. قم بتحليل نص المقابلة وتقييم المرشح بشكل شامل.";
 
-الوظيفة: ${interview.job_position}${jobContext}
+    const systemPrompt = `${roleDescriptor}
+
+الوظيفة: ${interview.job_position || "—"}${jobContext}
 
 معايير التقييم:
 1. مهارات التواصل (0-100) — الوزن: ${Math.round(wComm * 100)}%
@@ -129,7 +142,8 @@ ${videoAnalysisSummary}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4.1",
+        // P0.1: tiered model cost — practice uses cheaper mini model
+        model: isPractice ? "gpt-4.1-mini" : "gpt-4.1",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `نص المقابلة:\n\n${transcript}` },
@@ -245,6 +259,11 @@ ${videoAnalysisSummary}`;
       },
     };
 
+    // P0.1: in practice mode, evaluation is auto-released to the student (no HR review gate)
+    if (isPractice) {
+      evalRecord.review_status = "released";
+    }
+
     const { data: savedEval, error: saveErr } = await supabase
       .from("evaluations")
       .insert(evalRecord)
@@ -254,6 +273,23 @@ ${videoAnalysisSummary}`;
     if (saveErr) {
       console.error("Save evaluation error:", saveErr);
       throw new Error("Failed to save evaluation");
+    }
+
+    // P0.2: fire-and-forget per-answer coaching for practice mode (where it matters most)
+    if (isPractice) {
+      try {
+        const coachUrl = `${SUPABASE_URL}/functions/v1/coach-response`;
+        await fetch(coachUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({ interview_id }),
+        }).catch((err) => console.warn("coach-response invocation failed:", err));
+      } catch (err) {
+        console.warn("coach-response trigger error:", err);
+      }
     }
 
     return new Response(JSON.stringify(savedEval), {

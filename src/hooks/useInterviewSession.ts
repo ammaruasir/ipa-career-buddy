@@ -41,9 +41,21 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     setIsLoading(true);
     contextSummaryRef.current = "";
 
+    // P0.1: read practice flag from URL — defaults to assessment for legacy behavior
+    const isPractice = searchParams.get("practice") === "true";
+    const mode = isPractice ? "practice" : "assessment";
+    const visibility = isPractice ? "private" : "hr";
+
     const { data: interview, error } = await supabase
       .from("interviews")
-      .insert({ user_id: user.id, type: type as any, job_position: job, status: "in_progress" as any })
+      .insert({
+        user_id: user.id,
+        type: type as any,
+        job_position: job,
+        status: "in_progress" as any,
+        mode: mode as any,
+        visibility: visibility as any,
+      })
       .select()
       .single();
 
@@ -56,8 +68,9 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     setInterviewId(interview.id);
     interviewIdRef.current = interview.id;
 
+    // P0.1: practice mode does not feed the hiring pipeline
     const vacancyId = searchParams.get("vacancy_id");
-    if (vacancyId) {
+    if (vacancyId && !isPractice) {
       await supabase
         .from("job_applications")
         .update({ interview_id: interview.id, status: "interviewing" } as any)

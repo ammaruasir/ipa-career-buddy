@@ -35,6 +35,9 @@ const DashboardRouter = () => {
     } else if (role === "hr") {
       navigate("/dashboard/hr", { replace: true });
       setChecking(false);
+    } else if (role === "instructor") {
+      navigate("/dashboard/instructor", { replace: true });
+      setChecking(false);
     } else {
       navigate("/dashboard/admin", { replace: true });
       setChecking(false);

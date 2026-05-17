@@ -3,7 +3,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 
-type AppRole = "candidate" | "admin" | "hr";
+type AppRole = "candidate" | "admin" | "hr" | "instructor";
 
 interface AuthContextType {
   user: User | null;
@@ -28,10 +28,11 @@ const AuthProviderInner = ({ children }: { children: ReactNode }) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", userId);
-    // Prioritize admin > hr > student
+    // Prioritize admin > hr > instructor > candidate
     const roles = (data || []).map((r) => r.role as AppRole);
     if (roles.includes("admin")) setRole("admin");
     else if (roles.includes("hr")) setRole("hr");
+    else if (roles.includes("instructor")) setRole("instructor");
     else setRole(roles[0] || "candidate");
   };
 

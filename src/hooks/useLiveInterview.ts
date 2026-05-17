@@ -575,8 +575,9 @@ export const useLiveInterview = ({
       .update({ status: "completed" as any })
       .eq("id", currentId);
 
-    // Update job application status
-    if (vacancyIdRef.current && user) {
+    // P0.1: practice mode does not update the hiring pipeline
+    const isPracticeRun = searchParams.get("practice") === "true";
+    if (vacancyIdRef.current && user && !isPracticeRun) {
       await supabase
         .from("job_applications")
         .update({ status: "interviewed" } as any)
@@ -736,6 +737,11 @@ export const useLiveInterview = ({
         }
       }
 
+      // P0.1: read practice flag from URL — defaults to assessment for legacy behavior
+      const isPractice = searchParams.get("practice") === "true";
+      const mode = isPractice ? "practice" : "assessment";
+      const visibility = isPractice ? "private" : "hr";
+
       const { data: interview, error } = await supabase
         .from("interviews")
         .insert({
@@ -743,6 +749,8 @@ export const useLiveInterview = ({
           type: type as any,
           job_position: jobPosition,
           status: "in_progress" as any,
+          mode: mode as any,
+          visibility: visibility as any,
         })
         .select()
         .single();
