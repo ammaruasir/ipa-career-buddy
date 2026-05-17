@@ -599,6 +599,9 @@ const AdminSettings = () => {
                       >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="IES4nrmZdUBHByLBde0P">هيثم — عربي أصلي (ذكوري) ⭐</SelectItem>
+                          <SelectItem value="mRdG9GYEjJmIzqbYTidv">سناء — عربي أصلي (أنثوي) ⭐</SelectItem>
+                          <SelectItem value="tavIIPLplRB883FzWU0V">منى — لهجة خليجية (أنثوي)</SelectItem>
                           <SelectItem value="SAz9YHcvj6GT2YYXdXww">River (أنثوي)</SelectItem>
                           <SelectItem value="EXAVITQu4vr4xnSDxMaL">Sarah (أنثوي)</SelectItem>
                           <SelectItem value="FGY2WhTYpPnrIDTdsKH5">Laura (أنثوي)</SelectItem>
