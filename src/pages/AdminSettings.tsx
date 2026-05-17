@@ -67,6 +67,68 @@ const AdminSettings = () => {
   });
   const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
 
+  // Voice draft (only saved when admin clicks "Save")
+  const [voiceDraft, setVoiceDraft] = useState<{ name: string; gender: string; voice_id: string; avatar_url: string } | null>(null);
+  const [savingVoice, setSavingVoice] = useState(false);
+  const [previewingVoice, setPreviewingVoice] = useState(false);
+
+  useEffect(() => {
+    if (settings.interviewer_voice && !voiceDraft) {
+      setVoiceDraft({
+        name: settings.interviewer_voice.name || "نورة",
+        gender: settings.interviewer_voice.gender || "female",
+        voice_id: settings.interviewer_voice.voice_id || "QsV9PCczMIklRM6xLPAS",
+        avatar_url: settings.interviewer_voice.avatar_url || "",
+      });
+    }
+  }, [settings.interviewer_voice]);
+
+  const voiceDirty = voiceDraft && settings.interviewer_voice && (
+    voiceDraft.name !== settings.interviewer_voice.name ||
+    voiceDraft.gender !== settings.interviewer_voice.gender ||
+    voiceDraft.voice_id !== settings.interviewer_voice.voice_id
+  );
+
+  const saveVoice = async () => {
+    if (!voiceDraft) return;
+    setSavingVoice(true);
+    const { error } = await updateSettings({ interviewer_voice: voiceDraft as any });
+    setSavingVoice(false);
+    if (error) {
+      toast({ title: "تعذّر الحفظ", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "تم حفظ صوت المحاور", description: `تم تفعيل: ${voiceDraft.name}` });
+    }
+  };
+
+  const previewVoice = async () => {
+    if (!voiceDraft) return;
+    setPreviewingVoice(true);
+    try {
+      const sample = `السلام عليكم، أنا ${voiceDraft.name}، المحاور الذكي. هذا اختبار سريع للصوت المختار.`;
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text: sample, voiceId: voiceDraft.voice_id }),
+        }
+      );
+      if (!res.ok) throw new Error(`فشل توليد الصوت (${res.status})`);
+      const blob = await res.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
+      await audio.play();
+      audio.onended = () => setPreviewingVoice(false);
+    } catch (e: any) {
+      toast({ title: "تعذّر تجربة الصوت", description: e.message, variant: "destructive" });
+      setPreviewingVoice(false);
+    }
+  };
+
   useEffect(() => {
     if (!authLoading && (!user || role !== "admin")) {
       navigate("/dashboard");
@@ -564,16 +626,16 @@ const AdminSettings = () => {
               {/* Interviewer Voice Settings */}
               <Card className="md:col-span-2">
                 <CardHeader>
-                  <CardTitle className="text-base font-tajawal flex items-center gap-2"><Mic className="w-4 h-4" /> صوت المحاور/ة</CardTitle>
-                  <CardDescription className="font-tajawal">تخصيص هوية المحاور الذكي (الاسم والجنس والصوت)</CardDescription>
+                  <CardTitle className="text-base font-tajawal flex items-center gap-2"><Mic className="w-4 h-4" /> صوت وشخصية المحاور</CardTitle>
+                  <CardDescription className="font-tajawal">عدّل الاسم والجنس والصوت ثم اضغط "حفظ وتفعيل" — لن تُطبّق التغييرات إلا بعد الحفظ.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-3">
                     <div className="space-y-2">
                       <Label className="font-tajawal">اسم المحاور/ة</Label>
                       <Input
-                        value={settings.interviewer_voice?.name || "نورة"}
-                        onChange={(e) => updateSettings({ interviewer_voice: { ...settings.interviewer_voice, name: e.target.value } as any })}
+                        value={voiceDraft?.name ?? ""}
+                        onChange={(e) => setVoiceDraft((d) => d ? { ...d, name: e.target.value } : d)}
                         placeholder="مثال: نورة"
                         className="font-tajawal"
                       />
@@ -581,8 +643,8 @@ const AdminSettings = () => {
                     <div className="space-y-2">
                       <Label className="font-tajawal">الجنس</Label>
                       <Select
-                        value={settings.interviewer_voice?.gender || "female"}
-                        onValueChange={(v) => updateSettings({ interviewer_voice: { ...settings.interviewer_voice, gender: v } as any })}
+                        value={voiceDraft?.gender ?? "female"}
+                        onValueChange={(v) => setVoiceDraft((d) => d ? { ...d, gender: v } : d)}
                       >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -594,8 +656,8 @@ const AdminSettings = () => {
                     <div className="space-y-2">
                       <Label className="font-tajawal">صوت ElevenLabs</Label>
                       <Select
-                        value={settings.interviewer_voice?.voice_id || "SAz9YHcvj6GT2YYXdXww"}
-                        onValueChange={(v) => updateSettings({ interviewer_voice: { ...settings.interviewer_voice, voice_id: v } as any })}
+                        value={voiceDraft?.voice_id ?? "QsV9PCczMIklRM6xLPAS"}
+                        onValueChange={(v) => setVoiceDraft((d) => d ? { ...d, voice_id: v } : d)}
                       >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -624,9 +686,32 @@ const AdminSettings = () => {
                       </Select>
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground font-tajawal">
-                    التغييرات ستُطبّق تلقائياً على المقابلات الجديدة. الاسم والجنس يحددان البرومبت والضمائر والصورة.
-                  </p>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-xs text-muted-foreground font-tajawal">
+                      {voiceDirty ? "⚠️ لديك تغييرات غير محفوظة" : "✓ الإعدادات الحالية مفعّلة"}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="font-tajawal"
+                        onClick={previewVoice}
+                        disabled={previewingVoice || !voiceDraft?.voice_id}
+                      >
+                        {previewingVoice ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        تجربة الصوت
+                      </Button>
+                      <Button
+                        type="button"
+                        className="font-tajawal"
+                        onClick={saveVoice}
+                        disabled={savingVoice || !voiceDirty}
+                      >
+                        {savingVoice ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
+                        حفظ وتفعيل
+                      </Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
