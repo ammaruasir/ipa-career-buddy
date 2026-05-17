@@ -23,7 +23,7 @@ serve(async (req) => {
     }
 
     // Default to first user-provided Arabic voice. Admin can override per request.
-    const selectedVoiceId = voiceId || "IK7YYZcSpmlkjKrQxbSn";
+    const selectedVoiceId = voiceId || "QsV9PCczMIklRM6xLPAS";
     // Flash v2.5 → ~75ms first-byte, supports Arabic. Falls back to multilingual_v2 on error.
     const primaryModel = model || "eleven_flash_v2_5";
 
