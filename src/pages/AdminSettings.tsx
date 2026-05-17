@@ -713,7 +713,6 @@ const AdminSettings = () => {
                       </div>
                     </div>
                   </div>
-                  </div>
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <p className="text-xs text-muted-foreground font-tajawal">
                       {voiceDirty ? "⚠️ لديك تغييرات غير محفوظة" : "✓ الإعدادات الحالية مفعّلة"}
