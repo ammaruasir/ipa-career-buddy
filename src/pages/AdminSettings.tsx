@@ -67,6 +67,68 @@ const AdminSettings = () => {
   });
   const [applicantCounts, setApplicantCounts] = useState<Record<string, number>>({});
 
+  // Voice draft (only saved when admin clicks "Save")
+  const [voiceDraft, setVoiceDraft] = useState<{ name: string; gender: string; voice_id: string; avatar_url: string } | null>(null);
+  const [savingVoice, setSavingVoice] = useState(false);
+  const [previewingVoice, setPreviewingVoice] = useState(false);
+
+  useEffect(() => {
+    if (settings.interviewer_voice && !voiceDraft) {
+      setVoiceDraft({
+        name: settings.interviewer_voice.name || "نورة",
+        gender: settings.interviewer_voice.gender || "female",
+        voice_id: settings.interviewer_voice.voice_id || "QsV9PCczMIklRM6xLPAS",
+        avatar_url: settings.interviewer_voice.avatar_url || "",
+      });
+    }
+  }, [settings.interviewer_voice]);
+
+  const voiceDirty = voiceDraft && settings.interviewer_voice && (
+    voiceDraft.name !== settings.interviewer_voice.name ||
+    voiceDraft.gender !== settings.interviewer_voice.gender ||
+    voiceDraft.voice_id !== settings.interviewer_voice.voice_id
+  );
+
+  const saveVoice = async () => {
+    if (!voiceDraft) return;
+    setSavingVoice(true);
+    const { error } = await updateSettings({ interviewer_voice: voiceDraft as any });
+    setSavingVoice(false);
+    if (error) {
+      toast({ title: "تعذّر الحفظ", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "تم حفظ صوت المحاور", description: `تم تفعيل: ${voiceDraft.name}` });
+    }
+  };
+
+  const previewVoice = async () => {
+    if (!voiceDraft) return;
+    setPreviewingVoice(true);
+    try {
+      const sample = `السلام عليكم، أنا ${voiceDraft.name}، المحاور الذكي. هذا اختبار سريع للصوت المختار.`;
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text: sample, voiceId: voiceDraft.voice_id }),
+        }
+      );
+      if (!res.ok) throw new Error(`فشل توليد الصوت (${res.status})`);
+      const blob = await res.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
+      await audio.play();
+      audio.onended = () => setPreviewingVoice(false);
+    } catch (e: any) {
+      toast({ title: "تعذّر تجربة الصوت", description: e.message, variant: "destructive" });
+      setPreviewingVoice(false);
+    }
+  };
+
   useEffect(() => {
     if (!authLoading && (!user || role !== "admin")) {
       navigate("/dashboard");
