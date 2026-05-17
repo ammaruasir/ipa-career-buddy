@@ -159,6 +159,14 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
     return null;
   };
 
+  if (settingsLoading || !settings.id) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background" dir="rtl">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col" dir="rtl">
       <InterviewHeader
