@@ -137,7 +137,7 @@ export const useLiveInterview = ({
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             },
-            body: JSON.stringify({ text: cleanedText, voiceId: interviewerVoiceId }),
+            body: JSON.stringify({ text: cleanedText, voiceId: interviewerVoiceIdRef.current }),
           }
         );
 
