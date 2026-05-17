@@ -48,6 +48,8 @@ export const useLiveInterview = ({
 
   const interviewIdRef = useRef<string | null>(null);
   const transcriptRef = useRef<TranscriptEntry[]>([]);
+  const interviewerVoiceIdRef = useRef<string | undefined>(interviewerVoiceId);
+  useEffect(() => { interviewerVoiceIdRef.current = interviewerVoiceId; }, [interviewerVoiceId]);
   const questionCountRef = useRef(0);
   const conversationRef = useRef<{ role: string; content: string }[]>([]);
   const contextSummaryRef = useRef<string>("");
@@ -135,7 +137,7 @@ export const useLiveInterview = ({
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             },
-            body: JSON.stringify({ text: cleanedText, voiceId: interviewerVoiceId }),
+            body: JSON.stringify({ text: cleanedText, voiceId: interviewerVoiceIdRef.current }),
           }
         );
 
