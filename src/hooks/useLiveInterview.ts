@@ -266,7 +266,7 @@ export const useLiveInterview = ({
       let silenceStart: number | null = null;
       let speechDetected = false;
       const SILENCE_THRESHOLD = 30;
-      const SILENCE_DURATION = 1200;
+      const SILENCE_DURATION = 800;
 
       const checkSilence = () => {
         if (!activeRef.current || stoppedManuallyRef.current) return;
