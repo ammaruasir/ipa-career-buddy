@@ -36,7 +36,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
   const [showExit, setShowExit] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const { tabSwitchCount, showWarning } = useAntiCheat({ enableTabDetection: true });
-  const { settings } = useSystemSettings();
+  const { settings, loading: settingsLoading } = useSystemSettings();
 
   const iv = settings.interviewer_voice;
 
