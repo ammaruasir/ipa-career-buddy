@@ -734,6 +734,21 @@ export const useLiveInterview = ({
         }
       }
 
+      const rawMode = (searchParams.get("mode") || "practice").toLowerCase();
+      const vacancyId = searchParams.get("vacancy_id");
+      let mode: "practice" | "assessment" | "mock_final" = "practice";
+      let visibility: "private" | "instructor" | "hr" = "private";
+      if (vacancyId) {
+        mode = "assessment";
+        visibility = "hr";
+      } else if (rawMode === "mock_final") {
+        mode = "mock_final";
+        visibility = "instructor";
+      } else if (rawMode === "assessment") {
+        mode = "assessment";
+        visibility = "hr";
+      }
+
       const { data: interview, error } = await supabase
         .from("interviews")
         .insert({
@@ -741,6 +756,8 @@ export const useLiveInterview = ({
           type: type as any,
           job_position: jobPosition,
           status: "in_progress" as any,
+          mode,
+          visibility,
         })
         .select()
         .single();

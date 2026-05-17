@@ -7,11 +7,23 @@ import { useSystemSettings } from "@/hooks/useSystemSettings";
 
 type Msg = { role: "user" | "assistant" | "system"; content: string };
 type InterviewType = "text" | "voice" | "video";
+type InterviewMode = "practice" | "assessment" | "mock_final";
+type InterviewVisibility = "private" | "instructor" | "hr";
 
 interface UseInterviewSessionOptions {
   type: InterviewType;
   totalQuestions?: number;
 }
+
+const inferModeFromUrl = (params: URLSearchParams): { mode: InterviewMode; visibility: InterviewVisibility } => {
+  const raw = (params.get("mode") || "practice").toLowerCase();
+  const vacancyId = params.get("vacancy_id");
+  // If the candidate started from a real job application -> formal assessment.
+  if (vacancyId) return { mode: "assessment", visibility: "hr" };
+  if (raw === "mock_final") return { mode: "mock_final", visibility: "instructor" };
+  if (raw === "assessment") return { mode: "assessment", visibility: "hr" };
+  return { mode: "practice", visibility: "private" };
+};
 
 export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestions }: UseInterviewSessionOptions) => {
   const { user } = useAuth();
@@ -41,9 +53,17 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     setIsLoading(true);
     contextSummaryRef.current = "";
 
+    const { mode, visibility } = inferModeFromUrl(searchParams);
     const { data: interview, error } = await supabase
       .from("interviews")
-      .insert({ user_id: user.id, type: type as any, job_position: job, status: "in_progress" as any })
+      .insert({
+        user_id: user.id,
+        type: type as any,
+        job_position: job,
+        status: "in_progress" as any,
+        mode,
+        visibility,
+      })
       .select()
       .single();
 

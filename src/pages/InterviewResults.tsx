@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   ArrowRight, Award, Brain, MessageSquare, Briefcase,
   Users, BarChart3, Loader2, Eye, TrendingUp, TrendingDown, Clock,
-  Smartphone, AlertTriangle
+  Smartphone, AlertTriangle, GraduationCap, Sparkles, Lightbulb
 } from "lucide-react";
 
 const discLabels: Record<string, { label: string; desc: string; color: string }> = {
@@ -31,7 +33,19 @@ const InterviewResults = () => {
   const { user, loading: authLoading } = useAuth();
   const [evaluation, setEvaluation] = useState<any>(null);
   const [interview, setInterview] = useState<any>(null);
+  const [responses, setResponses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [coachingFor, setCoachingFor] = useState<string | null>(null);
+
+  const loadResponses = async () => {
+    if (!id) return;
+    const { data } = await supabase
+      .from("responses")
+      .select("*")
+      .eq("interview_id", id)
+      .order("created_at");
+    setResponses(data || []);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) { navigate("/login"); return; }
@@ -40,12 +54,33 @@ const InterviewResults = () => {
     Promise.all([
       supabase.from("evaluations").select("*").eq("interview_id", id).maybeSingle(),
       supabase.from("interviews").select("*").eq("id", id).single(),
-    ]).then(([evalRes, intRes]) => {
+      supabase.from("responses").select("*").eq("interview_id", id).order("created_at"),
+    ]).then(([evalRes, intRes, resRes]) => {
       setEvaluation(evalRes.data);
       setInterview(intRes.data);
+      setResponses(resRes.data || []);
       setLoading(false);
     });
   }, [user, authLoading, id, navigate]);
+
+  const requestCoaching = async (responseId: string) => {
+    setCoachingFor(responseId);
+    try {
+      const { data, error } = await supabase.functions.invoke("coach-response", {
+        body: { response_id: responseId },
+      });
+      if (error) throw error;
+      if (data?.coaching) {
+        setResponses((prev) => prev.map((r) => r.id === responseId ? { ...r, coaching: data.coaching } : r));
+        toast.success("تم تحضير التغذية الراجعة");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("تعذّر تحضير التغذية الراجعة الآن");
+    } finally {
+      setCoachingFor(null);
+    }
+  };
 
   if (authLoading || loading) {
     return (
@@ -64,9 +99,11 @@ const InterviewResults = () => {
     );
   }
 
-  // Check review_status — if not released, show pending message
+  // Check review_status — in practice mode (scope='formative' / status='auto_released')
+  // we always show results. In assessment mode, gate on review_status === 'released'.
   const reviewStatus = (evaluation as any).review_status;
-  if (reviewStatus && reviewStatus !== "released") {
+  const isFormative = (evaluation as any).scope === "formative" || reviewStatus === "auto_released";
+  if (!isFormative && reviewStatus && reviewStatus !== "released") {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6 px-4" dir="rtl">
         <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
@@ -265,6 +302,138 @@ const InterviewResults = () => {
             <p className="text-sm text-foreground leading-relaxed">{evaluation.ai_feedback_ar}</p>
           </CardContent>
         </Card>
+
+        {/* Per-response STAR coaching (P0.2) */}
+        {responses.length > 0 && (
+          <Card className="rounded-2xl shadow-lg">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-primary" />
+                مراجعة كل إجابة على حدة (منهج STAR)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Accordion type="single" collapsible className="w-full">
+                {responses.map((r, idx) => {
+                  const c = r.coaching as any;
+                  const total = c?.coverage_score ?? 0;
+                  return (
+                    <AccordionItem key={r.id} value={r.id}>
+                      <AccordionTrigger className="text-right hover:no-underline">
+                        <div className="flex items-center justify-between w-full pl-4">
+                          <span className="font-medium text-foreground line-clamp-1">سؤال {idx + 1}: {r.question_text}</span>
+                          {c && (
+                            <Badge variant="outline" className="ml-2 shrink-0">{Math.round(total)}/100</Badge>
+                          )}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-4 pt-2">
+                        <div className="bg-muted/50 rounded-xl p-4">
+                          <p className="text-xs text-muted-foreground mb-1">إجابتك:</p>
+                          <p className="text-sm text-foreground whitespace-pre-wrap">{r.answer_text || "(لم تُسجَّل إجابة)"}</p>
+                        </div>
+
+                        {!c && (
+                          <div className="flex flex-col items-start gap-3">
+                            <p className="text-sm text-muted-foreground">لم يُحضَّر الكوتشينج بعد لهذه الإجابة.</p>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={coachingFor === r.id}
+                              onClick={() => requestCoaching(r.id)}
+                            >
+                              {coachingFor === r.id ? (
+                                <><Loader2 className="w-4 h-4 ml-2 animate-spin" /> جارٍ التحضير...</>
+                              ) : (
+                                <><Sparkles className="w-4 h-4 ml-2" /> اشرح إجابتي وفق STAR</>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+
+                        {c && (
+                          <>
+                            {/* STAR meter */}
+                            <div className="grid grid-cols-4 gap-2">
+                              {[
+                                { key: "s", label: "S — الموقف" },
+                                { key: "t", label: "T — المهمة" },
+                                { key: "a", label: "A — الإجراء" },
+                                { key: "r", label: "R — النتيجة" },
+                              ].map(({ key, label }) => {
+                                const v = (c.star as any)?.[key] ?? 0;
+                                return (
+                                  <div key={key} className="space-y-1">
+                                    <p className="text-[10px] text-muted-foreground text-center">{label}</p>
+                                    <Progress value={(v / 3) * 100} className="h-2" />
+                                    <p className="text-xs text-center font-medium">{v}/3</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Strengths in answer */}
+                            {Array.isArray(c.strengths_in_answer) && c.strengths_in_answer.length > 0 && (
+                              <div className="border border-green-200 dark:border-green-900/40 rounded-xl p-3 bg-green-50/50 dark:bg-green-900/10">
+                                <p className="text-xs font-semibold text-green-800 dark:text-green-300 mb-1.5 flex items-center gap-1.5">
+                                  <TrendingUp className="w-3.5 h-3.5" /> نقاط قوة في إجابتك
+                                </p>
+                                <ul className="space-y-1 text-sm text-foreground">
+                                  {c.strengths_in_answer.map((s: string, i: number) => (
+                                    <li key={i} className="flex gap-1.5"><span className="text-green-600">✓</span>{s}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Improved rewrite */}
+                            {c.rewrite_ar && (
+                              <div className="border border-primary/20 rounded-xl p-3 bg-primary/5">
+                                <p className="text-xs font-semibold text-primary mb-1.5 flex items-center gap-1.5">
+                                  <Sparkles className="w-3.5 h-3.5" /> نسخة محسّنة من إجابتك
+                                </p>
+                                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{c.rewrite_ar}</p>
+                              </div>
+                            )}
+
+                            {/* Exemplar */}
+                            {c.exemplar_ar && (
+                              <div className="border border-border rounded-xl p-3 bg-card">
+                                <p className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                                  <Lightbulb className="w-3.5 h-3.5" /> إجابة نموذجية — هكذا تبدو الإجابة القوية
+                                </p>
+                                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{c.exemplar_ar}</p>
+                              </div>
+                            )}
+
+                            {/* Tips */}
+                            {Array.isArray(c.tips) && c.tips.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 mb-1.5">نصائح للجلسة التالية</p>
+                                <ul className="space-y-1 text-sm text-foreground">
+                                  {c.tips.map((t: string, i: number) => (
+                                    <li key={i} className="flex gap-1.5"><span className="text-amber-600">→</span>{t}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Filler word count for this answer */}
+                            {Array.isArray(c.filler_marks) && c.filler_marks.length > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                كلمات الحشو في هذه الإجابة: <span className="font-medium text-foreground">{c.filler_marks.length}</span>
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex justify-center pb-8">
           <Button size="lg" className="rounded-xl" onClick={() => navigate("/dashboard")}>العودة للوحة التحكم</Button>

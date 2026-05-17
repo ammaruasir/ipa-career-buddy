@@ -48,6 +48,11 @@ const CompleteProfile = lazyRetry(() => import("./pages/CompleteProfile"));
 const HiringPipeline = lazyRetry(() => import("./pages/HiringPipeline"));
 const CandidateCompare = lazyRetry(() => import("./pages/CandidateCompare"));
 const CareerGuidance = lazyRetry(() => import("./pages/CareerGuidance"));
+const CVReview = lazyRetry(() => import("./pages/CVReview"));
+const CVBuilder = lazyRetry(() => import("./pages/CVBuilder"));
+const InstructorDashboard = lazyRetry(() => import("./pages/InstructorDashboard"));
+const CohortDetail = lazyRetry(() => import("./pages/CohortDetail"));
+const AssignmentView = lazyRetry(() => import("./pages/AssignmentView"));
 
 const queryClient = new QueryClient();
 
@@ -87,6 +92,12 @@ const App = () => (
               <Route path="/settings/interview" element={<InterviewSettings />} />
               <Route path="/admin/settings" element={<AdminSettings />} />
               <Route path="/admin/interviews" element={<AdminInterviews />} />
+              <Route path="/cv/review" element={<CVReview />} />
+              <Route path="/cv/builder" element={<CVBuilder />} />
+              <Route path="/cv/builder/:id" element={<CVBuilder />} />
+              <Route path="/dashboard/instructor" element={<InstructorDashboard />} />
+              <Route path="/dashboard/instructor/cohort/:id" element={<CohortDetail />} />
+              <Route path="/dashboard/instructor/assignment/:id" element={<AssignmentView />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

@@ -147,7 +147,7 @@ const TrainingSection = ({ interviews, evaluations }: TrainingSectionProps) => {
             const { label, icon: Icon } = typeMap[t];
             return (
               <Button key={t} variant="outline" className="rounded-2xl h-auto py-5 flex flex-col gap-2 hover:border-secondary/50 transition-all" asChild>
-                <Link to={`/interview/${t}?practice=true`}>
+                <Link to={`/interview/${t}?mode=practice`}>
                   <Icon className="w-7 h-7 text-secondary" />
                   <span className="text-base font-semibold">تدريب {label}</span>
                 </Link>

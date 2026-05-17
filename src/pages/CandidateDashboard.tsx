@@ -233,6 +233,38 @@ const CandidateDashboard = () => {
           </CardContent>
         </Card>
 
+        {/* CV Tools — P0.3 + P0.4 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card className="rounded-2xl shadow-lg border-2 border-primary/15 bg-gradient-to-l from-primary/5 to-transparent">
+            <CardContent className="p-6 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <FileText className="w-6 h-6 text-primary" />
+                <div>
+                  <p className="font-bold text-foreground">منشئ السيرة الذاتية</p>
+                  <p className="text-xs text-muted-foreground">قوالب IPA — توليد ذكي للنقاط — تصدير PDF</p>
+                </div>
+              </div>
+              <Button asChild variant="default" size="sm" className="rounded-xl shrink-0">
+                <Link to="/cv/builder">ابدأ</Link>
+              </Button>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl shadow-lg border-2 border-primary/15 bg-gradient-to-l from-primary/5 to-transparent">
+            <CardContent className="p-6 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <BarChart3 className="w-6 h-6 text-primary" />
+                <div>
+                  <p className="font-bold text-foreground">تقييم السيرة الذاتية</p>
+                  <p className="text-xs text-muted-foreground">درجات لكل قسم + إعادة كتابة محسّنة</p>
+                </div>
+              </div>
+              <Button asChild variant="secondary" size="sm" className="rounded-xl shrink-0">
+                <Link to="/cv/review">افتح</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Practice Mode */}
         <TrainingSection interviews={interviews} evaluations={evaluations} />
 
