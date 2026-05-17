@@ -22,10 +22,12 @@ serve(async (req) => {
       });
     }
 
-    // Default to Haytham (native Arabic male). Admin can override per request.
-    const selectedVoiceId = voiceId || "IES4nrmZdUBHByLBde0P";
+    // Default to first user-provided Arabic voice. Admin can override per request.
+    const selectedVoiceId = voiceId || "IK7YYZcSpmlkjKrQxbSn";
     // Flash v2.5 → ~75ms first-byte, supports Arabic. Falls back to multilingual_v2 on error.
     const primaryModel = model || "eleven_flash_v2_5";
+
+    console.log(`[TTS] voice=${selectedVoiceId} model=${primaryModel} chars=${text?.length ?? 0}`);
 
     const callElevenLabs = async (modelId: string) =>
       fetch(
