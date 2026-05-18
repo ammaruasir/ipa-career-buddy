@@ -5,13 +5,14 @@ import { Sparkles, Play, Mic } from "lucide-react";
 import { useTourEngine } from "@/contexts/DemoTourContext";
 
 const Demo = () => {
-  const { status, start, micConsent, setMicConsent } = useTourEngine();
+  const { status, start, micConsent, setMicConsent, stepIndex, isSpeaking } = useTourEngine();
 
   useEffect(() => {
     document.title = "جولة AI تفاعلية — منصّة IPA";
   }, []);
 
   const launching = status === "running" || status === "paused" || status === "qna";
+  const preparing = status === "running" && stepIndex === 0 && !isSpeaking;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8" dir="rtl">
@@ -56,7 +57,7 @@ const Demo = () => {
           disabled={launching}
         >
           <Play className="w-5 h-5" />
-          {launching ? "الجولة قيد التشغيل…" : "ابدأ الجولة"}
+          {preparing ? "جاري تجهيز الصوت…" : launching ? "الجولة قيد التشغيل…" : "ابدأ الجولة"}
         </Button>
 
         <p className="text-[11px] text-muted-foreground">

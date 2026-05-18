@@ -174,6 +174,10 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
   const runtimeCtxRef = useRef<DemoRuntimeContext>({ lastInterviewId: null });
 
   const cancelRef = useRef(false);
+  // Map<stepId, Promise<Blob|null>> — provider-side preloads (currently just
+  // step 0) so the first click feels instant instead of waiting on a TTS
+  // round-trip while the page sits silent.
+  const preloadedAudioRef = useRef<Map<string, Promise<Blob | null>>>(new Map());
   const currentStep: TourStep | null = tourScript[stepIndex] ?? null;
 
   // ── Cursor helpers ────────────────────────────────────────────────────────
@@ -232,6 +236,19 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [status]);
+
+  // Preload the first step's TTS in the background once the provider mounts
+  // so the very first click doesn't sit silent for 2–4s while the TTS POST
+  // round-trips. Fire-and-forget; speak() handles a missing/failed preload.
+  useEffect(() => {
+    const first = tourScript[0];
+    if (!first) return;
+    if (preloadedAudioRef.current.has(first.id)) return;
+    const p = voice.fetchTtsBlob(first.narration).catch(() => null);
+    preloadedAudioRef.current.set(first.id, p);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const setMicConsent = useCallback((on: boolean) => {
     setMicConsentState(on);
@@ -441,7 +458,16 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       if (cancelRef.current) return;
 
       appendTranscript({ role: "presenter", text: step.narration });
-      const speaking = voice.speak(step.narration, undefined, step.id);
+      const preloaded = preloadedAudioRef.current.get(step.id);
+      // Consume the preload so re-runs (resume/next) refetch instead of reusing stale.
+      if (preloaded) preloadedAudioRef.current.delete(step.id);
+      const preloadedBlob = preloaded ? await preloaded.catch(() => null) : null;
+      const speaking = voice
+        .speak(step.narration, undefined, step.id, preloadedBlob)
+        .catch((e) => {
+          console.warn("voice.speak threw unexpectedly:", e);
+          appendTranscript({ role: "presenter", text: "(تعذّر النطق لهذه الخطوة)" });
+        });
 
       if (step.action && !isSessionSwap && !takeOverMode) {
         runAction(step.action).catch((e) =>
@@ -465,38 +491,60 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
     [navigate, voice, appendTranscript, takeOverMode, runAction]
   );
 
+  const startingRef = useRef(false);
   const start = useCallback(async () => {
+    // Guard: ignore accidental double-clicks / already-running tours so we
+    // don't kick off two parallel for-loops fighting over the same audio bus.
+    if (startingRef.current) return;
+    if (status === "running" || status === "qna") return;
+    startingRef.current = true;
+
     cancelRef.current = false;
     setStepIndex(0);
     setTranscript([]);
     setQaCount(0);
     runtimeCtxRef.current = { lastInterviewId: null };
 
-    // CRITICAL: prime the audio context BEFORE any async work — this is the
-    // last moment we're inside the user-gesture window for the click that
-    // invoked start(). Without it, autoplay policy blocks the first TTS
-    // audio.play() and the whole tour silently rushes through.
+    // Flip status FIRST so the DemoOverlay mounts immediately and the user
+    // sees "جاري تجهيز الجولة…" instead of a silent 2–4s gap while we wait
+    // on primeAudio + the first TTS round-trip.
+    setStatus("running");
+
+    // CRITICAL: prime the audio context inside the user-gesture window for
+    // the click that invoked start(). Without it, autoplay policy blocks the
+    // first TTS audio.play() and the whole tour silently rushes through.
     await voice.primeAudio();
     await candidateVoice.primeAudio();
 
-    setStatus("running");
-    for (let i = 0; i < tourScript.length; i++) {
-      if (cancelRef.current) return;
-      setStepIndex(i);
-      await runStep(tourScript[i]);
-      const nextStep = tourScript[i + 1];
-      if (nextStep && nextStep.act !== tourScript[i].act) {
-        setActEndLabel(tourScript[i].act);
-        setShowActEndPrompt(true);
-        await sleep(2200);
-        setShowActEndPrompt(false);
-        setActEndLabel(null);
+    try {
+      for (let i = 0; i < tourScript.length; i++) {
         if (cancelRef.current) return;
+        setStepIndex(i);
+        try {
+          await runStep(tourScript[i]);
+        } catch (e) {
+          console.warn(`Tour step ${tourScript[i].id} failed:`, e);
+          appendTranscript({
+            role: "presenter",
+            text: "(تعذّر تنفيذ هذه الخطوة — نكمل للخطوة التالية)",
+          });
+        }
+        const nextStep = tourScript[i + 1];
+        if (nextStep && nextStep.act !== tourScript[i].act) {
+          setActEndLabel(tourScript[i].act);
+          setShowActEndPrompt(true);
+          await sleep(2200);
+          setShowActEndPrompt(false);
+          setActEndLabel(null);
+          if (cancelRef.current) return;
+        }
       }
+      setStatus("finished");
+      hideCursor();
+    } finally {
+      startingRef.current = false;
     }
-    setStatus("finished");
-    hideCursor();
-  }, [runStep, voice, candidateVoice, hideCursor]);
+  }, [runStep, voice, candidateVoice, hideCursor, status, appendTranscript]);
 
   const pause = useCallback(() => {
     cancelRef.current = true;
