@@ -491,7 +491,13 @@ const CVReview = () => {
         </Card>
 
         {/* P0.4: AI chat about this CV */}
-        <CVChatPanel cvDocumentId={doc.id} language="ar" />
+        <CVChatPanel
+          cvDocumentId={doc.id}
+          language="ar"
+          onAcceptImprovement={async (improved, original) => {
+            await acceptRewrite(original, improved);
+          }}
+        />
 
         {/* Saudi compliance */}
         {compliance && (
