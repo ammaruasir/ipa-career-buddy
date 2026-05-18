@@ -229,30 +229,92 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
                     {m.content}
                   </div>
                   {m.role === "assistant" && onAcceptImprovement && !m.content.startsWith("⚠️") && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs h-7 mt-1.5"
-                      onClick={async () => {
-                        const original = window.prompt(
-                          language === "en"
-                            ? "Paste the original text from your CV that this improvement should replace:"
-                            : "الصق النص الأصلي من سيرتك الذاتية الذي تريد استبداله بهذا التحسين:",
-                        );
-                        if (!original?.trim()) return;
-                        try {
-                          await onAcceptImprovement(m.content, original.trim());
-                          toast.success(
-                            language === "en" ? "Added to accepted improvements" : "تمت إضافته للتحسينات المعتمدة",
-                          );
-                        } catch (e: any) {
-                          toast.error(e?.message || (language === "en" ? "Failed to save" : "تعذّر الحفظ"));
-                        }
-                      }}
-                    >
-                      <CheckCircle2 className="w-3 h-3 ml-1" />
-                      {language === "en" ? "Use as improvement" : "اعتمد كتحسين على السيرة"}
-                    </Button>
+                    <div className="space-y-2 mt-1.5">
+                      {/* Structured replacements from AI */}
+                      {m.replacements && m.replacements.length > 0 && (
+                        <div className="space-y-2">
+                          {m.replacements.map((rep, ri) => {
+                            const isAddition = !rep.original?.trim();
+                            return (
+                              <div
+                                key={ri}
+                                className="rounded-lg border border-primary/20 bg-background p-2.5 space-y-2"
+                              >
+                                {isAddition ? (
+                                  <div>
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <PlusCircle className="w-3 h-3 text-emerald-600" />
+                                      <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                                        {language === "en" ? "New addition" : "إضافة جديدة"}
+                                      </span>
+                                      {rep.section && (
+                                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                                          {rep.section}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
+                                      {rep.improved}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div>
+                                      <div className="flex items-center gap-1.5 mb-0.5">
+                                        <span className="text-[10px] font-semibold text-muted-foreground">
+                                          {language === "en" ? "Original" : "الأصلي"}
+                                        </span>
+                                        {rep.section && (
+                                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                                            {rep.section}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <p className="text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground line-through">
+                                        {rep.original}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5">
+                                        {language === "en" ? "Improved" : "المُحسَّن"}
+                                      </div>
+                                      <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
+                                        {rep.improved}
+                                      </p>
+                                    </div>
+                                  </>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7 w-full"
+                                  onClick={() => acceptOne(rep.improved, rep.original || "", rep.section)}
+                                >
+                                  <CheckCircle2 className="w-3 h-3 ml-1" />
+                                  {language === "en" ? "Accept this improvement" : "اعتمد هذا التحسين"}
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Generic "use this whole reply" button */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-7"
+                        onClick={() => {
+                          setPickerImproved(m.content);
+                          setPickerOriginal("");
+                          setPickerSection("other");
+                          setPickerOpen(true);
+                        }}
+                      >
+                        <CheckCircle2 className="w-3 h-3 ml-1" />
+                        {language === "en" ? "Use as improvement" : "اعتمد كتحسين على السيرة"}
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
