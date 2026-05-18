@@ -53,7 +53,7 @@ serve(async (req) => {
     const selectedVoiceId =
       typeof voiceId === "string" && ALLOWED_VOICE_IDS.has(voiceId)
         ? voiceId
-        : "QsV9PCczMIklRM6xLPAS";
+        : "usjDi9nBY6UHvtKrL4ba";
 
     const callElevenLabs = (modelId: string) =>
       fetch(
