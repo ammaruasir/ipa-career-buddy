@@ -96,6 +96,37 @@ const CVReview = () => {
   const { user, loading: authLoading } = useAuth();
   const [doc, setDoc] = useState<CVDocument | null>(null);
   const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [hasResume, setHasResume] = useState(false);
+
+  const loadAnalysis = async (uid: string) => {
+    const { data } = await supabase
+      .from("cv_documents" as any)
+      .select("id, uploaded_at, file_name, section_scores, weaknesses, rewrites, saudi_compliance")
+      .eq("user_id", uid)
+      .order("uploaded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return (data as unknown as CVDocument) ?? null;
+  };
+
+  const triggerAnalysis = async () => {
+    if (!user) return;
+    setAnalyzing(true);
+    try {
+      const path = `${user.id}/resume.pdf`;
+      const { error } = await supabase.functions.invoke("analyze-resume", {
+        body: { resume_path: path },
+      });
+      if (error) throw error;
+      const fresh = await loadAnalysis(user.id);
+      setDoc(fresh);
+    } catch (e) {
+      console.error("analyze-resume failed:", e);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -105,15 +136,28 @@ const CVReview = () => {
     if (!user) return;
 
     const load = async () => {
-      const { data } = await supabase
-        .from("cv_documents" as any)
-        .select("id, uploaded_at, file_name, section_scores, weaknesses, rewrites, saudi_compliance")
+      const existing = await loadAnalysis(user.id);
+      if (existing) {
+        setDoc(existing);
+        setHasResume(true);
+        setLoading(false);
+        return;
+      }
+      // No analysis yet — check if a resume exists in the profile, and analyze it automatically.
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("resume_url")
         .eq("user_id", user.id)
-        .order("uploaded_at", { ascending: false })
-        .limit(1)
         .maybeSingle();
-      setDoc((data as unknown as CVDocument) ?? null);
-      setLoading(false);
+      const resumeExists = !!(profile as any)?.resume_url;
+      setHasResume(resumeExists);
+      if (resumeExists) {
+        setLoading(false);
+        // Auto-trigger analysis on first visit
+        await triggerAnalysis();
+      } else {
+        setLoading(false);
+      }
     };
     load();
   }, [user, authLoading, navigate]);
@@ -130,10 +174,23 @@ const CVReview = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 px-4" dir="rtl">
         <FileText className="w-12 h-12 text-muted-foreground" />
-        <p className="text-muted-foreground text-lg text-center">
-          لم يتمّ تحليل سيرة ذاتية بعد. ارفع سيرتك من إعدادات الملف الشخصي لتبدأ.
-        </p>
-        <Button onClick={() => navigate("/settings/profile")}>الذهاب لرفع السيرة</Button>
+        {hasResume ? (
+          <>
+            <p className="text-muted-foreground text-lg text-center">
+              سيرتك الذاتية مرفوعة. اضغط لتحليلها بالذكاء الاصطناعي.
+            </p>
+            <Button onClick={triggerAnalysis} disabled={analyzing}>
+              {analyzing ? "جارٍ التحليل..." : "حلّل سيرتي الآن"}
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="text-muted-foreground text-lg text-center">
+              لم يتمّ تحليل سيرة ذاتية بعد. ارفع سيرتك من إعدادات الملف الشخصي لتبدأ.
+            </p>
+            <Button onClick={() => navigate("/settings/profile")}>الذهاب لرفع السيرة</Button>
+          </>
+        )}
       </div>
     );
   }

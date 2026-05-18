@@ -1,40 +1,62 @@
-## AI integration & wiring audit (post-merge)
+# خطة الإصلاح
 
-### Edge functions added by the merge
+## ما الذي سأصلحه
 
-| Function | AI provider | Model | Called from |
-|---|---|---|---|
-| `coach-response` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | `CoachingSection.tsx` ✅ |
-| `chat-with-cv` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | `CVChatPanel.tsx` ✅ |
-| `cv-interview-step` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | `CVInterview.tsx` ✅ |
-| `generate-cv-bullets` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | `AIAssistButton.tsx` ✅ |
-| `improve-cv-summary` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | `CVInterview.tsx` ✅ |
-| `suggest-cv-skills` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | **Not called from anywhere** ⚠️ |
+1. **إصلاح طبقة الخلفية الناقصة**
+  - تطبيق الهجرات غير المنعكسة في الخلفية للكيانات التي يعتمد عليها المسار الجديد:
+    - `user_consents`
+    - `cv_documents`
+    - `cv_drafts`
+    - `cv_interview_sessions`
+  - التحقق بعد ذلك أن وظائف الخلفية الخاصة بـ:
+    - تحليل السيرة
+    - الدردشة مع السيرة
+    - إنشاء السيرة من الصفر
+    تعمل على الجداول الصحيحة فعلاً.
+2. **إصلاح حفظ الموافقات حتى لا تظهر كل مرة**
+  - معالجة سبب فشل قراءة/حفظ الموافقات.
+  - التأكد أن نافذة الموافقات تُغلق بعد الحفظ وتقرأ الحالة الصحيحة عند إعادة فتح الصفحة.
+  - إضافة تعامل أوضح مع الأخطاء إذا فشل الحفظ بدل أن يبدو وكأنه لم يُحفظ.
+3. **إصلاح مسار “إنشاء السيرة الذاتية”**
+  - معالجة خطأ **فشل بدء الجلسة** في صفحة إنشاء السيرة من الصفر.
+  - بعد توفر جدول الجلسات، التحقق أن زر البداية ينشئ الجلسة ويُرجع أول سؤال بشكل صحيح.
+  - تحسين رسالة الخطأ لتعرض السبب الحقيقي إن تعطل المسار مرة أخرى.
+4. **إصلاح “حلل السيرة” و “دردش معها” بحيث يستخدمان السيرة الموجودة في الملف الشخصي**
+  - جعل صفحة تقييم السيرة لا تعتمد فقط على سجل `cv_documents` إن كانت السيرة مرفوعة أصلًا في الملف الشخصي.
+  - إضافة fallback واضح:
+    - إذا كانت السيرة موجودة في `profiles.resume_url` لكن لا يوجد تحليل محفوظ بعد، يستخدم النظام الملف الموجود بدل طلب رفعه مرة أخرى.
+  - ربط التحليل الناتج بسجل `cv_documents` حتى تعمل الدردشة على آخر سيرة محللة دون إعادة الرفع.
+5. **التحقق الشامل من السيناريو الكامل على الموبايل**
+  - حفظ الموافقات.
+  - بدء مقابلة إنشاء السيرة.
+  - فتح تقييم السيرة دون طلب رفع جديد إذا كانت موجودة.
+  - التأكد أن الدردشة مع السيرة تعمل على آخر تحليل متاح.
 
-### Verdict
+## السبب المرجّح الذي وجدته
 
-The wiring is solid overall:
+المشكلة الأساسية ليست من السيرة نفسها، بل من **عدم تطابق بين الكود والخلفية بعد الدمج**:
 
-- **Secrets**: `LOVABLE_API_KEY` and `OPENAI_API_KEY` are both already set in the project — no missing keys.
-- **Provider pattern**: Every new function prefers Lovable AI Gateway and falls back to OpenAI automatically. Consistent and safe.
-- **Models**: All use `google/gemini-2.5-flash` (a supported gateway model) — good cost/latency balance for CV/coaching tasks.
-- **Client wiring**: 5 of 6 functions are correctly invoked via `supabase.functions.invoke(...)` in the matching React components.
-- **CORS / auth**: Functions use the standard `_shared/guards.ts` pattern from the existing codebase.
+- الواجهة والكود الحاليان يتوقعان وجود جداول جديدة للموافقات وتحليل السيرة وإنشاء السيرة.
+- لكن في الخلفية الحالية هذه الجداول **غير موجودة فعليًا**.
+- هذا يفسّر الأعراض الثلاثة معًا:
+  - الموافقات لا تُحفظ وتظهر كل مرة.
+  - بدء إنشاء السيرة يفشل.
+  - صفحة تحليل/دردشة السيرة لا ترى السيرة المرفوعة من الملف الشخصي لأنها تبحث عن سجل تحليل غير موجود.
 
-### Issues to address
+## التفاصيل التقنية
 
-1. **`suggest-cv-skills` is orphaned** — deployed but no component calls it. Either:
-   - Wire it into the `CVBuilder` skills step as a "Suggest skills with AI" button, **or**
-   - Remove it to avoid dead code.
+- تأكدت أن الخلفية نفسها تعمل، لكن الجداول التالية غير موجودة حاليًا:
+  - `public.user_consents`
+  - `public.cv_documents`
+  - `public.cv_drafts`
+  - `public.cv_interview_sessions`
+- صفحة الموافقات تستعلم مباشرة من `user_consents`، لذلك تفشل القراءة والحفظ.
+- صفحة تقييم السيرة تقرأ من `cv_documents` فقط، بينما رفع السيرة في الملف الشخصي يحدّث `profiles.resume_url` أيضًا؛ لذلك يوجد انفصال بين “الملف مرفوع” و“التحليل المتاح للعرض/الدردشة”.
+- وظيفة بدء إنشاء السيرة تعتمد على `cv_interview_sessions`، ولذلك تعطي فشل بدء الجلسة عند غياب الجدول.
 
-2. **`gpt-4.1-mini` fallback model** — `gpt-4.1-mini` is fine on the OpenAI direct API, but if `LOVABLE_API_KEY` is ever removed the fallback would activate; worth knowing it sends data through OpenAI directly rather than the gateway. Today it never triggers because `LOVABLE_API_KEY` is present.
+## الناتج بعد التنفيذ
 
-3. **Model choice for `coach-response`** — coaching is the longest-context call (full transcript + STAR evaluation). Consider upgrading to `google/gemini-2.5-pro` if you see truncated or shallow coaching output. No action required today; flagging for tuning.
-
-### Optional cleanup
-
-- Add `[functions.coach-response]` (and the 5 others) blocks to `supabase/config.toml` only if you want explicit `verify_jwt` overrides. They currently deploy with the Lovable default (`verify_jwt = false` + in-code JWT validation), which matches the rest of the project.
-
-### Recommended next step
-
-Wire `suggest-cv-skills` into `CVBuilder` as an "AI suggest skills" button on the skills step (matches the existing `AIAssistButton` pattern). Want me to do that?
+- الموافقات تُحفظ مرة واحدة وتبقى محفوظة.
+- زر **ابدأ المقابلة** في إنشاء السيرة يعمل.
+- **حلل السيرة** و**دردش معها** يلتقطان السيرة المرفوعة مسبقًا من الملف الشخصي دون مطالبتك بإعادة الرفع.اذا كان مرفوعا واذا لايوجد يمكن رفعه في الملف الشخصي او اضافه خيار رفع من نفس الصفحه
+- المسار يصبح متسقًا بين الملف الشخصي، التحليل، والدردشة.
