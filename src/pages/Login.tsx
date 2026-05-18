@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Briefcase, Loader2, Shield, GraduationCap } from "lucide-react";
+import { Briefcase, Loader2, Shield, GraduationCap, ArrowRight } from "lucide-react";
 
 const QUICK_ACCOUNTS = [
   { label: "مسؤول", email: "admin@test.com", password: "00000000", role: "admin" as const },
@@ -86,6 +86,10 @@ const Login = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-gradient-to-bl from-primary/5 via-transparent to-secondary/5" />
+        <Link to="/" className="absolute top-4 right-4 z-20 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg px-3 py-2 hover:bg-muted/60">
+          <ArrowRight className="w-4 h-4" />
+          العودة للرئيسية
+        </Link>
         <Card className="w-full max-w-md rounded-2xl shadow-xl relative z-10">
           <CardHeader className="text-center space-y-4 pb-2">
             <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="mx-auto w-16 h-16 rounded-2xl object-contain" />
@@ -125,6 +129,10 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gradient-to-bl from-primary/5 via-transparent to-secondary/5" />
+      <Link to="/" className="absolute top-4 right-4 z-20 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg px-3 py-2 hover:bg-muted/60">
+        <ArrowRight className="w-4 h-4" />
+        العودة للرئيسية
+      </Link>
       <Card className="w-full max-w-md rounded-2xl shadow-xl relative z-10">
         <CardHeader className="text-center space-y-4 pb-2">
           <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="mx-auto w-16 h-16 rounded-2xl object-contain" />
