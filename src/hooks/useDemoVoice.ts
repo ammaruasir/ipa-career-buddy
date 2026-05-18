@@ -104,18 +104,13 @@ export function useDemoVoice() {
         }
       }
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken =
-        sessionData.session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-elevenlabs-tts`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ text: cleanTextForTTS(text), voiceId }),
         }
