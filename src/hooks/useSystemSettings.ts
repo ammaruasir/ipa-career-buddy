@@ -40,7 +40,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
   evaluation_thresholds: { highly_recommended: 80, recommended: 60 },
   filler_words: ["ممم", "يعني", "أحس", "كدا", "طبعاً", "بصراحة", "الله يعطيك العافية"],
   interview_engine: "built_in",
-  interviewer_voice: { name: "نورة", gender: "female", voice_id: "QsV9PCczMIklRM6xLPAS", avatar_url: "" },
+  interviewer_voice: { name: "عبدالله", gender: "male", voice_id: "yXEnnEln9armDCyhkXcA", avatar_url: "" },
 };
 
 export const useSystemSettings = () => {

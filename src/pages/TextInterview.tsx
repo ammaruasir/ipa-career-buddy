@@ -161,6 +161,13 @@ const TextInterview = () => {
     return <JobSelector title="المقابلة النصية" onSelect={(job, count) => { setCustomQuestionCount(count); session.startInterview(job); }} onBack={() => navigate("/dashboard")} isPractice={isPracticeMode} preSelectedJob={preSelectedJob} />;
   }
 
+  const phaseLabel = {
+    intro: "المرحلة التعريفية",
+    core: "الأسئلة الجوهرية",
+    closing: "المرحلة الختامية",
+    end: "اكتملت المقابلة",
+  }[session.currentPhase] ?? undefined;
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <InterviewHeader
@@ -168,6 +175,7 @@ const TextInterview = () => {
         isWarning={timer.isWarning}
         questionCount={session.questionCount}
         totalQuestions={session.totalQuestions}
+        phaseLabel={phaseLabel}
         onBack={handleBack}
       />
 
