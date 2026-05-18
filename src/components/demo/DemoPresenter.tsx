@@ -60,6 +60,23 @@ export function DemoPresenter() {
     try { await endVoiceQuestion(); } finally { setSending(false); }
   };
 
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onClick={() => setCollapsed(false)}
+        dir="rtl"
+        className="fixed z-[70] bottom-4 right-0 flex items-center gap-2 pl-3 pr-2 py-2 rounded-l-2xl bg-primary text-primary-foreground shadow-2xl border border-primary/30 hover:bg-primary/90 transition-all"
+        title="إظهار مرشدة المنصّة"
+        aria-label="إظهار مرشدة المنصّة"
+      >
+        <ChevronLeft className="w-4 h-4" />
+        <Sparkles className="w-4 h-4" />
+        <span className="text-xs font-semibold">لينا</span>
+      </button>
+    );
+  }
+
   return (
     <div
       className="fixed z-[70] bottom-0 right-0 left-0 sm:bottom-4 sm:right-4 sm:left-auto sm:w-[min(400px,calc(100vw-2rem))]"
@@ -83,6 +100,16 @@ export function DemoPresenter() {
             </p>
           </div>
           <Waveform active={isSpeaking} />
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setCollapsed(true)}
+            title="إخفاء"
+            aria-label="إخفاء مرشدة المنصّة"
+            className="shrink-0 h-7 w-7"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
         </div>
 
         <p className="text-xs text-foreground/85 leading-relaxed max-h-32 overflow-y-auto">
