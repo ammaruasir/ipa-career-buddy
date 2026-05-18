@@ -35,8 +35,8 @@ export const useLiveInterview = ({
   type,
   jobPosition,
   totalQuestions,
-  interviewerName = "نورة",
-  interviewerGender = "female",
+  interviewerName = "عبدالله",
+  interviewerGender = "male",
   interviewerVoiceId,
 }: UseLiveInterviewOptions) => {
   const { user } = useAuth();
