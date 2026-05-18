@@ -97,6 +97,8 @@ const CVInterview = () => {
   const { user, loading: authLoading } = useAuth();
   const prefill = useProfilePrefill();
   const [prefilled, setPrefilled] = useState(false);
+  // When user navigates back, we restore their saved answer; suppress the prefill effect once.
+  const skipPrefillOnceRef = useRef(false);
 
   // Pre-interview language picker
   const [language, setLanguage] = useState<Lang>("ar");
