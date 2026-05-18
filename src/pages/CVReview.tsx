@@ -164,7 +164,7 @@ const CVReview = () => {
         .maybeSingle();
       const url = (profile as any)?.resume_url ?? null;
       setResumeUrl(url);
-      setHasResume(!!url);
+      
 
       if (existing) {
         setDoc(existing);
