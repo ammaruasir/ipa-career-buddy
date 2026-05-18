@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Mic, MicOff, Send } from "lucide-react";
+import { Sparkles, Mic, MicOff, Send, ChevronRight, ChevronLeft } from "lucide-react";
 import { useTourEngine } from "@/contexts/DemoTourContext";
 import { DemoControls } from "./DemoControls";
 
