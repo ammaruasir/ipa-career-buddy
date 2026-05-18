@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import AppNav from "@/components/nav/AppNav";
+import { DemoTourProvider } from "@/contexts/DemoTourContext";
+import { DemoOverlay } from "@/components/demo/DemoOverlay";
 import { lazy, Suspense } from "react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -59,6 +61,7 @@ const CVInterview = lazyRetry(() => import("./pages/CVInterview"));
 const Features = lazyRetry(() => import("./pages/Features"));
 const CVHub = lazyRetry(() => import("./pages/CVHub"));
 const CoverLetter = lazyRetry(() => import("./pages/CoverLetter"));
+const Demo = lazyRetry(() => import("./pages/Demo"));
 
 const queryClient = new QueryClient();
 
@@ -75,11 +78,14 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AppNav />
-          <Suspense fallback={<LazyFallback />}>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
+          <DemoTourProvider>
+            <AppNav />
+            <DemoOverlay />
+            <Suspense fallback={<LazyFallback />}>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/demo" element={<Demo />} />
+                <Route path="/login" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/dashboard" element={<DashboardRouter />} />
               <Route path="/dashboard/candidate" element={<CandidateDashboard />} />
@@ -109,9 +115,10 @@ const App = () => (
               <Route path="/admin/interviews" element={<AdminInterviews />} />
               <Route path="/admin/proctor" element={<LiveProctor />} />
               <Route path="/admin/proctor/:interviewId" element={<LiveProctorSession />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </DemoTourProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

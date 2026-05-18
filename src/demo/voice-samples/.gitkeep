@@ -1,0 +1,2 @@
+# Voice sample recordings (.wav) for Phase B.5 cloning go here.
+# DO NOT commit .wav files — add `src/demo/voice-samples/*.wav` to .gitignore first.
