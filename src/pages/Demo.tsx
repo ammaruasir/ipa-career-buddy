@@ -5,13 +5,14 @@ import { Sparkles, Play, Mic } from "lucide-react";
 import { useTourEngine } from "@/contexts/DemoTourContext";
 
 const Demo = () => {
-  const { status, start, micConsent, setMicConsent } = useTourEngine();
+  const { status, start, micConsent, setMicConsent, stepIndex, isSpeaking } = useTourEngine();
 
   useEffect(() => {
     document.title = "جولة AI تفاعلية — منصّة IPA";
   }, []);
 
   const launching = status === "running" || status === "paused" || status === "qna";
+  const preparing = status === "running" && stepIndex === 0 && !isSpeaking;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8" dir="rtl">
