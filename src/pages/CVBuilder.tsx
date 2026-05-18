@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AIAssistBullets } from "@/components/cv-builder/AIAssistButton";
+import { ProofreadInput, ProofreadTextarea } from "@/components/cv-builder/ProofreadInput";
+import { useProfilePrefill } from "@/hooks/useProfilePrefill";
 
 interface PersonalInfo {
   full_name?: string;
