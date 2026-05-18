@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveInterview } from "@/hooks/useLiveInterview";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
-import { useCheatCamera } from "@/hooks/useCheatCamera";
+
 import { useSystemSettings } from "@/hooks/useSystemSettings";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
