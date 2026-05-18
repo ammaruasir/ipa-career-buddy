@@ -89,11 +89,14 @@ export function useDemoVoice() {
       stop();
       setIsSpeaking(true);
 
-      // Try pre-cached MP3 first (Phase F cost-saver).
+      // Try pre-cached MP3 first (Phase F cost-saver). Validate Content-Type
+      // because in dev/preview missing files are rewritten to the SPA HTML
+      // shell with status 200, which would otherwise be played as "audio".
       if (cacheKey) {
         try {
           const cacheResp = await fetch(`/demo-audio/${encodeURIComponent(cacheKey)}.mp3`);
-          if (cacheResp.ok) {
+          const ct = cacheResp.headers.get("content-type") ?? "";
+          if (cacheResp.ok && /^audio\//i.test(ct)) {
             const blob = await cacheResp.blob();
             const url = URL.createObjectURL(blob);
             const audio = new Audio(url);
