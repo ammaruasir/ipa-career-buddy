@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { MessagesSquare, Send, Loader2, Lightbulb, Sparkles, User2, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import JustificationCard, { type Justification } from "./JustificationCard";
+import { proofreadText } from "./ProofreadInput";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
