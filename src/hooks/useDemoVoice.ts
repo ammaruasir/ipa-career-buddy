@@ -1,9 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { presenterVoiceId } from "@/demo/voices";
-
-const cleanTextForTTS = (text: string): string => text.replace(/(.)\1{2,}/g, "$1");
+import { cleanTextForTTS } from "@/demo/clean-tts";
 
 // 1×1px silent WAV used to unlock the autoplay policy under a user gesture.
 // Once primed, subsequent audio.play() calls in the same tab succeed.
