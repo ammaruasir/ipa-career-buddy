@@ -66,7 +66,14 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: "أنت نظام تحليل سير ذاتية متخصص. حلّل السيرة الذاتية المرفقة واستخرج المعلومات المطلوبة بدقة. أجب دائماً باستخدام الأداة المحددة.",
+            content: `أنت مدرّب سير ذاتية محترف لمعهد الإدارة العامة (IPA) في السعودية.
+حلّل السيرة الذاتية المرفقة:
+1) استخراج البيانات المهنية المهيكلة (المهارات/الشهادات/الخبرة).
+2) تقييم جودة كل قسم من 0 إلى 100.
+3) رصد نقاط الضعف بأمثلة حرفية من النصّ.
+4) اقتراح إعادة كتابة عربية فصحى للنقاط الضعيفة فقط (لا تختلق حقائق).
+5) فحص الامتثال للمعايير السعودية: التواريخ الهجرية، تنسيق العنوان، ذكر خدمة العلم، رابط جدارات.
+أجب دائماً باستخدام الأداة المحدّدة. تجنّب الترويج العدواني للذات (غير ملائم ثقافياً).`,
           },
           {
             role: "user",
@@ -80,7 +87,7 @@ serve(async (req) => {
               },
               {
                 type: "text",
-                text: "حلّل هذه السيرة الذاتية واستخرج: المهارات التقنية، المهارات الشخصية، الشهادات والدورات، سنوات الخبرة، التخصص، والمستوى التعليمي. أرجع النتيجة باستخدام الأداة المحددة.",
+                text: "حلّل هذه السيرة الذاتية وفق الأداة. كن صريحاً في نقاط الضعف ومحدّداً في الاقتباسات.",
               },
             ],
           },
@@ -90,20 +97,80 @@ serve(async (req) => {
             type: "function",
             function: {
               name: "resume_analysis",
-              description: "Return structured resume analysis",
+              description: "Structured resume extraction + per-section evaluation + KSA compliance",
               parameters: {
                 type: "object",
                 properties: {
-                  technical_skills: { type: "array", items: { type: "string" }, description: "المهارات التقنية" },
-                  soft_skills: { type: "array", items: { type: "string" }, description: "المهارات الشخصية" },
-                  certifications: { type: "array", items: { type: "string" }, description: "الشهادات والدورات التدريبية" },
-                  experience_years: { type: "number", description: "إجمالي سنوات الخبرة التقريبية" },
-                  education_level: { type: "string", description: "أعلى مستوى تعليمي: ثانوي/دبلوم/بكالوريوس/ماجستير/دكتوراه" },
-                  major: { type: "string", description: "التخصص الأكاديمي" },
-                  languages: { type: "array", items: { type: "string" }, description: "اللغات" },
-                  summary: { type: "string", description: "ملخص مختصر للمؤهلات بالعربية" },
+                  // P0.3-legacy: extraction (kept compatible with profiles.resume_skills downstream)
+                  technical_skills: { type: "array", items: { type: "string" } },
+                  soft_skills: { type: "array", items: { type: "string" } },
+                  certifications: { type: "array", items: { type: "string" } },
+                  experience_years: { type: "number" },
+                  education_level: { type: "string" },
+                  major: { type: "string" },
+                  languages: { type: "array", items: { type: "string" } },
+                  summary: { type: "string" },
+
+                  // P0.3-new: evaluation
+                  section_scores: {
+                    type: "object",
+                    properties: {
+                      contact: { type: "number", minimum: 0, maximum: 100 },
+                      summary: { type: "number", minimum: 0, maximum: 100 },
+                      experience: { type: "number", minimum: 0, maximum: 100 },
+                      education: { type: "number", minimum: 0, maximum: 100 },
+                      skills: { type: "number", minimum: 0, maximum: 100 },
+                      achievements: { type: "number", minimum: 0, maximum: 100 },
+                      language_quality: { type: "number", minimum: 0, maximum: 100 },
+                    },
+                    required: ["contact", "summary", "experience", "education", "skills", "achievements", "language_quality"],
+                    additionalProperties: false,
+                  },
+                  weaknesses: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        section: { type: "string" },
+                        issue: { type: "string", description: "وصف المشكلة بالعربية" },
+                        original_text: { type: "string", description: "النص الأصلي الحرفي من السيرة" },
+                        severity: { type: "string", enum: ["minor", "moderate", "major"] },
+                      },
+                      required: ["section", "issue", "original_text", "severity"],
+                      additionalProperties: false,
+                    },
+                  },
+                  rewrites: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        original: { type: "string" },
+                        improved: { type: "string" },
+                        reason: { type: "string", description: "سبب التحسين بالعربية" },
+                      },
+                      required: ["original", "improved", "reason"],
+                      additionalProperties: false,
+                    },
+                  },
+                  saudi_compliance: {
+                    type: "object",
+                    properties: {
+                      uses_hijri_dates: { type: "boolean" },
+                      address_format_correct: { type: "boolean" },
+                      military_service_mentioned: { type: "boolean" },
+                      jadarat_link_present: { type: "boolean" },
+                      recommendations: { type: "array", items: { type: "string" } },
+                    },
+                    required: ["uses_hijri_dates", "address_format_correct", "military_service_mentioned", "jadarat_link_present", "recommendations"],
+                    additionalProperties: false,
+                  },
                 },
-                required: ["technical_skills", "soft_skills", "certifications", "experience_years", "education_level", "summary"],
+                required: [
+                  "technical_skills", "soft_skills", "certifications",
+                  "experience_years", "education_level", "summary",
+                  "section_scores", "weaknesses", "rewrites", "saudi_compliance",
+                ],
                 additionalProperties: false,
               },
             },
@@ -132,22 +199,67 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "تعذر تحليل السيرة الذاتية" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const resumeSkills = JSON.parse(toolCall.function.arguments);
+    const analysis = JSON.parse(toolCall.function.arguments);
 
-    // Save to profiles
+    // P0.3: split extraction (legacy shape) from evaluation
+    const extraction = {
+      technical_skills: analysis.technical_skills,
+      soft_skills: analysis.soft_skills,
+      certifications: analysis.certifications,
+      experience_years: analysis.experience_years,
+      education_level: analysis.education_level,
+      major: analysis.major,
+      languages: analysis.languages,
+      summary: analysis.summary,
+    };
+
     const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // Keep legacy profiles.resume_skills field in sync (downstream matching uses it)
     const { error: updateError } = await serviceClient
       .from("profiles")
-      .update({ resume_skills: resumeSkills })
+      .update({ resume_skills: extraction })
       .eq("user_id", userId);
+    if (updateError) console.error("Profile update error:", updateError);
 
-    if (updateError) {
-      console.error("Profile update error:", updateError);
+    // P0.3: persist evaluation snapshot to cv_documents
+    const { data: cvDoc, error: cvErr } = await serviceClient
+      .from("cv_documents")
+      .insert({
+        user_id: userId,
+        file_url: resume_path,
+        file_name: resume_path.split("/").pop() ?? "resume.pdf",
+        file_size: arrayBuffer.byteLength,
+        extraction,
+        section_scores: analysis.section_scores,
+        weaknesses: analysis.weaknesses,
+        rewrites: analysis.rewrites,
+        saudi_compliance: analysis.saudi_compliance,
+        model_used: "google/gemini-3-flash-preview",
+        tokens_used: aiData.usage?.total_tokens ?? null,
+      })
+      .select()
+      .single();
+
+    if (cvErr) {
+      // Non-fatal: extraction still useful even if snapshot save failed
+      console.warn("cv_documents insert failed:", cvErr);
     }
 
-    return new Response(JSON.stringify({ success: true, skills: resumeSkills }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        skills: extraction,
+        evaluation: {
+          section_scores: analysis.section_scores,
+          weaknesses: analysis.weaknesses,
+          rewrites: analysis.rewrites,
+          saudi_compliance: analysis.saudi_compliance,
+        },
+        cv_document_id: cvDoc?.id ?? null,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (e) {
     console.error("analyze-resume error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {

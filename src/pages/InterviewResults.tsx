@@ -9,8 +9,9 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowRight, Award, Brain, MessageSquare, Briefcase,
   Users, BarChart3, Loader2, Eye, TrendingUp, TrendingDown, Clock,
-  Smartphone, AlertTriangle
+  Smartphone, AlertTriangle, GraduationCap
 } from "lucide-react";
+import CoachingSection from "@/components/coaching/CoachingSection";
 
 const discLabels: Record<string, { label: string; desc: string; color: string }> = {
   D: { label: "مسيطر (D)", desc: "قيادي، حاسم، يركز على النتائج", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
@@ -65,8 +66,10 @@ const InterviewResults = () => {
   }
 
   // Check review_status — if not released, show pending message
+  // P0.1: practice-mode evaluations are auto-released; only show gate for assessment mode
   const reviewStatus = (evaluation as any).review_status;
-  if (reviewStatus && reviewStatus !== "released") {
+  const isPracticeMode = (interview as any)?.mode === "practice";
+  if (!isPracticeMode && reviewStatus && reviewStatus !== "released") {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-6 px-4" dir="rtl">
         <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
@@ -88,6 +91,7 @@ const InterviewResults = () => {
   const strengths = (evaluation.strengths as string[]) || [];
   const improvements = (evaluation.improvements as string[]) || [];
   const videoAnalysis = (evaluation.detailed_scores as any)?.video_analysis;
+  const isPractice = (interview as any)?.mode === "practice";
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
@@ -105,6 +109,22 @@ const InterviewResults = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8 space-y-6 max-w-4xl">
+        {/* P0.1 + P0.2: Practice-mode banner */}
+        {isPractice && (
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
+              <GraduationCap className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-base font-bold text-foreground mb-1">جلسة تدريب — خاصّة بك</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                هذه نتائج تدريب تعليمية لمساعدتك على التحسّن. لن يراها فريق الموارد البشرية ولن تؤثّر على أي تقييم رسمي.
+                ركّز على التغذية الراجعة لكل إجابة بالأسفل.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Overall Score */}
         <Card className="rounded-2xl shadow-lg">
           <CardContent className="p-8 flex flex-col items-center gap-4">
@@ -265,6 +285,9 @@ const InterviewResults = () => {
             <p className="text-sm text-foreground leading-relaxed">{evaluation.ai_feedback_ar}</p>
           </CardContent>
         </Card>
+
+        {/* P0.2: Per-answer STAR coaching */}
+        {id && <CoachingSection interviewId={id} practice={isPractice} />}
 
         <div className="flex justify-center pb-8">
           <Button size="lg" className="rounded-xl" onClick={() => navigate("/dashboard")}>العودة للوحة التحكم</Button>

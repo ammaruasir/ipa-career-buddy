@@ -20,17 +20,61 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const updateData: Record<string, unknown> = { status: "completed" };
-    if (recording_url) {
-      updateData.recording_url = recording_url;
+    // SECURITY: verify ownership. Allow either authenticated user OR service-role beacon (sendBeacon
+    // on tab close cannot easily attach auth — we accept service-role as a fallback for that path).
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const isServerCall = authHeader === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`;
+
+    const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Load interview to verify it exists and capture owner
+    const { data: iv, error: ivErr } = await adminClient
+      .from("interviews")
+      .select("id, user_id, status, recording_url")
+      .eq("id", interview_id)
+      .single();
+    if (ivErr || !iv) {
+      return new Response(JSON.stringify({ error: "Interview not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const { error } = await supabase
+    if (!isServerCall) {
+      const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user } } = await userClient.auth.getUser(token);
+      if (!user || user.id !== (iv as any).user_id) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // SECURITY: validate recording_url is in the owner's storage path
+    let safeRecordingUrl: string | undefined;
+    if (recording_url && typeof recording_url === "string") {
+      const ownerPrefix = `${(iv as any).user_id}/`;
+      if (recording_url.startsWith(ownerPrefix) && !recording_url.includes("..")) {
+        safeRecordingUrl = recording_url;
+      } else {
+        console.warn("Rejected suspicious recording_url:", recording_url.slice(0, 80));
+      }
+    }
+
+    const updateData: Record<string, unknown> = { status: "completed" };
+    if (safeRecordingUrl) {
+      updateData.recording_url = safeRecordingUrl;
+    }
+
+    const { error } = await adminClient
       .from("interviews")
       .update(updateData)
       .eq("id", interview_id)
