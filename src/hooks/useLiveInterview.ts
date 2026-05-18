@@ -63,6 +63,10 @@ export const useLiveInterview = ({
   const transcriptRef = useRef<TranscriptEntry[]>([]);
   const interviewerVoiceIdRef = useRef<string | undefined>(interviewerVoiceId);
   useEffect(() => { interviewerVoiceIdRef.current = interviewerVoiceId; }, [interviewerVoiceId]);
+  const interviewerNameRef = useRef<string>(interviewerName);
+  const interviewerGenderRef = useRef<"male" | "female">(interviewerGender);
+  useEffect(() => { interviewerNameRef.current = interviewerName; }, [interviewerName]);
+  useEffect(() => { interviewerGenderRef.current = interviewerGender; }, [interviewerGender]);
   const questionCountRef = useRef(0);
   const conversationRef = useRef<{ role: string; content: string }[]>([]);
   const contextSummaryRef = useRef<string>("");
