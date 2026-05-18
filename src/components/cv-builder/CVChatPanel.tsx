@@ -2,9 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { MessagesSquare, Send, Loader2, Lightbulb, Sparkles, User2, CheckCircle2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { MessagesSquare, Send, Loader2, Lightbulb, Sparkles, User2, CheckCircle2, PlusCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import JustificationCard, { type Justification } from "./JustificationCard";
 import { proofreadText } from "./ProofreadInput";
@@ -13,18 +20,25 @@ import { toast } from "sonner";
 
 type Lang = "ar" | "en";
 
+interface Replacement {
+  original: string;
+  improved: string;
+  section?: string;
+}
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   justifications?: Justification[];
   suggested_actions?: string[];
+  replacements?: Replacement[];
   created_at?: string;
 }
 
 interface CVChatPanelProps {
   cvDocumentId: string;
   language?: Lang;
-  onAcceptImprovement?: (improved: string, original: string) => Promise<void> | void;
+  onAcceptImprovement?: (improved: string, original: string, section?: string) => Promise<void> | void;
 }
 
 const TEXT = {
