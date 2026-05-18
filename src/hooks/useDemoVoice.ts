@@ -1,9 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { presenterVoiceId } from "@/demo/voices";
-
-const cleanTextForTTS = (text: string): string => text.replace(/(.)\1{2,}/g, "$1");
+import { cleanTextForTTS } from "@/demo/clean-tts";
 
 // 1×1px silent WAV used to unlock the autoplay policy under a user gesture.
 // Once primed, subsequent audio.play() calls in the same tab succeed.
@@ -106,18 +104,13 @@ export function useDemoVoice() {
         }
       }
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken =
-        sessionData.session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-elevenlabs-tts`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ text: cleanTextForTTS(text), voiceId }),
         }

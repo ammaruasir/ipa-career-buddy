@@ -1,44 +1,65 @@
-# Demo Mode Deployment
+## Why the demo voice is silent
 
-All files from commit `170e0ba` are present in the tree. Execute the runbook in order.
+The console shows the same error on every TTS attempt:
 
-## Step 1 — Deploy 4 edge functions
-Single `deploy_edge_functions` call with:
-`["demo-chat", "demo-candidate-bot", "demo-transcribe", "demo-session"]`
+```
+NotSupportedError: Failed to load because no supported source was found.
+```
 
-(All four directories exist under `supabase/functions/`. Required secrets `OPENAI_API_KEY`, `LOVABLE_API_KEY`, `ELEVENLABS_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` are already provisioned — no `add_secret` needed.)
+That means the blob handed to `new Audio(...)` is not audio. Tracing the call:
 
-## Step 2 — Apply migration
-Run `supabase--migration` with the contents of `supabase/migrations/20260518160000_demo_mode_scaffold.sql` exactly as committed.
+1. `/demo` is a **public, unauthenticated** route.
+2. `useDemoVoice.speak()` (and `useDemoCandidate.askSara()`) call the production `elevenlabs-tts` edge function with `Authorization: Bearer <anon publishable key>` as a fallback when no session exists.
+3. `supabase/functions/elevenlabs-tts/index.ts` (lines 50–69) requires a real signed-in user — `auth.getUser(token)` fails for the anon key and returns **401 JSON** (`{"error":"Unauthorized"}`).
+4. The client wraps that JSON body in an audio element → `NotSupportedError`.
 
-Effects (per file header):
-- Adds `is_demo boolean default false` to: `profiles`, `interviews`, `responses`, `evaluations`, `cv_drafts`, `cohorts`, `enrollments`, `job_vacancies`, `question_templates`.
-- Creates `public.is_demo_account()` helper (SECURITY DEFINER).
-- Adds symmetric RESTRICTIVE RLS policies on the 9 tables: hide `is_demo=true` from regular users; restrict demo accounts to `is_demo=true` only.
+`demo-chat`, `demo-candidate-bot`, and `demo-transcribe` already follow the correct pattern (no JWT, IP-rate-limited via `enforceIpRateLimit`). The TTS path was the one piece left routed through the gated production function — which is also the cost-isolation issue called out in the earlier review.
 
-Safe: RESTRICTIVE composes via AND with existing permissive policies; no existing rows modified.
+## Plan
 
-After approval+execution, run `supabase--linter` to confirm zero new warnings.
+### 1. New edge function: `demo-elevenlabs-tts`
 
-## Step 3 — Seed demo data
-Run `node scripts/seed-demo-data.ts` via `code--exec`. Idempotent. Creates 5 accounts (`demo-candidate`, `demo-candidate2`, `demo-admin`, `demo-hr`, `demo-instructor` @ `ipa-training.sa`), plus demo vacancy, 5 question-bank rows, and a demo cohort with both candidates enrolled — all `is_demo=true`.
+`supabase/functions/demo-elevenlabs-tts/index.ts` — clone of `elevenlabs-tts` with these differences:
 
-Uses `SUPABASE_SERVICE_ROLE_KEY` from env. Default passwords are hardcoded in `demo-session/index.ts`.
+- No `getUser`/auth gate. Public, like the other `demo-*` functions.
+- Rate-limit by IP using `enforceIpRateLimit(req, "demo-elevenlabs-tts", 120, 3600, corsHeaders)` (≈ enough for one full 39-step tour plus retries; tunable).
+- Hard-cap text length (e.g. 1500 chars, same as production).
+- Whitelist `voiceId` to the three known demo voices (`presenterVoiceId`, `candidateVoiceId`, `interviewerVoiceId` — all currently the same fallback ID). Any other ID → 400. This prevents demo traffic from being used as a free TTS proxy for arbitrary voices.
+- Same ElevenLabs streaming call + `eleven_flash_v2_5` → `eleven_multilingual_v2` fallback as production.
+- Same CORS headers as the other `demo-*` functions.
 
-If the script needs `tsx`/`ts-node`, fall back to `bunx tsx scripts/seed-demo-data.ts`.
+Add a `[functions.demo-elevenlabs-tts]` block with `verify_jwt = false` in `supabase/config.toml` (matching the other demo functions).
 
-## Step 4 — Verify
-Use `browser--navigate_to_sandbox` to `/demo`, then `browser--act` to tick the mic-consent box and click "ابدأ الجولة". Confirm Lina speaks Arabic and the tour auto-navigates through admin/HR/instructor acts. Capture console + network if anything fails.
+### 2. Point the demo hooks at it
 
-## Step 5 — Optional post-checks
-Only if Step 4 passes, run via `code--exec`:
-- `node scripts/precache-demo-tts.ts`
-- `node scripts/demo-rls-audit.ts`
-- `node scripts/demo-latency-profile.ts`
+- `src/hooks/useDemoVoice.ts` — change the `fetch` URL from `/functions/v1/elevenlabs-tts` to `/functions/v1/demo-elevenlabs-tts`, drop the `Authorization` header and the `supabase.auth.getSession()` call. Keep `apikey: VITE_SUPABASE_PUBLISHABLE_KEY` for gateway routing.
+- `src/hooks/useDemoCandidate.ts` — same swap for Sara's TTS call. Drop the session lookup.
 
-Report results inline.
+### 3. Improve `cleanTextForTTS` (small, while we're here)
 
-## Notes
-- No source code changes; pure deploy + data ops.
-- If migration approval is declined, stop and surface back to user.
-- If seed fails on a duplicate, treat as already-seeded (idempotent) and continue.
+The current one-liner only collapses repeated chars. For the demo it should also strip markdown/HTML so Lina doesn't read `**bold**` aloud:
+
+```ts
+const cleanTextForTTS = (t: string) =>
+  t.replace(/<[^>]+>/g, " ")
+   .replace(/[*_`#>]+/g, "")
+   .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+   .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+   .replace(/(.)\1{2,}/g, "$1")
+   .replace(/\s+/g, " ")
+   .trim();
+```
+
+Move it to a shared `src/demo/clean-tts.ts` and import from both hooks.
+
+### 4. Verify
+
+- Deploy `demo-elevenlabs-tts`.
+- `curl` it with a sample Arabic string and confirm `Content-Type: audio/mpeg` + non-zero body.
+- Open `/demo` in an incognito tab, press "ابدأ الجولة", confirm Lina speaks and Sara's answers play.
+- Confirm production interview flows (which still use `elevenlabs-tts` with a real session) are unaffected.
+
+## Out of scope
+
+- Voice cloning / Khaleeji voice procurement (Phase B.5).
+- Pre-cached MP3 generation (`scripts/precache-demo-tts.ts`) — already exists and will keep working; it should be re-pointed at `demo-elevenlabs-tts` in a follow-up so pre-caching doesn't need a service-role token.
