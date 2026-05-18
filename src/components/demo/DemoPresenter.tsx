@@ -32,6 +32,7 @@ export function DemoPresenter() {
 
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   if (status === "idle" || status === "finished") return null;
 
