@@ -14,6 +14,7 @@ const corsHeaders = {
 // Keep in sync with src/demo/voices.ts. Until Khaleeji clones land, all three
 // resolve to the platform's default Arabic voice.
 const ALLOWED_VOICE_IDS = new Set<string>([
+  "gVzwmdZzRgBrNjXaTmi5",
   "usjDi9nBY6UHvtKrL4ba",
   "QsV9PCczMIklRM6xLPAS",
 ]);
@@ -53,7 +54,7 @@ serve(async (req) => {
     const selectedVoiceId =
       typeof voiceId === "string" && ALLOWED_VOICE_IDS.has(voiceId)
         ? voiceId
-        : "usjDi9nBY6UHvtKrL4ba";
+        : "gVzwmdZzRgBrNjXaTmi5";
 
     const callElevenLabs = (modelId: string) =>
       fetch(
