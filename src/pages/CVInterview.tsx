@@ -732,7 +732,13 @@ const CVInterview = () => {
           </div>
           <Button
             onClick={() => submit()}
-            disabled={loading || (question?.required && !answer.trim())}
+            disabled={
+              loading ||
+              (question?.required &&
+                (STRUCTURED_TYPES.includes(question.type)
+                  ? !isStructuredAnswerMeaningful(question, structuredAnswer)
+                  : !answer.trim()))
+            }
             className="rounded-xl"
             size="lg"
           >
