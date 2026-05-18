@@ -83,10 +83,27 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerImproved, setPickerImproved] = useState("");
+  const [pickerOriginal, setPickerOriginal] = useState("");
+  const [pickerSection, setPickerSection] = useState("other");
+  const [accepting, setAccepting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const t = TEXT[language];
   const dir = language === "ar" ? "rtl" : "ltr";
+
+  const acceptOne = async (improved: string, original: string, section?: string) => {
+    if (!onAcceptImprovement) return;
+    try {
+      await onAcceptImprovement(improved, original, section);
+      toast.success(
+        language === "en" ? "Added to accepted improvements" : "تمت إضافته للتحسينات المعتمدة",
+      );
+    } catch (e: any) {
+      toast.error(e?.message || (language === "en" ? "Failed to save" : "تعذّر الحفظ"));
+    }
+  };
 
   // Auto-scroll on new message
   useEffect(() => {
