@@ -94,6 +94,8 @@ const TEXT = {
 const CVInterview = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const prefill = useProfilePrefill();
+  const [prefilled, setPrefilled] = useState(false);
 
   // Pre-interview language picker
   const [language, setLanguage] = useState<Lang>("ar");
