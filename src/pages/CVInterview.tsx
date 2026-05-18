@@ -267,9 +267,11 @@ const CVInterview = () => {
         body: { action: "back", session_id: sessionId, language },
       });
       if (error) throw error;
+      // Mark that the next prefill effect should NOT overwrite the restored answer
+      skipPrefillOnceRef.current = true;
+      setAnswer(data.previous_answer ?? "");
       setCurrentStep(data.current_step);
       setQuestion(data.question);
-      setAnswer(data.previous_answer ?? "");
     } catch (e) {
       console.error(e);
       toast.error(uiLang === "en" ? "Failed to go back" : "تعذّر الرجوع");
