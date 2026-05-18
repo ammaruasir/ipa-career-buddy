@@ -174,6 +174,7 @@ const CVInterview = () => {
   const [totalSteps, setTotalSteps] = useState(15);
   const [question, setQuestion] = useState<Question | null>(null);
   const [answer, setAnswer] = useState("");
+  const [structuredAnswer, setStructuredAnswer] = useState<any>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
 
   // UI state
