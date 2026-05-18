@@ -458,7 +458,7 @@ const CVReview = () => {
                     revision?.accepted_rewrites ?? [],
                     doc.file_name ?? "السيرة الذاتية",
                   );
-                  await exportToDocx(data, `cv-${Date.now()}.docx`);
+                  await exportToDocx(data, `cv-${Date.now()}.docx`, { language: "ar" });
                   toast.success("تم تصدير ملف Word");
                 } catch (e: any) {
                   toast.error(e?.message || "فشل تصدير Word");
