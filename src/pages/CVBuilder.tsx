@@ -111,6 +111,78 @@ const EMPTY_DRAFT: Draft = {
   language: "ar",
 };
 
+// Effective export language for the draft. Bilingual → Arabic numerals & RTL.
+const effectiveLang = (d: Draft): CVLang => (d.language === "en" ? "en" : "ar");
+
+// Build the export-ready CV structure from the in-progress draft.
+const draftToCV = (d: Draft): CVDocumentData => {
+  const lang = effectiveLang(d);
+  const isAr = lang === "ar";
+  const pi = d.personal_info || {};
+  const fullName = (pi.full_name || (isAr ? "السيرة الذاتية" : "Curriculum Vitae")).trim();
+  const contact = [pi.email, pi.phone, pi.city].filter(Boolean).join("  •  ");
+
+  const sections: CVSection[] = [];
+
+  const summaryText = (isAr ? d.summary?.ar : d.summary?.en) || d.summary?.ar || d.summary?.en;
+  if (summaryText && summaryText.trim()) {
+    sections.push({
+      title: isAr ? "الملخّص المهني" : "Professional Summary",
+      paragraphs: [summaryText.trim()],
+    });
+  }
+
+  if (d.experience.length > 0) {
+    sections.push({
+      title: isAr ? "الخبرة العملية" : "Work Experience",
+      paragraphs: d.experience.map((e) => {
+        const head = [e.position, e.company].filter(Boolean).join(" — ");
+        const period = [e.start, e.end].filter(Boolean).join(" – ");
+        const headLine = period ? `${head} (${period})` : head;
+        const bullets = (e.bullets ?? []).filter(Boolean);
+        return [headLine, ...bullets].filter(Boolean).join("\n");
+      }),
+    });
+  }
+
+  if (d.education.length > 0) {
+    sections.push({
+      title: isAr ? "التعليم" : "Education",
+      paragraphs: d.education.map((e) => {
+        const degree = [e.degree, e.major].filter(Boolean).join(isAr ? " في " : " in ");
+        const inst = e.institution || "";
+        const period = [e.start, e.end].filter(Boolean).join(" – ");
+        const tail = [inst, period, e.gpa ? (isAr ? `المعدل ${e.gpa}` : `GPA ${e.gpa}`) : ""]
+          .filter(Boolean)
+          .join(" — ");
+        return [degree, tail].filter(Boolean).join(" — ");
+      }),
+    });
+  }
+
+  const tech = d.skills.technical ?? [];
+  const soft = d.skills.soft ?? [];
+  const langs = d.skills.languages ?? [];
+  if (tech.length || soft.length || langs.length) {
+    const lines: string[] = [];
+    if (tech.length) lines.push(`${isAr ? "تقنية" : "Technical"}: ${tech.join("، ")}`);
+    if (soft.length) lines.push(`${isAr ? "شخصية" : "Soft"}: ${soft.join("، ")}`);
+    if (langs.length) lines.push(`${isAr ? "اللغات" : "Languages"}: ${langs.join("، ")}`);
+    sections.push({ title: isAr ? "المهارات" : "Skills", paragraphs: lines });
+  }
+
+  if (d.certifications.length > 0) {
+    sections.push({
+      title: isAr ? "الشهادات" : "Certifications",
+      paragraphs: d.certifications.map((c) =>
+        [c.name, c.issuer, c.date].filter(Boolean).join(" — "),
+      ),
+    });
+  }
+
+  return { fullName, contact, sections };
+};
+
 const CVBuilder = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
