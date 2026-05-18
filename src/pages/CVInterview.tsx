@@ -21,6 +21,7 @@ import {
   SkipForward,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useProfilePrefill } from "@/hooks/useProfilePrefill";
 
 interface QuestionChoice {
   value: string;
