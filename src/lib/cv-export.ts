@@ -53,6 +53,8 @@ const localizeData = (data: CVDocumentData, lang: CVLang): CVDocumentData => ({
 export interface AcceptedRewrite {
   original: string;
   improved: string;
+  /** Optional section hint for appended (originalless) entries: summary | experience | education | skills | achievements | certifications | other */
+  section?: string;
 }
 
 const applyRewritesToText = (text: string, rewrites: AcceptedRewrite[]): string => {
