@@ -72,6 +72,7 @@ interface CVDocument {
   weaknesses: Weakness[] | null;
   rewrites: Rewrite[] | null;
   saudi_compliance: SaudiCompliance | null;
+  extraction: any | null;
 }
 
 const SECTION_LABELS: Record<string, string> = {
