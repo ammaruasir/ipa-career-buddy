@@ -98,6 +98,7 @@ export type Database = {
           end_date: string
           id: string
           instructor_id: string | null
+          is_demo: boolean
           name: string
           start_date: string
           status: string
@@ -111,6 +112,7 @@ export type Database = {
           end_date: string
           id?: string
           instructor_id?: string | null
+          is_demo?: boolean
           name: string
           start_date: string
           status?: string
@@ -124,6 +126,7 @@ export type Database = {
           end_date?: string
           id?: string
           instructor_id?: string | null
+          is_demo?: boolean
           name?: string
           start_date?: string
           status?: string
@@ -255,6 +258,7 @@ export type Database = {
           experience: Json | null
           export_count: number | null
           id: string
+          is_demo: boolean
           language: string | null
           last_exported_at: string | null
           personal_info: Json | null
@@ -274,6 +278,7 @@ export type Database = {
           experience?: Json | null
           export_count?: number | null
           id?: string
+          is_demo?: boolean
           language?: string | null
           last_exported_at?: string | null
           personal_info?: Json | null
@@ -293,6 +298,7 @@ export type Database = {
           experience?: Json | null
           export_count?: number | null
           id?: string
+          is_demo?: boolean
           language?: string | null
           last_exported_at?: string | null
           personal_info?: Json | null
@@ -400,6 +406,7 @@ export type Database = {
           cohort_id: string
           enrolled_at: string
           id: string
+          is_demo: boolean
           status: string
           student_id: string
         }
@@ -407,6 +414,7 @@ export type Database = {
           cohort_id: string
           enrolled_at?: string
           id?: string
+          is_demo?: boolean
           status?: string
           student_id: string
         }
@@ -414,6 +422,7 @@ export type Database = {
           cohort_id?: string
           enrolled_at?: string
           id?: string
+          is_demo?: boolean
           status?: string
           student_id?: string
         }
@@ -441,6 +450,7 @@ export type Database = {
           id: string
           improvements: Json | null
           interview_id: string
+          is_demo: boolean
           leadership: number | null
           overall_score: number | null
           personality_match: number | null
@@ -467,6 +477,7 @@ export type Database = {
           id?: string
           improvements?: Json | null
           interview_id: string
+          is_demo?: boolean
           leadership?: number | null
           overall_score?: number | null
           personality_match?: number | null
@@ -493,6 +504,7 @@ export type Database = {
           id?: string
           improvements?: Json | null
           interview_id?: string
+          is_demo?: boolean
           leadership?: number | null
           overall_score?: number | null
           personality_match?: number | null
@@ -555,6 +567,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_demo: boolean
           job_position: string | null
           mode: Database["public"]["Enums"]["interview_mode"]
           questions: Json | null
@@ -568,6 +581,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_demo?: boolean
           job_position?: string | null
           mode?: Database["public"]["Enums"]["interview_mode"]
           questions?: Json | null
@@ -581,6 +595,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_demo?: boolean
           job_position?: string | null
           mode?: Database["public"]["Enums"]["interview_mode"]
           questions?: Json | null
@@ -647,6 +662,7 @@ export type Database = {
           employment_type: string | null
           id: string
           is_active: boolean | null
+          is_demo: boolean
           location: string | null
           requirements: Json | null
           title: string
@@ -660,6 +676,7 @@ export type Database = {
           employment_type?: string | null
           id?: string
           is_active?: boolean | null
+          is_demo?: boolean
           location?: string | null
           requirements?: Json | null
           title: string
@@ -673,6 +690,7 @@ export type Database = {
           employment_type?: string | null
           id?: string
           is_active?: boolean | null
+          is_demo?: boolean
           location?: string | null
           requirements?: Json | null
           title?: string
@@ -764,6 +782,7 @@ export type Database = {
           gender: string | null
           gpa: string | null
           id: string
+          is_demo: boolean
           major: string | null
           nationality: string | null
           phone: string | null
@@ -785,6 +804,7 @@ export type Database = {
           gender?: string | null
           gpa?: string | null
           id?: string
+          is_demo?: boolean
           major?: string | null
           nationality?: string | null
           phone?: string | null
@@ -806,6 +826,7 @@ export type Database = {
           gender?: string | null
           gpa?: string | null
           id?: string
+          is_demo?: boolean
           major?: string | null
           nationality?: string | null
           phone?: string | null
@@ -825,6 +846,7 @@ export type Database = {
           difficulty: string | null
           id: string
           interview_type: Database["public"]["Enums"]["interview_type"]
+          is_demo: boolean
           question_text: string
         }
         Insert: {
@@ -834,6 +856,7 @@ export type Database = {
           difficulty?: string | null
           id?: string
           interview_type: Database["public"]["Enums"]["interview_type"]
+          is_demo?: boolean
           question_text: string
         }
         Update: {
@@ -843,6 +866,7 @@ export type Database = {
           difficulty?: string | null
           id?: string
           interview_type?: Database["public"]["Enums"]["interview_type"]
+          is_demo?: boolean
           question_text?: string
         }
         Relationships: []
@@ -875,6 +899,7 @@ export type Database = {
           created_at: string
           id: string
           interview_id: string
+          is_demo: boolean
           media_url: string | null
           question_text: string
           scores: Json | null
@@ -885,6 +910,7 @@ export type Database = {
           created_at?: string
           id?: string
           interview_id: string
+          is_demo?: boolean
           media_url?: string | null
           question_text: string
           scores?: Json | null
@@ -895,6 +921,7 @@ export type Database = {
           created_at?: string
           id?: string
           interview_id?: string
+          is_demo?: boolean
           media_url?: string | null
           question_text?: string
           scores?: Json | null
@@ -1047,6 +1074,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_demo_account: { Args: { uid: string }; Returns: boolean }
     }
     Enums: {
       app_role: "student" | "admin" | "hr" | "candidate" | "instructor"
