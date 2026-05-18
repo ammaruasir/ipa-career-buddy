@@ -3,7 +3,12 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { checkRateLimit, rateLimitResponse, safeParseJson } from "../_shared/guards.ts";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  safeParseJson,
+  handleAiGatewayError,
+} from "../_shared/guards.ts";
 
 // SECURITY: strip injection patterns from user-controlled text before LLM
 function sanitizeForPrompt(text: string): string {
@@ -236,6 +241,8 @@ ${JSON.stringify(cvDoc, null, 2).slice(0, 5000)}
     if (!resp.ok) {
       const t = await resp.text();
       console.error("AI error:", resp.status, t);
+      const gatewayErr = handleAiGatewayError(resp, corsHeaders);
+      if (gatewayErr) return gatewayErr;
       throw new Error("AI gateway error");
     }
 

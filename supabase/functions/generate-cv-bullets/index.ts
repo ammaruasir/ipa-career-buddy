@@ -5,7 +5,12 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { checkRateLimit, rateLimitResponse, safeParseJson } from "../_shared/guards.ts";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  safeParseJson,
+  handleAiGatewayError,
+} from "../_shared/guards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -234,12 +239,8 @@ serve(async (req) => {
     if (!resp.ok) {
       const t = await resp.text();
       console.error("AI error:", resp.status, t);
-      if (resp.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "تم تجاوز الحدّ / Rate limit exceeded" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
+      const gatewayErr = handleAiGatewayError(resp, corsHeaders);
+      if (gatewayErr) return gatewayErr;
       throw new Error("AI gateway error");
     }
 

@@ -1,5 +1,16 @@
-// Shared guards for edge functions: rate limiting, consent check, AI retry with backoff.
-// Import from "../_shared/guards.ts" in any function that needs them.
+// =============================================================================
+// Shared guards for IPA edge functions.
+//
+// IMPORTANT: This file lives at supabase/functions/_shared/guards.ts.
+// Supabase Edge Functions deployment SKIPS any directory whose name starts
+// with "_" — so `_shared/` is NOT deployed as a function. It's only included
+// as a dependency when other functions import from it via relative path.
+// See: https://supabase.com/docs/guides/functions/auth#shared-modules
+//
+// Adding a new shared utility here means every function that imports it
+// gets the update on next redeploy. Keep this module dependency-free except
+// for Supabase + Deno stdlib.
+// =============================================================================
 
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -91,6 +102,40 @@ export function consentRequiredResponse(
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     },
   );
+}
+
+/**
+ * Standard handler for Lovable AI Gateway / OpenAI error responses.
+ * Returns a Response if the status maps to a user-facing message; null if caller should continue.
+ *   402 → "اشحن رصيد Lovable" (matches analyze-resume convention)
+ *   429 → "تجاوزت الحدّ" (rate-limited by provider, not us)
+ *
+ * Intended use:
+ *   const errResp = handleAiGatewayError(aiResp, corsHeaders);
+ *   if (errResp) return errResp;
+ *   const data = await aiResp.json();
+ */
+export function handleAiGatewayError(
+  resp: Response,
+  corsHeaders: Record<string, string>,
+): Response | null {
+  if (resp.status === 402) {
+    return new Response(
+      JSON.stringify({
+        error: "يرجى شحن رصيد محرك واكب للذكاء الاصطناعي / AI gateway credit exhausted",
+      }),
+      { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+  if (resp.status === 429) {
+    return new Response(
+      JSON.stringify({
+        error: "تم تجاوز الحدّ المسموح / Rate limit exceeded — retry shortly",
+      }),
+      { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+  return null;
 }
 
 /**

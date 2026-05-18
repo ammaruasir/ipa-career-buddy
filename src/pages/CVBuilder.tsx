@@ -120,7 +120,7 @@ const CVBuilder = () => {
 
     const load = async () => {
       const { data } = await supabase
-        .from("cv_drafts" as any)
+        .from("cv_drafts")
         .select("*")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
@@ -154,7 +154,7 @@ const CVBuilder = () => {
       try {
         if (payload.id) {
           await supabase
-            .from("cv_drafts" as any)
+            .from("cv_drafts")
             .update({
               personal_info: payload.personal_info,
               summary: payload.summary,
@@ -168,7 +168,7 @@ const CVBuilder = () => {
             .eq("id", payload.id);
         } else {
           const { data } = await supabase
-            .from("cv_drafts" as any)
+            .from("cv_drafts")
             .insert({
               user_id: user.id,
               personal_info: payload.personal_info,

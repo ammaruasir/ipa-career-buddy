@@ -78,7 +78,7 @@ const ConsentBanner = ({ language = "ar" }: { language?: "ar" | "en" }) => {
     if (!user) return;
     const load = async () => {
       const { data } = await supabase
-        .from("user_consents" as any)
+        .from("user_consents")
         .select("consent_type, granted, revoked_at")
         .eq("user_id", user.id);
       const granted = new Set<string>();
@@ -114,7 +114,7 @@ const ConsentBanner = ({ language = "ar" }: { language?: "ar" | "en" }) => {
 
       // upsert each
       for (const r of rows) {
-        await supabase.from("user_consents" as any).upsert(r as any, {
+        await supabase.from("user_consents").upsert(r as any, {
           onConflict: "user_id,consent_type,version",
         });
       }

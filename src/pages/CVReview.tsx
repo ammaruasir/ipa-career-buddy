@@ -106,7 +106,7 @@ const CVReview = () => {
 
     const load = async () => {
       const { data } = await supabase
-        .from("cv_documents" as any)
+        .from("cv_documents")
         .select("id, uploaded_at, file_name, section_scores, weaknesses, rewrites, saudi_compliance")
         .eq("user_id", user.id)
         .order("uploaded_at", { ascending: false })

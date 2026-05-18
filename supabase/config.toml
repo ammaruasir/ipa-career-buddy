@@ -35,3 +35,28 @@ verify_jwt = false
 
 [functions.manage-user]
 verify_jwt = false
+
+# New functions added 2026-05-18 (training-platform pivot).
+# All use verify_jwt=false because each function does its own auth check internally
+# (Bearer-token validation for user calls, or service-role-key check for
+# server-to-server calls like evaluate-interview → coach-response).
+[functions.coach-response]
+verify_jwt = false
+
+[functions.chat-with-cv]
+verify_jwt = false
+
+[functions.generate-cv-bullets]
+verify_jwt = false
+
+[functions.improve-cv-summary]
+verify_jwt = false
+
+[functions.suggest-cv-skills]
+verify_jwt = false
+
+[functions.cv-interview-step]
+verify_jwt = false
+
+[functions.admin-interview]
+verify_jwt = false
