@@ -491,38 +491,60 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
     [navigate, voice, appendTranscript, takeOverMode, runAction]
   );
 
+  const startingRef = useRef(false);
   const start = useCallback(async () => {
+    // Guard: ignore accidental double-clicks / already-running tours so we
+    // don't kick off two parallel for-loops fighting over the same audio bus.
+    if (startingRef.current) return;
+    if (status === "running" || status === "qna") return;
+    startingRef.current = true;
+
     cancelRef.current = false;
     setStepIndex(0);
     setTranscript([]);
     setQaCount(0);
     runtimeCtxRef.current = { lastInterviewId: null };
 
-    // CRITICAL: prime the audio context BEFORE any async work — this is the
-    // last moment we're inside the user-gesture window for the click that
-    // invoked start(). Without it, autoplay policy blocks the first TTS
-    // audio.play() and the whole tour silently rushes through.
+    // Flip status FIRST so the DemoOverlay mounts immediately and the user
+    // sees "جاري تجهيز الجولة…" instead of a silent 2–4s gap while we wait
+    // on primeAudio + the first TTS round-trip.
+    setStatus("running");
+
+    // CRITICAL: prime the audio context inside the user-gesture window for
+    // the click that invoked start(). Without it, autoplay policy blocks the
+    // first TTS audio.play() and the whole tour silently rushes through.
     await voice.primeAudio();
     await candidateVoice.primeAudio();
 
-    setStatus("running");
-    for (let i = 0; i < tourScript.length; i++) {
-      if (cancelRef.current) return;
-      setStepIndex(i);
-      await runStep(tourScript[i]);
-      const nextStep = tourScript[i + 1];
-      if (nextStep && nextStep.act !== tourScript[i].act) {
-        setActEndLabel(tourScript[i].act);
-        setShowActEndPrompt(true);
-        await sleep(2200);
-        setShowActEndPrompt(false);
-        setActEndLabel(null);
+    try {
+      for (let i = 0; i < tourScript.length; i++) {
         if (cancelRef.current) return;
+        setStepIndex(i);
+        try {
+          await runStep(tourScript[i]);
+        } catch (e) {
+          console.warn(`Tour step ${tourScript[i].id} failed:`, e);
+          appendTranscript({
+            role: "presenter",
+            text: "(تعذّر تنفيذ هذه الخطوة — نكمل للخطوة التالية)",
+          });
+        }
+        const nextStep = tourScript[i + 1];
+        if (nextStep && nextStep.act !== tourScript[i].act) {
+          setActEndLabel(tourScript[i].act);
+          setShowActEndPrompt(true);
+          await sleep(2200);
+          setShowActEndPrompt(false);
+          setActEndLabel(null);
+          if (cancelRef.current) return;
+        }
       }
+      setStatus("finished");
+      hideCursor();
+    } finally {
+      startingRef.current = false;
     }
-    setStatus("finished");
-    hideCursor();
-  }, [runStep, voice, candidateVoice, hideCursor]);
+  }, [runStep, voice, candidateVoice, hideCursor, status, appendTranscript]);
 
   const pause = useCallback(() => {
     cancelRef.current = true;
