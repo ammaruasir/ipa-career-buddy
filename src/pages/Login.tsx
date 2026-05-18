@@ -18,7 +18,7 @@ import { toast } from "sonner";
 const Login = () => {
   const [searchParams] = useSearchParams();
   const [isSignup, setIsSignup] = useState(searchParams.get("tab") === "signup");
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(!!searchParams.get("forgot"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
