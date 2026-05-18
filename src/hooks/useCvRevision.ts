@@ -67,19 +67,24 @@ export const useCvRevision = (userId: string | undefined, cvDocumentId: string |
   );
 
   const acceptRewrite = useCallback(
-    async (original: string, improved: string) => {
+    async (original: string, improved: string, section?: string) => {
       const list = revision?.accepted_rewrites ?? [];
-      const next = list.filter((r) => r.original !== original);
-      next.push({ original, improved });
+      // Dedup by (original|improved) — allows multiple empty-original additions
+      const key = `${original}||${improved}`;
+      const next = list.filter((r) => `${r.original}||${r.improved}` !== key);
+      next.push({ original, improved, ...(section ? { section } : {}) });
       return upsert({ accepted_rewrites: next });
     },
     [revision, upsert],
   );
 
   const rejectRewrite = useCallback(
-    async (original: string) => {
+    async (original: string, improved?: string) => {
       const list = revision?.accepted_rewrites ?? [];
-      const next = list.filter((r) => r.original !== original);
+      const next =
+        improved !== undefined
+          ? list.filter((r) => !(r.original === original && r.improved === improved))
+          : list.filter((r) => r.original !== original);
       return upsert({ accepted_rewrites: next });
     },
     [revision, upsert],
