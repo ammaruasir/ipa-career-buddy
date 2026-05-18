@@ -73,7 +73,7 @@ export function useDemoVoice() {
         if (isAutoplayBlock && !autoplayWarnedRef.current) {
           autoplayWarnedRef.current = true;
           toast.error(
-            "تعذّر تشغيل صوت المرشدة — اضغط مكاناً ما في الصفحة ثم 'ابدأ الجولة' مرّة أخرى.",
+            "تعذّر تشغيل صوت المرشد — اضغط مكاناً ما في الصفحة ثم 'ابدأ الجولة' مرّة أخرى.",
             { duration: 8000 },
           );
         } else if (!isAutoplayBlock) {

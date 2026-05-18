@@ -67,12 +67,12 @@ export function DemoPresenter() {
         onClick={() => setCollapsed(false)}
         dir="rtl"
         className="fixed z-[70] bottom-4 right-0 flex items-center gap-2 pl-3 pr-2 py-2 rounded-l-2xl bg-primary text-primary-foreground shadow-2xl border border-primary/30 hover:bg-primary/90 transition-all"
-        title="إظهار مرشدة المنصّة"
-        aria-label="إظهار مرشدة المنصّة"
+        title="إظهار مرشد المنصّة"
+        aria-label="إظهار مرشد المنصّة"
       >
         <ChevronLeft className="w-4 h-4" />
         <Sparkles className="w-4 h-4" />
-        <span className="text-xs font-semibold">لينا</span>
+        <span className="text-xs font-semibold">عبدالله</span>
       </button>
     );
   }
@@ -93,9 +93,9 @@ export function DemoPresenter() {
             <Sparkles className="w-4 h-4 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-foreground leading-tight">لينا</p>
+            <p className="text-sm font-bold text-foreground leading-tight">عبدالله</p>
             <p className="text-[11px] text-muted-foreground">
-              مرشدة المنصّة · {stepIndex + 1} / {totalSteps}
+              مرشد المنصّة · {stepIndex + 1} / {totalSteps}
               {qaCount > 0 && <span className="mx-1">· {qaCount}/{qaCap} سؤال</span>}
             </p>
           </div>
@@ -105,7 +105,7 @@ export function DemoPresenter() {
             variant="ghost"
             onClick={() => setCollapsed(true)}
             title="إخفاء"
-            aria-label="إخفاء مرشدة المنصّة"
+            aria-label="إخفاء مرشد المنصّة"
             className="shrink-0 h-7 w-7"
           >
             <ChevronRight className="w-4 h-4" />
