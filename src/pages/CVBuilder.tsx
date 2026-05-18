@@ -379,22 +379,24 @@ const PersonalStep = ({
 }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
     {[
-      { key: "full_name", label: "الاسم الكامل", placeholder: "محمد عبدالله السعيد" },
-      { key: "email", label: "البريد الإلكتروني", placeholder: "name@example.com", type: "email" },
-      { key: "phone", label: "رقم الجوّال", placeholder: "+966 5XXXXXXXX", type: "tel" },
-      { key: "city", label: "المدينة", placeholder: "الرياض" },
-      { key: "nationality", label: "الجنسية", placeholder: "سعودي" },
-      { key: "linkedin", label: "LinkedIn", placeholder: "linkedin.com/in/username" },
+      { key: "full_name", label: "الاسم الكامل", placeholder: "محمد عبدالله السعيد", ctx: "name" as const },
+      { key: "email", label: "البريد الإلكتروني", placeholder: "name@example.com", type: "email", ctx: null },
+      { key: "phone", label: "رقم الجوّال", placeholder: "+966 5XXXXXXXX", type: "tel", ctx: null },
+      { key: "city", label: "المدينة", placeholder: "الرياض", ctx: "name" as const },
+      { key: "nationality", label: "الجنسية", placeholder: "سعودي", ctx: "name" as const },
+      { key: "linkedin", label: "LinkedIn", placeholder: "linkedin.com/in/username", ctx: null },
     ].map((f) => (
       <div key={f.key} className="space-y-1.5">
         <Label htmlFor={f.key}>{f.label}</Label>
-        <Input
+        <ProofreadInput
           id={f.key}
           type={f.type ?? "text"}
           value={(value as any)[f.key] ?? ""}
-          onChange={(e) => onChange({ ...value, [f.key]: e.target.value })}
+          onChange={(v) => onChange({ ...value, [f.key]: v })}
           placeholder={f.placeholder}
           dir={f.type === "email" || f.type === "tel" ? "ltr" : "rtl"}
+          proofreadContext={f.ctx ?? "general"}
+          enableProofread={!!f.ctx}
         />
       </div>
     ))}
