@@ -250,6 +250,7 @@ export function useDemoVoice() {
 
   return {
     speak,
+    fetchTtsBlob,
     stop,
     pause,
     resume,
