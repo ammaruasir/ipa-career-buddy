@@ -1,17 +1,50 @@
 import { useCallback, useRef, useState } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { presenterVoiceId } from "@/demo/voices";
 
 const cleanTextForTTS = (text: string): string => text.replace(/(.)\1{2,}/g, "$1");
 
+// 1×1px silent WAV used to unlock the autoplay policy under a user gesture.
+// Once primed, subsequent audio.play() calls in the same tab succeed.
+const SILENT_WAV_DATA_URI =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+
 export function useDemoVoice() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  // Autoplay-policy state: true once the user has clicked something AND we've
+  // played a silent audio to unlock subsequent programmatic plays.
+  const audioPrimedRef = useRef(false);
+  const autoplayWarnedRef = useRef(false);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingResolveRef = useRef<((blob: Blob | null) => void) | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  /**
+   * Call this from inside a click handler (e.g. the "Start tour" button)
+   * BEFORE any async work. Plays a silent audio to unlock the autoplay
+   * policy so subsequent TTS audio plays without being blocked.
+   * Safe to call multiple times; only the first call does real work.
+   */
+  const primeAudio = useCallback(async (): Promise<boolean> => {
+    if (audioPrimedRef.current) return true;
+    try {
+      const a = new Audio(SILENT_WAV_DATA_URI);
+      a.volume = 0;
+      // Some browsers require muted for autoplay unlock; setting both is safe.
+      a.muted = true;
+      await a.play();
+      a.pause();
+      audioPrimedRef.current = true;
+      return true;
+    } catch (e) {
+      console.warn("primeAudio failed:", e);
+      return false;
+    }
+  }, []);
 
   const stop = useCallback(() => {
     if (currentAudioRef.current) {
@@ -31,8 +64,25 @@ export function useDemoVoice() {
         resolve();
       };
       audio.onended = cleanup;
-      audio.onerror = cleanup;
-      audio.play().catch(cleanup);
+      audio.onerror = (err) => {
+        console.warn("Audio element error:", err);
+        cleanup();
+      };
+      audio.play().catch((err) => {
+        // Don't silently swallow — most common case is autoplay block.
+        const isAutoplayBlock =
+          err?.name === "NotAllowedError" || /play\(\) failed/i.test(String(err?.message ?? ""));
+        if (isAutoplayBlock && !autoplayWarnedRef.current) {
+          autoplayWarnedRef.current = true;
+          toast.error(
+            "تعذّر تشغيل صوت المرشدة — اضغط مكاناً ما في الصفحة ثم 'ابدأ الجولة' مرّة أخرى.",
+            { duration: 8000 },
+          );
+        } else if (!isAutoplayBlock) {
+          console.error("audio.play() failed:", err);
+        }
+        cleanup();
+      });
     });
   }, []);
 
@@ -137,5 +187,14 @@ export function useDemoVoice() {
     return (data.transcription ?? "").trim();
   }, []);
 
-  return { speak, stop, isSpeaking, startRecording, stopRecording, isRecording, transcribe };
+  return {
+    speak,
+    stop,
+    isSpeaking,
+    startRecording,
+    stopRecording,
+    isRecording,
+    transcribe,
+    primeAudio,
+  };
 }

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { tourScript } from "@/demo/tour-script";
 import { featureSpec } from "@/demo/feature-spec";
@@ -36,7 +36,61 @@ type DemoTourContextValue = TourState & {
 const QA_CAP = 30;
 const MIC_CONSENT_KEY = "ipa-demo-mic-consent-v1";
 
+// Minimum time each step is shown, even if voice fails or finishes early.
+// Gives the human viewer a chance to read the narration + see the UI change.
+const MIN_STEP_DURATION_MS = 4500;
+
+// Hard cap so a runaway step (e.g. very long narration) doesn't stall the tour.
+const MAX_STEP_DURATION_MS = 60_000;
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// Used to suppress required PDPL consents during the demo (the demo-candidate
+// account doesn't grant them server-side, so without this the ConsentBanner
+// pops up over the dashboard mid-tour and blocks every interaction).
+async function prefillDemoConsents(): Promise<void> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const user = sessionData.session?.user;
+  if (!user) return;
+  const rows = ["audio_third_party_ai", "video_third_party_ai", "cv_third_party_ai"].map(
+    (consent_type) => ({ user_id: user.id, consent_type, granted: true, version: "v1" }),
+  );
+  try {
+    await supabase.from("user_consents").upsert(rows as any, {
+      onConflict: "user_id,consent_type,version",
+    });
+  } catch (e) {
+    console.warn("prefillDemoConsents failed (non-fatal):", e);
+  }
+}
+
+// Selectors of dialog/popup elements that block the tour. The auto-dismiss
+// observer below clicks the "save/accept/skip" button inside any of these.
+const DIALOG_ROOT_SELECTORS = [
+  '[role="dialog"]',
+  '[data-radix-dialog-content]',
+  '[data-tour="consent-banner"]',
+];
+
+// Button-text patterns we treat as safe to auto-click inside a dialog.
+const SAFE_ACCEPT_PATTERNS = [
+  /حفظ/i, /اعتمد/i, /موافق/i, /قبول/i, /متابعة/i, /save/i, /accept/i, /continue/i, /skip/i, /تأكيد/, // تأكيد
+];
+
+function findClickableInDialog(root: HTMLElement): HTMLElement | null {
+  const buttons = Array.from(root.querySelectorAll("button, [role='button']")) as HTMLElement[];
+  // Prefer primary/save-like buttons; skip explicit cancel/close ones.
+  for (const b of buttons) {
+    const text = (b.textContent || "").trim();
+    if (!text) continue;
+    if (/إلغاء|cancel/i.test(text)) continue;
+    if (SAFE_ACCEPT_PATTERNS.some((re) => re.test(text))) return b;
+  }
+  // Fallback: any submit-type button.
+  const submit = root.querySelector("button[type='submit']") as HTMLElement | null;
+  if (submit) return submit;
+  return null;
+}
 
 async function findElement(selector: string, timeoutMs = 2000): Promise<HTMLElement | null> {
   const start = Date.now();
@@ -150,6 +204,35 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
   const cancelRef = useRef(false);
   const currentStep: TourStep | null = tourScript[stepIndex] ?? null;
 
+  // ── Auto-dismiss popups during the tour ──────────────────────────────────
+  // When status is "running", any modal/dialog that appears (e.g. the PDPL
+  // ConsentBanner that auto-opens on /dashboard/candidate) blocks the tour.
+  // We watch the DOM and, after a short delay so the viewer sees it flash by,
+  // click the safe accept/save button inside it.
+  useEffect(() => {
+    if (status !== "running") return;
+    const handled = new WeakSet<Element>();
+    const tryDismiss = (root: HTMLElement) => {
+      if (handled.has(root)) return;
+      const btn = findClickableInDialog(root);
+      if (!btn) return;
+      handled.add(root);
+      // Brief flash so the viewer notices the popup, then auto-dismiss.
+      setTimeout(() => btn.click(), 1200);
+    };
+    const scan = () => {
+      for (const sel of DIALOG_ROOT_SELECTORS) {
+        document.querySelectorAll(sel).forEach((node) => {
+          if (node instanceof HTMLElement) tryDismiss(node);
+        });
+      }
+    };
+    scan();
+    const observer = new MutationObserver(() => scan());
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [status]);
+
   const setMicConsent = useCallback((on: boolean) => {
     setMicConsentState(on);
     if (typeof window !== "undefined") {
@@ -174,6 +257,11 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       if (isSessionSwap) {
         await runAction(step.action!, navigate, cancelRef);
         if (cancelRef.current) return;
+        // After swapping to the candidate session, pre-grant PDPL consents so
+        // the ConsentBanner doesn't pop up mid-tour.
+        if (step.action!.kind === "swap-session" && step.action!.role === "candidate") {
+          await prefillDemoConsents();
+        }
       }
 
       if (step.route) {
@@ -190,7 +278,19 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
           console.warn("Tour action failed:", e)
         );
       }
-      await speaking;
+
+      // Race voice against an estimated duration so the step never finishes
+      // sooner than is readable for a human viewer. If voice fails (autoplay
+      // block, network), durationEstimateMs or MIN_STEP_DURATION_MS holds.
+      const desired = Math.min(
+        MAX_STEP_DURATION_MS,
+        Math.max(MIN_STEP_DURATION_MS, step.durationEstimateMs ?? MIN_STEP_DURATION_MS),
+      );
+      const minWait = new Promise<void>((r) => setTimeout(r, desired));
+
+      // If voice still speaking when min duration ends, wait for voice;
+      // if voice ended first, wait the remaining min duration.
+      await Promise.all([speaking, minWait]);
     },
     [navigate, voice, appendTranscript, takeOverMode]
   );
@@ -200,6 +300,13 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
     setStepIndex(0);
     setTranscript([]);
     setQaCount(0);
+
+    // CRITICAL: prime the audio context BEFORE any async work — this is the
+    // last moment we're inside the user-gesture window for the click that
+    // invoked start(). Without it, autoplay policy blocks the first TTS
+    // audio.play() and the whole tour silently rushes through.
+    await voice.primeAudio();
+
     setStatus("running");
     for (let i = 0; i < tourScript.length; i++) {
       if (cancelRef.current) return;
@@ -216,7 +323,7 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       }
     }
     setStatus("finished");
-  }, [runStep]);
+  }, [runStep, voice]);
 
   const pause = useCallback(() => {
     cancelRef.current = true;
