@@ -5,6 +5,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, rateLimitResponse, safeParseJson } from "../_shared/guards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -172,6 +173,14 @@ serve(async (req) => {
       });
     }
 
+    // Rate limit (10/min)
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const rl = await checkRateLimit(adminClient, user.id, "cv_generate", 10, 60);
+    if (!rl.allowed) return rateLimitResponse(rl.retryAfter, corsHeaders);
+
     const body = await req.json();
     const role: string = body.role ?? "";
     const raw: string = sanitizeForPrompt(body.raw_description ?? "");
@@ -238,7 +247,13 @@ serve(async (req) => {
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) throw new Error("No structured output from AI");
 
-    const parsed = JSON.parse(toolCall.function.arguments);
+    const parsed = safeParseJson<any>(toolCall.function.arguments);
+    if (!parsed) {
+      return new Response(
+        JSON.stringify({ error: "AI output unparseable — retry" }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // Soft validation: ensure bullets are within length limits
     const validateBullets = (bullets?: string[]) =>

@@ -1,5 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  safeParseJson,
+} from "../_shared/guards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,6 +36,13 @@ serve(async (req) => {
     if (responsesRes.error) throw new Error("Failed to fetch responses");
 
     const interview = interviewRes.data;
+
+    // Rate limit per-user (audit #8). Allow 5 evaluations per 60 seconds.
+    // (Evaluations are expensive; in normal use a user evaluates 1-2 interviews/hour.)
+    if (interview.user_id) {
+      const rl = await checkRateLimit(supabase, interview.user_id, "evaluate", 5, 60);
+      if (!rl.allowed) return rateLimitResponse(rl.retryAfter, corsHeaders);
+    }
     const responses = responsesRes.data || [];
     const settings = settingsRes.data;
 
@@ -225,7 +237,17 @@ ${videoAnalysisSummary}`;
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall?.function?.arguments) throw new Error("No evaluation returned from AI");
 
-    const evaluation = JSON.parse(toolCall.function.arguments);
+    // Robust JSON parsing (audit #11) — give a useful error instead of generic 500
+    const evaluation = safeParseJson<any>(toolCall.function.arguments);
+    if (!evaluation) {
+      return new Response(
+        JSON.stringify({
+          error: "تعذّر تفسير ناتج الذكاء الاصطناعي / Failed to parse AI output. Please retry.",
+          retry_recommended: true,
+        }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
     const overallScore = Math.round(
       (evaluation.communication_score * wComm) +
       (evaluation.technical_score * wTech) +

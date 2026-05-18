@@ -72,8 +72,23 @@ const CoachingSection = ({ interviewId, practice = false }: CoachingSectionProps
       if (error) {
         console.error("Failed to trigger coaching:", error);
       }
-      // Poll once a few seconds later to pick up new coaching rows
-      setTimeout(() => load(), 4000);
+      // Audit #18: poll with exponential backoff until all coached or 5 attempts.
+      // Delays: 2s, 4s, 8s, 16s, 30s (cumulative ~60s).
+      const delays = [2000, 4000, 8000, 16000, 30000];
+      for (const delay of delays) {
+        await new Promise((r) => setTimeout(r, delay));
+        const { data } = await supabase
+          .from("responses")
+          .select("id, question_text, answer_text, coaching, coached_at")
+          .eq("interview_id", interviewId)
+          .order("created_at", { ascending: true });
+        if (data) {
+          const rows = data as unknown as ResponseWithCoaching[];
+          setResponses(rows);
+          const allDone = rows.length > 0 && rows.every((r) => r.coaching);
+          if (allDone) break;
+        }
+      }
     } finally {
       setGenerating(false);
     }

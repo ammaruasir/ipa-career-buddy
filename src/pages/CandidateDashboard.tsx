@@ -20,6 +20,7 @@ import {
 } from "recharts";
 import TrainingSection from "@/components/training/TrainingSection";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
+import ConsentBanner from "@/components/consent/ConsentBanner";
 import { toast } from "sonner";
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -232,6 +233,9 @@ const CandidateDashboard = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {/* PDPL consent (auto-prompts on first visit if any required consent is missing) */}
+        <ConsentBanner language="ar" />
 
         {/* Practice Mode */}
         <TrainingSection interviews={interviews} evaluations={evaluations} />
