@@ -213,63 +213,13 @@ function renderHtml(draft: Draft, lang: "ar" | "en"): string {
     )
     .join("");
 
-  // Template variations via accent color
+  // Per-template accent + layout
+  const tpl = draft.template ?? "modern";
   const accent =
-    draft.template === "executive"
-      ? "#1e3a8a"
-      : draft.template === "conservative"
-      ? "#374151"
-      : "#1e40af"; // modern
+    tpl === "executive" ? "#1e3a8a" : tpl === "conservative" ? "#374151" : "#1e40af";
 
-  return `<!doctype html>
-<html lang="${lang}" dir="${dir}">
-<head>
-  <meta charset="utf-8" />
-  <title>${escapeHtml(pi.full_name ?? "CV")}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0; padding: 0;
-      font-family: ${fontFamily};
-      color: #111;
-      line-height: 1.55;
-      font-size: 11pt;
-    }
-    body { padding: 24mm 20mm; max-width: 210mm; margin: 0 auto; }
-    .header { text-align: center; border-bottom: 2px solid ${accent}; padding-bottom: 12px; margin-bottom: 16px; }
-    .header h1 { font-size: 22pt; margin: 0; color: ${accent}; font-weight: 700; }
-    .header .contact { color: #555; font-size: 10pt; margin-top: 4px; }
-    section { margin-top: 14px; }
-    section h2 {
-      font-size: 13pt; color: ${accent};
-      border-bottom: 1px solid ${accent}33;
-      padding-bottom: 3px; margin: 0 0 8px;
-      text-align: ${align};
-    }
-    .entry { margin-bottom: 10px; }
-    .entry-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-    .entry-head strong { font-size: 11pt; }
-    .dates { color: #666; font-size: 9pt; white-space: nowrap; }
-    .company { color: #444; font-size: 10pt; margin-bottom: 2px; }
-    ul { margin: 4px 0 0; padding-${isAr ? "right" : "left"}: 16px; }
-    li { margin-bottom: 2px; font-size: 10.5pt; }
-    p { margin: 4px 0; font-size: 10.5pt; }
-    @media print {
-      body { padding: 18mm 16mm; }
-      @page { size: A4; margin: 0; }
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>${escapeHtml(pi.full_name ?? "")}</h1>
-    ${contactLine ? `<div class="contact">${contactLine}</div>` : ""}
-  </div>
-
-  ${resolveOrder(draft.section_order).map((key) => {
+  // Build a section renderer map (so each template can pick which keys it owns)
+  const renderSection = (key: string): string => {
     switch (key) {
       case "summary":
         return summary ? `<section><h2>${t.summary}</h2><p>${escapeHtml(summary)}</p></section>` : "";
@@ -292,9 +242,133 @@ function renderHtml(draft: Draft, lang: "ar" | "en"): string {
       default:
         return "";
     }
-  }).join("\n")}
-</body>
-</html>`;
+  };
+
+  const orderedKeys = resolveOrder(draft.section_order);
+  const fontHead = `
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />`;
+
+  const baseStyles = `
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: ${fontFamily}; color: #111; line-height: 1.55; font-size: 11pt; }
+    .entry { margin-bottom: 10px; }
+    .entry-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .entry-head strong { font-size: 11pt; }
+    .dates { color: #666; font-size: 9pt; white-space: nowrap; }
+    .company { color: #444; font-size: 10pt; margin-bottom: 2px; }
+    ul { margin: 4px 0 0; padding-${isAr ? "right" : "left"}: 16px; }
+    li { margin-bottom: 2px; font-size: 10.5pt; }
+    p { margin: 4px 0; font-size: 10.5pt; }
+    @media print { @page { size: A4; margin: 0; } }`;
+
+  // ============================================================
+  // TEMPLATE: MODERN — accent top bar, name aligned, section underlines
+  // ============================================================
+  if (tpl === "modern") {
+    const body = `
+  <div class="top-bar"></div>
+  <div class="page">
+    <header class="hdr">
+      <h1>${escapeHtml(pi.full_name ?? "")}</h1>
+      ${contactLine ? `<div class="contact">${contactLine}</div>` : ""}
+    </header>
+    ${orderedKeys.map(renderSection).join("\n")}
+  </div>`;
+    return `<!doctype html><html lang="${lang}" dir="${dir}"><head><meta charset="utf-8"/><title>${escapeHtml(pi.full_name ?? "CV")}</title>${fontHead}<style>${baseStyles}
+    .top-bar { height: 8mm; background: ${accent}; }
+    .page { padding: 14mm 18mm 18mm; max-width: 210mm; margin: 0 auto; }
+    .hdr { margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb; text-align: ${align}; }
+    .hdr h1 { font-size: 24pt; margin: 0; color: #0f172a; font-weight: 700; letter-spacing: -0.5px; }
+    .hdr .contact { color: #555; font-size: 10pt; margin-top: 4px; }
+    section { margin-top: 14px; }
+    section h2 { font-size: 13pt; color: ${accent}; border-bottom: 2px solid ${accent}; padding-bottom: 3px; margin: 0 0 8px; text-align: ${align}; font-weight: 700; }
+    @media print { .page { padding: 12mm 16mm 16mm; } }
+    </style></head><body>${body}</body></html>`;
+  }
+
+  // ============================================================
+  // TEMPLATE: CONSERVATIVE — centered classic, thin rules, Caps headings
+  // ============================================================
+  if (tpl === "conservative") {
+    const body = `
+  <div class="page">
+    <header class="hdr">
+      <h1>${escapeHtml(pi.full_name ?? "")}</h1>
+      ${contactLine ? `<div class="contact">${contactLine}</div>` : ""}
+    </header>
+    ${orderedKeys.map(renderSection).join("\n")}
+  </div>`;
+    return `<!doctype html><html lang="${lang}" dir="${dir}"><head><meta charset="utf-8"/><title>${escapeHtml(pi.full_name ?? "CV")}</title>${fontHead}<style>${baseStyles}
+    .page { padding: 22mm 22mm; max-width: 210mm; margin: 0 auto; }
+    .hdr { text-align: center; padding: 10px 0 12px; border-top: 1px solid #9ca3af; border-bottom: 1px solid #9ca3af; margin-bottom: 18px; }
+    .hdr h1 { font-size: 22pt; margin: 0 0 4px; color: #111; font-weight: 600; letter-spacing: 1px; }
+    .hdr .contact { color: #555; font-size: 10pt; }
+    section { margin-top: 14px; }
+    section h2 { font-size: 11pt; color: ${accent}; padding-bottom: 4px; margin: 0 0 8px; text-align: ${align}; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; border-bottom: 1px solid #d1d5db; }
+    @media print { .page { padding: 18mm 18mm; } }
+    </style></head><body>${body}</body></html>`;
+  }
+
+  // ============================================================
+  // TEMPLATE: EXECUTIVE — two columns, dark navy sidebar
+  // ============================================================
+  // Skills + languages auto-go to sidebar; rest follow section_order in main.
+  const sidebarKeys = new Set(["skills", "languages_structured"]);
+  const mainKeys = orderedKeys.filter((k) => !sidebarKeys.has(k));
+
+  const sidebarBlock = (key: string): string => {
+    if (key === "skills") {
+      const s = draft.skills ?? {};
+      const parts: string[] = [];
+      if (s.technical?.length) parts.push(`<div class="sb-group"><div class="sb-sub">${t.technical}</div><div class="sb-list">${(s.technical as string[]).map(escapeHtml).join("، ")}</div></div>`);
+      if (s.soft?.length) parts.push(`<div class="sb-group"><div class="sb-sub">${t.soft}</div><div class="sb-list">${(s.soft as string[]).map(escapeHtml).join("، ")}</div></div>`);
+      if (!parts.length) return "";
+      return `<div class="sb-section"><div class="sb-h">${t.skills}</div>${parts.join("")}</div>`;
+    }
+    if (key === "languages_structured") {
+      if (!langsHtml) return "";
+      return `<div class="sb-section"><div class="sb-h">${t.languages}</div><ul class="sb-ul">${langsHtml}</ul></div>`;
+    }
+    return "";
+  };
+
+  // RTL: sidebar on right (start). LTR: sidebar on left (start). Use flex-direction natural.
+  const body = `
+  <div class="exec-page">
+    <aside class="sidebar">
+      <div class="sb-name">${escapeHtml(pi.full_name ?? "")}</div>
+      <div class="sb-contact">
+        ${pi.email ? `<div>${escapeHtml(pi.email)}</div>` : ""}
+        ${pi.phone ? `<div>${escapeHtml(pi.phone)}</div>` : ""}
+        ${pi.city ? `<div>${escapeHtml(pi.city)}</div>` : ""}
+        ${pi.linkedin ? `<div style="word-break:break-all;">${escapeHtml(pi.linkedin)}</div>` : ""}
+      </div>
+      ${["skills", "languages_structured"].map(sidebarBlock).join("")}
+    </aside>
+    <main class="main">
+      ${mainKeys.map(renderSection).join("\n")}
+    </main>
+  </div>`;
+  return `<!doctype html><html lang="${lang}" dir="${dir}"><head><meta charset="utf-8"/><title>${escapeHtml(pi.full_name ?? "CV")}</title>${fontHead}<style>${baseStyles}
+    .exec-page { display: flex; min-height: 297mm; max-width: 210mm; margin: 0 auto; }
+    .sidebar { width: 70mm; background: #0f172a; color: #f1f5f9; padding: 22mm 12mm; }
+    .main { flex: 1; padding: 22mm 16mm; background: #fff; }
+    .sb-name { font-size: 18pt; font-weight: 700; color: #fff; margin-bottom: 10px; border-bottom: 2px solid ${accent}; padding-bottom: 8px; }
+    .sb-contact { font-size: 9.5pt; color: #cbd5e1; margin-bottom: 18px; line-height: 1.7; }
+    .sb-section { margin-top: 14px; }
+    .sb-h { font-size: 11pt; color: #fff; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-bottom: 8px; }
+    .sb-sub { font-size: 9.5pt; color: ${accent === "#1e3a8a" ? "#93c5fd" : "#cbd5e1"}; font-weight: 600; margin-top: 6px; }
+    .sb-list { font-size: 9.5pt; color: #e2e8f0; line-height: 1.6; }
+    .sb-ul { padding-${isAr ? "right" : "left"}: 14px; margin: 4px 0 0; }
+    .sb-ul li { font-size: 9.5pt; color: #e2e8f0; }
+    .sb-ul li strong { color: #fff; }
+    .main section { margin-top: 14px; }
+    .main section:first-child { margin-top: 0; }
+    .main section h2 { font-size: 13pt; color: ${accent}; padding-bottom: 4px; margin: 0 0 8px; text-align: ${align}; font-weight: 700; border-bottom: 2px solid ${accent}; }
+    @media print { .sidebar { padding: 18mm 10mm; } .main { padding: 18mm 14mm; } }
+    </style></head><body>${body}</body></html>`;
 }
 
 // Merge two single-language HTML documents into one bilingual page.

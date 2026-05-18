@@ -46,6 +46,7 @@ import { AIAssistBullets, AIAssistSummary, AIAssistSkills } from "@/components/c
 import JobAlignmentDialog from "@/components/cv-builder/JobAlignmentDialog";
 import CVDateInput from "@/components/cv-builder/CVDateInput";
 import SectionOrderPanel, { resolveSectionOrder, type SectionKey } from "@/components/cv-builder/SectionOrderPanel";
+import TemplateGallery from "@/components/cv-builder/TemplateGallery";
 
 interface PersonalInfo {
   full_name?: string;
@@ -447,23 +448,17 @@ const CVBuilder = () => {
 
             <Progress value={progress} className="h-2" />
 
-            {/* Template + Language selector row */}
-            <div className="grid grid-cols-2 gap-2 pt-2">
-              <div className="space-y-1">
+            {/* Template gallery + Language selector row */}
+            <div className="space-y-3 pt-2">
+              <div className="space-y-1.5">
                 <Label className="text-xs flex items-center gap-1.5 text-muted-foreground">
                   <Palette className="w-3 h-3" />
                   القالب
                 </Label>
-                <Select value={draft.template} onValueChange={(v) => update("template", v as Draft["template"])}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="modern">حديث</SelectItem>
-                    <SelectItem value="conservative">محافظ</SelectItem>
-                    <SelectItem value="executive">تنفيذي</SelectItem>
-                  </SelectContent>
-                </Select>
+                <TemplateGallery
+                  value={draft.template}
+                  onChange={(v) => update("template", v)}
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs flex items-center gap-1.5 text-muted-foreground">
