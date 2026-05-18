@@ -19,6 +19,7 @@ import {
   MessagesSquare,
   CheckCircle2,
   SkipForward,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProfilePrefill } from "@/hooks/useProfilePrefill";
@@ -301,7 +302,11 @@ const CVInterview = () => {
   if (!started) {
     return (
       <div className="min-h-screen bg-background" dir={dir}>
-        <div className="container mx-auto px-4 py-10 max-w-2xl">
+        <div className="container mx-auto px-4 py-10 max-w-2xl space-y-4">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="rounded-xl">
+            {dir === "rtl" ? <ArrowRight className="w-4 h-4 ml-1.5" /> : <ArrowLeft className="w-4 h-4 mr-1.5" />}
+            {uiLang === "en" ? "Back to home" : "العودة للرئيسية"}
+          </Button>
           <Card className="rounded-2xl shadow-lg">
             <CardHeader className="text-center space-y-3">
               <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/15 flex items-center justify-center">
@@ -374,6 +379,10 @@ const CVInterview = () => {
   return (
     <div className="min-h-screen bg-background" dir={dir}>
       <div className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="rounded-xl -mb-2">
+          {dir === "rtl" ? <ArrowRight className="w-4 h-4 ml-1.5" /> : <ArrowLeft className="w-4 h-4 mr-1.5" />}
+          {uiLang === "en" ? "Back to home" : "العودة للرئيسية"}
+        </Button>
         {/* Progress */}
         <Card className="rounded-2xl">
           <CardContent className="p-4 space-y-2">
