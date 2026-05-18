@@ -176,10 +176,18 @@ export type Database = {
       interviews: {
         Row: {
           created_at: string
+          end_reason: string | null
+          flagged_at: string | null
+          flagged_by: string | null
+          flagged_reason: string | null
           id: string
           job_position: string | null
           mode: Database["public"]["Enums"]["interview_mode"]
           questions: Json | null
+          recording_chunk_count: number | null
+          recording_chunks_path: string | null
+          recording_duration_ms: number | null
+          recording_status: string | null
           recording_url: string | null
           status: Database["public"]["Enums"]["interview_status"]
           type: Database["public"]["Enums"]["interview_type"]
@@ -189,10 +197,18 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          end_reason?: string | null
+          flagged_at?: string | null
+          flagged_by?: string | null
+          flagged_reason?: string | null
           id?: string
           job_position?: string | null
           mode?: Database["public"]["Enums"]["interview_mode"]
           questions?: Json | null
+          recording_chunk_count?: number | null
+          recording_chunks_path?: string | null
+          recording_duration_ms?: number | null
+          recording_status?: string | null
           recording_url?: string | null
           status?: Database["public"]["Enums"]["interview_status"]
           type: Database["public"]["Enums"]["interview_type"]
@@ -202,16 +218,57 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          end_reason?: string | null
+          flagged_at?: string | null
+          flagged_by?: string | null
+          flagged_reason?: string | null
           id?: string
           job_position?: string | null
           mode?: Database["public"]["Enums"]["interview_mode"]
           questions?: Json | null
+          recording_chunk_count?: number | null
+          recording_chunks_path?: string | null
+          recording_duration_ms?: number | null
+          recording_status?: string | null
           recording_url?: string | null
           status?: Database["public"]["Enums"]["interview_status"]
           type?: Database["public"]["Enums"]["interview_type"]
           updated_at?: string
           user_id?: string
           visibility?: Database["public"]["Enums"]["interview_visibility"]
+        }
+        Relationships: []
+      }
+      proctor_sessions: {
+        Row: {
+          id: string
+          interview_id: string
+          proctor_id: string
+          role: string
+          joined_at: string
+          left_at: string | null
+          events: Json
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          interview_id: string
+          proctor_id: string
+          role: string
+          joined_at?: string
+          left_at?: string | null
+          events?: Json
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          interview_id?: string
+          proctor_id?: string
+          role?: string
+          joined_at?: string
+          left_at?: string | null
+          events?: Json
+          notes?: string | null
         }
         Relationships: []
       }
@@ -810,6 +867,7 @@ export type Database = {
           template: string | null
           language: string | null
           primary_color: string | null
+          custom_sections: Json | null
           created_at: string | null
           updated_at: string | null
           last_exported_at: string | null
@@ -827,6 +885,7 @@ export type Database = {
           template?: string | null
           language?: string | null
           primary_color?: string | null
+          custom_sections?: Json | null
           created_at?: string | null
           updated_at?: string | null
           last_exported_at?: string | null
@@ -844,6 +903,7 @@ export type Database = {
           template?: string | null
           language?: string | null
           primary_color?: string | null
+          custom_sections?: Json | null
           created_at?: string | null
           updated_at?: string | null
           last_exported_at?: string | null

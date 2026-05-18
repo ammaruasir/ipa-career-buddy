@@ -27,6 +27,12 @@ interface Draft {
   education: any[];
   skills: any;
   certifications: any[];
+  custom_sections?: {
+    volunteer?: any[];
+    awards?: any[];
+    projects?: any[];
+    languages_structured?: any[];
+  };
   template: "conservative" | "modern" | "executive";
   language: "ar" | "en" | "bilingual";
 }
@@ -62,6 +68,11 @@ function renderHtml(draft: Draft, lang: "ar" | "en"): string {
         soft: "شخصية",
         languages: "اللغات",
         present: "حتى الآن",
+        volunteer: "العمل التطوّعي",
+        projects: "المشاريع",
+        awards: "الجوائز والتقديرات",
+        tech_used: "التقنيات",
+        native: "الأم",
       }
     : {
         summary: "Summary",
@@ -73,6 +84,11 @@ function renderHtml(draft: Draft, lang: "ar" | "en"): string {
         soft: "Soft",
         languages: "Languages",
         present: "Present",
+        volunteer: "Volunteer Work",
+        projects: "Projects",
+        awards: "Awards & Recognition",
+        tech_used: "Tech",
+        native: "Native",
       };
 
   const contactLine = [pi.email, pi.phone, pi.city, pi.linkedin]
@@ -126,6 +142,55 @@ function renderHtml(draft: Draft, lang: "ar" | "en"): string {
     .map(
       (c: any) =>
         `<li><strong>${escapeHtml(c.name ?? "")}</strong>${c.issuer ? " — " + escapeHtml(c.issuer) : ""}${c.date ? ` (${escapeHtml(c.date)})` : ""}</li>`,
+    )
+    .join("");
+
+  const cs = draft.custom_sections ?? {};
+
+  const volunteerHtml = (cs.volunteer ?? [])
+    .map(
+      (v: any) => `
+        <div class="entry">
+          <div class="entry-head">
+            <strong>${escapeHtml(v.role ?? "")}</strong>
+            <span class="dates">${escapeHtml(v.start ?? "")} – ${escapeHtml(v.end || t.present)}</span>
+          </div>
+          <div class="company">${escapeHtml(v.organization ?? "")}</div>
+          ${v.description ? `<p>${escapeHtml(v.description)}</p>` : ""}
+        </div>`,
+    )
+    .join("");
+
+  const projectsHtml = (cs.projects ?? [])
+    .map(
+      (p: any) => `
+        <div class="entry">
+          <div class="entry-head">
+            <strong>${escapeHtml(p.name ?? "")}${p.role ? " — " + escapeHtml(p.role) : ""}</strong>
+            ${p.link ? `<span class="dates"><a href="${escapeHtml(p.link)}">${escapeHtml(p.link.replace(/^https?:\/\//, ""))}</a></span>` : ""}
+          </div>
+          ${p.description ? `<p>${escapeHtml(p.description)}</p>` : ""}
+          ${p.tech && p.tech.length ? `<p style="font-size:9pt;color:#666;"><strong>${t.tech_used}:</strong> ${(p.tech as string[]).map(escapeHtml).join("، ")}</p>` : ""}
+        </div>`,
+    )
+    .join("");
+
+  const awardsHtml = (cs.awards ?? [])
+    .map(
+      (a: any) => `
+        <li>
+          <strong>${escapeHtml(a.title ?? "")}</strong>
+          ${a.issuer ? " — " + escapeHtml(a.issuer) : ""}
+          ${a.date ? ` <span style="color:#666;">(${escapeHtml(a.date)})</span>` : ""}
+          ${a.description ? `<div style="font-size:9.5pt;color:#555;">${escapeHtml(a.description)}</div>` : ""}
+        </li>`,
+    )
+    .join("");
+
+  const langsHtml = (cs.languages_structured ?? [])
+    .map(
+      (l: any) =>
+        `<li><strong>${escapeHtml(l.name ?? "")}</strong>${l.cefr ? ` — ${l.cefr === "native" ? t.native : escapeHtml(l.cefr)}` : ""}${l.label ? ` <span style="color:#777;">· ${escapeHtml(l.label)}</span>` : ""}</li>`,
     )
     .join("");
 
@@ -194,6 +259,14 @@ function renderHtml(draft: Draft, lang: "ar" | "en"): string {
   ${skillsHtml ? `<section><h2>${t.skills}</h2>${skillsHtml}</section>` : ""}
 
   ${certHtml ? `<section><h2>${t.certifications}</h2><ul>${certHtml}</ul></section>` : ""}
+
+  ${volunteerHtml ? `<section><h2>${t.volunteer}</h2>${volunteerHtml}</section>` : ""}
+
+  ${projectsHtml ? `<section><h2>${t.projects}</h2>${projectsHtml}</section>` : ""}
+
+  ${awardsHtml ? `<section><h2>${t.awards}</h2><ul>${awardsHtml}</ul></section>` : ""}
+
+  ${langsHtml ? `<section><h2>${t.languages}</h2><ul>${langsHtml}</ul></section>` : ""}
 </body>
 </html>`;
 }
