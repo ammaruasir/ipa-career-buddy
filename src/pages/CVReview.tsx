@@ -129,10 +129,19 @@ const CVReview = () => {
       const { data, error } = await supabase.functions.invoke("analyze-resume", {
         body: { resume_path: path },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      // Prefer the function's own error payload over the generic FunctionsHttpError
+      const serverMsg = (data as any)?.error;
+      if (serverMsg) throw new Error(serverMsg);
+      if (error) {
+        // Try to read the function's error body for a better message
+        const ctxMsg =
+          (error as any)?.context?.body && typeof (error as any).context.body === "string"
+            ? (() => { try { return JSON.parse((error as any).context.body)?.error; } catch { return null; } })()
+            : null;
+        throw new Error(ctxMsg || error.message);
+      }
       const fresh = await loadAnalysis(user.id);
-      if (!fresh) throw new Error("تعذّر حفظ نتيجة التحليل");
+      if (!fresh) throw new Error("تعذّر قراءة نتيجة التحليل بعد الحفظ");
       setDoc(fresh);
       toast.success("اكتمل تحليل سيرتك الذاتية", { id: loadingId });
     } catch (e: any) {
