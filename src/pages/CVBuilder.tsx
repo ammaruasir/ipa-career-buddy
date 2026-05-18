@@ -472,15 +472,17 @@ const ExperienceStep = ({
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input
+              <ProofreadInput
                 placeholder="الجهة"
                 value={exp.company ?? ""}
-                onChange={(e) => updateItem(idx, { company: e.target.value })}
+                onChange={(v) => updateItem(idx, { company: v })}
+                proofreadContext="name"
               />
-              <Input
+              <ProofreadInput
                 placeholder="المسمّى الوظيفي"
                 value={exp.position ?? ""}
-                onChange={(e) => updateItem(idx, { position: e.target.value })}
+                onChange={(v) => updateItem(idx, { position: v })}
+                proofreadContext="general"
               />
               <Input
                 placeholder="تاريخ البداية"
@@ -493,14 +495,15 @@ const ExperienceStep = ({
                 onChange={(e) => updateItem(idx, { end: e.target.value })}
               />
             </div>
-            <Textarea
+            <ProofreadTextarea
               placeholder="اكتب إنجازاتك (سطر لكل إنجاز) — أو وصفاً حرّاً ثم اضغط زرّ AI بالأسفل"
               value={(exp.bullets ?? []).join("\n")}
-              onChange={(e) =>
-                updateItem(idx, { bullets: e.target.value.split("\n").filter(Boolean) })
+              onChange={(v) =>
+                updateItem(idx, { bullets: v.split("\n").filter(Boolean) })
               }
               rows={4}
               dir="rtl"
+              proofreadContext="bullet"
             />
 
             {/* AI Assist: convert raw description to STAR bullets */}
