@@ -1,9 +1,7 @@
 import { useCallback, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { candidateVoiceId } from "@/demo/voices";
 import { demoCandidate } from "@/demo/demo-candidate";
-
-const cleanTextForTTS = (text: string): string => text.replace(/(.)\1{2,}/g, "$1");
+import { cleanTextForTTS } from "@/demo/clean-tts";
 
 export type CandidateContext = "cv_chat" | "practice_interview" | "assessment_interview";
 export type CandidateTurn = { q: string; a: string };
