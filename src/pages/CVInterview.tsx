@@ -270,6 +270,7 @@ const CVInterview = () => {
     }
   };
 
+  const askSuggestion = async () => {
     if (!sessionId || !question) return;
     setSuggesting(true);
     try {
