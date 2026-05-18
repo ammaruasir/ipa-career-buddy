@@ -3,6 +3,16 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, rateLimitResponse, safeParseJson } from "../_shared/guards.ts";
+
+// SECURITY: strip injection patterns from user-controlled text before LLM
+function sanitizeForPrompt(text: string): string {
+  return (text || "")
+    .replace(/ignore (all |the )?(previous|above) instructions?/gi, "[blocked]")
+    .replace(/تجاهل (كل )?(التعليمات|التوجيهات)( السابقة)?/g, "[محظور]")
+    .replace(/system:?\s*/gi, "")
+    .replace(/<\|.*?\|>/g, "");
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -122,7 +132,7 @@ serve(async (req) => {
     const body = await req.json();
     const cvDocumentId: string | undefined = body.cv_document_id;
     let conversationId: string | undefined = body.conversation_id;
-    const userMessage: string = body.message ?? "";
+    const userMessage: string = sanitizeForPrompt(body.message ?? "");
     const language: "ar" | "en" | "bilingual" = body.language ?? "ar";
 
     if (!userMessage.trim()) {
@@ -131,6 +141,14 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Rate limit: chat is interactive; 15/min is generous but prevents spam loops
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const rl = await checkRateLimit(adminClient, user.id, "cv_chat", 15, 60);
+    if (!rl.allowed) return rateLimitResponse(rl.retryAfter, corsHeaders);
 
     // Load CV grounding (the extraction + evaluation snapshot)
     let cvGrounding = "";
@@ -225,7 +243,13 @@ ${JSON.stringify(cvDoc, null, 2).slice(0, 5000)}
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) throw new Error("No structured output");
 
-    const parsed = JSON.parse(toolCall.function.arguments);
+    const parsed = safeParseJson<any>(toolCall.function.arguments);
+    if (!parsed) {
+      return new Response(
+        JSON.stringify({ error: "AI output unparseable — retry" }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // Append assistant message with justifications
     const assistantMessage = {

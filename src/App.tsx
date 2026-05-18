@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import AppNav from "@/components/nav/AppNav";
 import { lazy, Suspense } from "react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -53,6 +54,7 @@ const CohortDetail = lazyRetry(() => import("./pages/instructor/CohortDetail"));
 const CVReview = lazyRetry(() => import("./pages/CVReview"));
 const CVBuilder = lazyRetry(() => import("./pages/CVBuilder"));
 const CVInterview = lazyRetry(() => import("./pages/CVInterview"));
+const Features = lazyRetry(() => import("./pages/Features"));
 
 const queryClient = new QueryClient();
 
@@ -69,6 +71,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <AppNav />
           <Suspense fallback={<LazyFallback />}>
             <Routes>
               <Route path="/" element={<Index />} />
@@ -84,6 +87,7 @@ const App = () => (
               <Route path="/cv/review" element={<CVReview />} />
               <Route path="/cv/builder" element={<CVBuilder />} />
               <Route path="/cv/interview" element={<CVInterview />} />
+              <Route path="/features" element={<Features />} />
               <Route path="/dashboard/hr/compare" element={<CandidateCompare />} />
               <Route path="/dashboard/admin/candidate/:id" element={<CandidateDetail />} />
               <Route path="/career-guidance" element={<CareerGuidance />} />

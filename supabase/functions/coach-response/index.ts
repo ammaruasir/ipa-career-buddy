@@ -4,6 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, rateLimitResponse, safeParseJson } from "../_shared/guards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -166,7 +167,8 @@ async function coachOne(
     throw new Error("No coaching returned from AI");
   }
 
-  const parsed = JSON.parse(toolCall.function.arguments);
+  const parsed = safeParseJson<any>(toolCall.function.arguments);
+  if (!parsed?.star) throw new Error("AI output malformed");
   const star = parsed.star;
   const overallCoverage =
     (star.situation.score + star.task.score + star.action.score + star.result.score) / 4;
@@ -252,6 +254,11 @@ serve(async (req) => {
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
+
+      // Rate limit for user-triggered coaching (3/min). Server-initiated calls bypass.
+      const checkClient2 = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const rl = await checkRateLimit(checkClient2, user.id, "coach", 3, 60);
+      if (!rl.allowed) return rateLimitResponse(rl.retryAfter, corsHeaders);
     }
 
     // Prefer Lovable AI gateway (cheaper Gemini for practice); fall back to OpenAI.

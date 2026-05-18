@@ -1,6 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { decode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  hasConsent,
+  fetchWithBackoff,
+} from "../_shared/guards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -66,6 +72,17 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      // PDPL: warn-mode for video third-party consent
+      const consented = await hasConsent(supabase, user.id, "video_third_party_ai");
+      if (!consented) {
+        console.warn(`User ${user.id} sent video frames without explicit consent`);
+        // TODO: enforce once consent rollout complete
+      }
+
+      // Rate limit: 20/min (frames sent in batches during interviews)
+      const rl = await checkRateLimit(supabase, user.id, "video_analyze", 20, 60);
+      if (!rl.allowed) return rateLimitResponse(rl.retryAfter, corsHeaders);
     }
 
     // Build multimodal content with frames as inline images
@@ -89,7 +106,7 @@ serve(async (req) => {
 6. كشف شخص إضافي - هل يوجد شخص آخر غير المرشح في الإطار؟
 7. اتجاه النظر - هل المرشح ينظر بعيداً عن الشاشة بشكل متكرر؟`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetchWithBackoff("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
