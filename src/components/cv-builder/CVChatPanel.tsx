@@ -194,6 +194,32 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
                   >
                     {m.content}
                   </div>
+                  {m.role === "assistant" && onAcceptImprovement && !m.content.startsWith("⚠️") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-7 mt-1.5"
+                      onClick={async () => {
+                        const original = window.prompt(
+                          language === "en"
+                            ? "Paste the original text from your CV that this improvement should replace:"
+                            : "الصق النص الأصلي من سيرتك الذاتية الذي تريد استبداله بهذا التحسين:",
+                        );
+                        if (!original?.trim()) return;
+                        try {
+                          await onAcceptImprovement(m.content, original.trim());
+                          toast.success(
+                            language === "en" ? "Added to accepted improvements" : "تمت إضافته للتحسينات المعتمدة",
+                          );
+                        } catch (e: any) {
+                          toast.error(e?.message || (language === "en" ? "Failed to save" : "تعذّر الحفظ"));
+                        }
+                      }}
+                    >
+                      <CheckCircle2 className="w-3 h-3 ml-1" />
+                      {language === "en" ? "Use as improvement" : "اعتمد كتحسين على السيرة"}
+                    </Button>
+                  )}
                 </div>
               </div>
 
