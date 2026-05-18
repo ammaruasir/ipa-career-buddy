@@ -259,6 +259,8 @@ const CVBuilder = () => {
           education: d.education ?? [],
           skills: d.skills ?? { technical: [], soft: [], languages: [] },
           certifications: d.certifications ?? [],
+          custom_sections: d.custom_sections ?? {},
+          section_order: d.section_order ?? null,
           template: d.template ?? "modern",
           language: d.language ?? "ar",
         });
