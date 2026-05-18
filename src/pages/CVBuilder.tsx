@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AIAssistBullets } from "@/components/cv-builder/AIAssistButton";
+import { ProofreadInput, ProofreadTextarea } from "@/components/cv-builder/ProofreadInput";
+import { useProfilePrefill } from "@/hooks/useProfilePrefill";
 
 interface PersonalInfo {
   full_name?: string;
@@ -104,19 +106,21 @@ const EMPTY_DRAFT: Draft = {
 const CVBuilder = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const prefill = useProfilePrefill();
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load existing draft
+  // Load existing draft (or seed a fresh one from the user profile)
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/login");
       return;
     }
     if (!user) return;
+    if (!prefill.loaded) return; // wait for profile so seeding is correct
 
     const load = async () => {
       const { data } = await supabase
@@ -140,11 +144,19 @@ const CVBuilder = () => {
           template: d.template ?? "modern",
           language: d.language ?? "ar",
         });
+      } else {
+        // Fresh draft → seed personal info + first education row from profile
+        setDraft({
+          ...EMPTY_DRAFT,
+          personal_info: { ...prefill.personal_info },
+          education: prefill.education.length > 0 ? [...prefill.education] : [],
+        });
+        toast.success("تم تعبئة بعض الحقول من ملفك الشخصي — يمكنك تعديلها");
       }
       setLoading(false);
     };
     load();
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, prefill.loaded]);
 
   // Debounced auto-save
   const saveDraft = useCallback(
@@ -367,22 +379,24 @@ const PersonalStep = ({
 }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
     {[
-      { key: "full_name", label: "الاسم الكامل", placeholder: "محمد عبدالله السعيد" },
-      { key: "email", label: "البريد الإلكتروني", placeholder: "name@example.com", type: "email" },
-      { key: "phone", label: "رقم الجوّال", placeholder: "+966 5XXXXXXXX", type: "tel" },
-      { key: "city", label: "المدينة", placeholder: "الرياض" },
-      { key: "nationality", label: "الجنسية", placeholder: "سعودي" },
-      { key: "linkedin", label: "LinkedIn", placeholder: "linkedin.com/in/username" },
+      { key: "full_name", label: "الاسم الكامل", placeholder: "محمد عبدالله السعيد", ctx: "name" as const },
+      { key: "email", label: "البريد الإلكتروني", placeholder: "name@example.com", type: "email", ctx: null },
+      { key: "phone", label: "رقم الجوّال", placeholder: "+966 5XXXXXXXX", type: "tel", ctx: null },
+      { key: "city", label: "المدينة", placeholder: "الرياض", ctx: "name" as const },
+      { key: "nationality", label: "الجنسية", placeholder: "سعودي", ctx: "name" as const },
+      { key: "linkedin", label: "LinkedIn", placeholder: "linkedin.com/in/username", ctx: null },
     ].map((f) => (
       <div key={f.key} className="space-y-1.5">
         <Label htmlFor={f.key}>{f.label}</Label>
-        <Input
+        <ProofreadInput
           id={f.key}
           type={f.type ?? "text"}
           value={(value as any)[f.key] ?? ""}
-          onChange={(e) => onChange({ ...value, [f.key]: e.target.value })}
+          onChange={(v) => onChange({ ...value, [f.key]: v })}
           placeholder={f.placeholder}
           dir={f.type === "email" || f.type === "tel" ? "ltr" : "rtl"}
+          proofreadContext={f.ctx ?? "general"}
+          enableProofread={!!f.ctx}
         />
       </div>
     ))}
@@ -399,16 +413,17 @@ const SummaryStep = ({
   <div className="space-y-4">
     <div className="space-y-1.5">
       <Label htmlFor="summary-ar">الملخّص (بالعربية)</Label>
-      <Textarea
+      <ProofreadTextarea
         id="summary-ar"
         value={value.ar ?? ""}
-        onChange={(e) => onChange({ ...value, ar: e.target.value })}
+        onChange={(v) => onChange({ ...value, ar: v })}
         placeholder="3–5 أسطر تلخّص خبراتك ومجال تخصّصك وأهدافك المهنية..."
         rows={5}
         dir="rtl"
+        proofreadContext="summary"
       />
       <p className="text-xs text-muted-foreground">
-        نصيحة: ركّز على الإنجازات الكمّية وتجنّب المبالغات.
+        نصيحة: ركّز على الإنجازات الكمّية وتجنّب المبالغات. التدقيق الإملائي يحدث تلقائياً.
       </p>
     </div>
     <div className="space-y-1.5">
@@ -457,15 +472,17 @@ const ExperienceStep = ({
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input
+              <ProofreadInput
                 placeholder="الجهة"
                 value={exp.company ?? ""}
-                onChange={(e) => updateItem(idx, { company: e.target.value })}
+                onChange={(v) => updateItem(idx, { company: v })}
+                proofreadContext="name"
               />
-              <Input
+              <ProofreadInput
                 placeholder="المسمّى الوظيفي"
                 value={exp.position ?? ""}
-                onChange={(e) => updateItem(idx, { position: e.target.value })}
+                onChange={(v) => updateItem(idx, { position: v })}
+                proofreadContext="general"
               />
               <Input
                 placeholder="تاريخ البداية"
@@ -478,14 +495,15 @@ const ExperienceStep = ({
                 onChange={(e) => updateItem(idx, { end: e.target.value })}
               />
             </div>
-            <Textarea
+            <ProofreadTextarea
               placeholder="اكتب إنجازاتك (سطر لكل إنجاز) — أو وصفاً حرّاً ثم اضغط زرّ AI بالأسفل"
               value={(exp.bullets ?? []).join("\n")}
-              onChange={(e) =>
-                updateItem(idx, { bullets: e.target.value.split("\n").filter(Boolean) })
+              onChange={(v) =>
+                updateItem(idx, { bullets: v.split("\n").filter(Boolean) })
               }
               rows={4}
               dir="rtl"
+              proofreadContext="bullet"
             />
 
             {/* AI Assist: convert raw description to STAR bullets */}
@@ -530,20 +548,23 @@ const EducationStep = ({
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input
+              <ProofreadInput
                 placeholder="المؤسّسة التعليمية"
                 value={ed.institution ?? ""}
-                onChange={(e) => updateItem(idx, { institution: e.target.value })}
+                onChange={(v) => updateItem(idx, { institution: v })}
+                proofreadContext="name"
               />
-              <Input
+              <ProofreadInput
                 placeholder="الدرجة (بكالوريوس / ماجستير...)"
                 value={ed.degree ?? ""}
-                onChange={(e) => updateItem(idx, { degree: e.target.value })}
+                onChange={(v) => updateItem(idx, { degree: v })}
+                proofreadContext="general"
               />
-              <Input
+              <ProofreadInput
                 placeholder="التخصّص"
                 value={ed.major ?? ""}
-                onChange={(e) => updateItem(idx, { major: e.target.value })}
+                onChange={(v) => updateItem(idx, { major: v })}
+                proofreadContext="general"
               />
               <Input
                 placeholder="المعدّل (اختياري)"
