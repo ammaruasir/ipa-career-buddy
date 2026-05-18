@@ -314,14 +314,14 @@ const CVBuilder = () => {
             .from("cv_drafts")
             .insert({
               user_id: user.id,
-              personal_info: payload.personal_info,
-              summary: payload.summary,
-              experience: payload.experience,
-              education: payload.education,
-              skills: payload.skills,
-              certifications: payload.certifications,
-              custom_sections: payload.custom_sections,
-              section_order: payload.section_order,
+              personal_info: payload.personal_info as any,
+              summary: payload.summary as any,
+              experience: payload.experience as any,
+              education: payload.education as any,
+              skills: payload.skills as any,
+              certifications: payload.certifications as any,
+              custom_sections: payload.custom_sections as any,
+              section_order: payload.section_order as any,
               template: payload.template,
               language: payload.language,
             })
