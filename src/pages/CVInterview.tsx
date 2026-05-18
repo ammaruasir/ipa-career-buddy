@@ -250,6 +250,26 @@ const CVInterview = () => {
     }
   };
 
+  const goBack = async () => {
+    if (!sessionId || currentStep <= 0 || loading) return;
+    setLoading(true);
+    setSuggestion(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("cv-interview-step", {
+        body: { action: "back", session_id: sessionId, language },
+      });
+      if (error) throw error;
+      setCurrentStep(data.current_step);
+      setQuestion(data.question);
+      setAnswer(data.previous_answer ?? "");
+    } catch (e) {
+      console.error(e);
+      toast.error(uiLang === "en" ? "Failed to go back" : "تعذّر الرجوع");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const askSuggestion = async () => {
     if (!sessionId || !question) return;
     setSuggesting(true);
@@ -504,20 +524,33 @@ const CVInterview = () => {
         )}
 
         {/* Navigation */}
-        <div className="flex items-center justify-between gap-3">
-          {!question?.required ? (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
             <Button
-              variant="ghost"
-              onClick={() => submit({ skip: true })}
-              disabled={loading}
+              variant="outline"
+              onClick={goBack}
+              disabled={loading || currentStep <= 0}
               className="rounded-xl"
             >
-              <SkipForward className="w-4 h-4 ml-2" />
-              {t.skip}
+              {uiLang === "ar" ? (
+                <ArrowRight className="w-4 h-4 ml-2" />
+              ) : (
+                <ArrowLeft className="w-4 h-4 mr-2" />
+              )}
+              {uiLang === "en" ? "Previous question" : "السؤال السابق"}
             </Button>
-          ) : (
-            <div />
-          )}
+            {!question?.required && (
+              <Button
+                variant="ghost"
+                onClick={() => submit({ skip: true })}
+                disabled={loading}
+                className="rounded-xl"
+              >
+                <SkipForward className="w-4 h-4 ml-2" />
+                {t.skip}
+              </Button>
+            )}
+          </div>
           <Button
             onClick={() => submit()}
             disabled={loading || (question?.required && !answer.trim())}
