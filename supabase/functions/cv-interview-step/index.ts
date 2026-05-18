@@ -499,6 +499,35 @@ serve(async (req) => {
       );
     }
 
+    // ----- action: back — go to previous question -----
+    if (action === "back") {
+      const stepIdx: number = session.current_step;
+      const prevStep = Math.max(0, stepIdx - 1);
+      const prevQ = QUESTIONS[prevStep];
+      if (!prevQ) throw new Error("No previous step");
+
+      await supabase
+        .from("cv_interview_sessions")
+        .update({ current_step: prevStep })
+        .eq("id", sessionId);
+
+      const savedAnswers = (session.answers as any) ?? {};
+      const previousAnswer = savedAnswers[prevQ.id]?.answer ?? "";
+
+      return new Response(
+        JSON.stringify({
+          session_id: sessionId,
+          current_step: prevStep,
+          total_steps: QUESTIONS.length,
+          question: prevQ,
+          previous_answer: previousAnswer,
+          suggestion: null,
+          done: false,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // ----- action: finalize — generate cv_drafts row -----
     if (action === "finalize") {
       const draftRecord = buildDraftFromAnswers((session.answers as any) ?? {});
