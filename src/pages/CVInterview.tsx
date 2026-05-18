@@ -20,6 +20,9 @@ import {
   CheckCircle2,
   SkipForward,
   Home,
+  Plus,
+  Trash2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProfilePrefill } from "@/hooks/useProfilePrefill";
