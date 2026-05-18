@@ -49,11 +49,6 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
     interviewerVoiceId: iv.voice_id,
   });
 
-  // Cheat camera for voice mode (video mode already has camera via useLiveInterview)
-  const cheatCamera = useCheatCamera({
-    enabled: type === "voice" && live.isCallActive,
-    interviewId: live.interviewId,
-  });
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
