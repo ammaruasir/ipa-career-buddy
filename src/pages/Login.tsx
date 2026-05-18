@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Briefcase, Loader2, Shield, GraduationCap } from "lucide-react";
+import { Briefcase, Loader2, Shield, GraduationCap, ArrowRight } from "lucide-react";
 
 const QUICK_ACCOUNTS = [
   { label: "مسؤول", email: "admin@test.com", password: "00000000", role: "admin" as const },
