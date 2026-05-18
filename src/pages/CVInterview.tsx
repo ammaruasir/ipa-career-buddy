@@ -179,6 +179,12 @@ const CVInterview = () => {
       setPrefilled(false);
       return;
     }
+    // After "Previous question", the saved answer is already in state — don't overwrite it.
+    if (skipPrefillOnceRef.current) {
+      skipPrefillOnceRef.current = false;
+      setPrefilled(false);
+      return;
+    }
     const seed = prefillFor(question);
     if (seed) {
       setAnswer(seed);
