@@ -57,7 +57,7 @@ const Demo = () => {
           disabled={launching}
         >
           <Play className="w-5 h-5" />
-          {launching ? "الجولة قيد التشغيل…" : "ابدأ الجولة"}
+          {preparing ? "جاري تجهيز الصوت…" : launching ? "الجولة قيد التشغيل…" : "ابدأ الجولة"}
         </Button>
 
         <p className="text-[11px] text-muted-foreground">
