@@ -16,13 +16,37 @@ const corsHeaders = {
 // ============================================================
 // Question bank — order matters. Bilingual labels.
 // ============================================================
+interface SubFieldDef {
+  key: string;
+  label_ar: string;
+  label_en: string;
+  type: "text" | "email" | "tel" | "url" | "date" | "textarea" | "choice";
+  required?: boolean;
+  placeholder_ar?: string;
+  placeholder_en?: string;
+  choices?: { value: string; label_ar: string; label_en: string }[];
+  span?: 1 | 2; // grid columns
+}
+
 interface QuestionDef {
   id: string;
   step: number;
   field: string;
   required: boolean;
-  type: "text" | "textarea" | "list_text" | "structured_list" | "choice";
+  type:
+    | "text"
+    | "textarea"
+    | "list_text"
+    | "structured_list"
+    | "choice"
+    | "form"
+    | "repeater"
+    | "repeater_simple"
+    | "chips";
   choices?: { value: string; label_ar: string; label_en: string }[];
+  fields?: SubFieldDef[]; // for form & repeater
+  item_label_ar?: string; // for repeaters
+  item_label_en?: string;
   label_ar: string;
   label_en: string;
   hint_ar: string;
@@ -85,20 +109,35 @@ const QUESTIONS: QuestionDef[] = [
     step: 5,
     field: "personal_info.contact",
     required: true,
-    type: "textarea",
-    label_ar: "بيانات التواصل: البريد، الجوّال، المدينة، LinkedIn (سطر لكل واحد)",
-    label_en: "Contact: email, phone, city, LinkedIn (one per line)",
-    hint_ar: "العنوان التفصيلي غير ضروري، المدينة كافية.",
-    hint_en: "Detailed address not needed, city is enough.",
+    type: "form",
+    fields: [
+      { key: "email", label_ar: "البريد الإلكتروني", label_en: "Email", type: "email", required: true, placeholder_ar: "name@example.com", placeholder_en: "name@example.com" },
+      { key: "phone", label_ar: "رقم الجوّال", label_en: "Phone", type: "tel", required: true, placeholder_ar: "+9665XXXXXXXX", placeholder_en: "+9665XXXXXXXX" },
+      { key: "city", label_ar: "المدينة", label_en: "City", type: "text", required: true, placeholder_ar: "الرياض", placeholder_en: "Riyadh" },
+      { key: "linkedin", label_ar: "رابط LinkedIn (اختياري)", label_en: "LinkedIn URL (optional)", type: "url", placeholder_ar: "https://linkedin.com/in/...", placeholder_en: "https://linkedin.com/in/..." },
+    ],
+    label_ar: "بيانات التواصل",
+    label_en: "Contact information",
+    hint_ar: "العنوان التفصيلي غير ضروري — المدينة كافية.",
+    hint_en: "Detailed address not needed — city is enough.",
   },
   {
     id: "experience_history",
     step: 6,
     field: "experience",
     required: true,
-    type: "textarea",
-    label_ar: "اكتب وظائفك السابقة (الأحدث أوّلاً). لكل وظيفة: المسمّى، الجهة، التواريخ، وملخّص ما فعلت.",
-    label_en: "List your work history (most recent first). For each: title, employer, dates, what you did.",
+    type: "repeater",
+    item_label_ar: "وظيفة",
+    item_label_en: "Job",
+    fields: [
+      { key: "title", label_ar: "المسمّى الوظيفي", label_en: "Job title", type: "text", required: true, span: 2 },
+      { key: "company", label_ar: "الجهة / الشركة", label_en: "Company", type: "text", required: true, span: 2 },
+      { key: "from", label_ar: "من (شهر/سنة)", label_en: "From (Mon/Year)", type: "text", placeholder_ar: "01/2022", placeholder_en: "01/2022" },
+      { key: "to", label_ar: "إلى (أو 'حالياً')", label_en: "To (or 'Present')", type: "text", placeholder_ar: "حالياً", placeholder_en: "Present" },
+      { key: "summary", label_ar: "ملخّص ما فعلت", label_en: "Summary of what you did", type: "textarea", span: 2 },
+    ],
+    label_ar: "خبراتك الوظيفية (الأحدث أوّلاً)",
+    label_en: "Work experience (most recent first)",
     hint_ar: "لا تقلق بشأن الصياغة — AI سيحوّلها لـ STAR bullets قويّة لاحقاً.",
     hint_en: "Don't worry about phrasing — AI will polish to STAR bullets later.",
   },
@@ -107,20 +146,31 @@ const QUESTIONS: QuestionDef[] = [
     step: 7,
     field: "key_achievements",
     required: true,
-    type: "textarea",
-    label_ar: "أكبر ٣-٥ إنجازات في مسيرتك المهنية (بالأرقام إن أمكن).",
-    label_en: "Your top 3-5 career achievements (with numbers if possible).",
-    hint_ar: "مثال: 'خفّضت تكلفة عمليّة بـ ٢٥٪'، 'قُدت فريق ١٢ شخص'، 'حصلت على جائزة...'",
-    hint_en: "Example: 'Cut process cost by 25%', 'Led 12-person team', 'Won award...'",
+    type: "repeater_simple",
+    item_label_ar: "إنجاز",
+    item_label_en: "Achievement",
+    label_ar: "أكبر ٣-٥ إنجازات في مسيرتك المهنية",
+    label_en: "Your top 3-5 career achievements",
+    hint_ar: "مثال: 'خفّضت تكلفة عمليّة بـ ٢٥٪'، 'قُدت فريق ١٢ شخص'.",
+    hint_en: "Example: 'Cut process cost by 25%', 'Led 12-person team'.",
   },
   {
     id: "education",
     step: 8,
     field: "education",
     required: true,
-    type: "textarea",
-    label_ar: "مؤهّلاتك التعليمية (الأحدث أوّلاً): الدرجة، التخصّص، الجامعة، السنة.",
-    label_en: "Your education (most recent first): degree, major, university, year.",
+    type: "repeater",
+    item_label_ar: "مؤهّل",
+    item_label_en: "Degree",
+    fields: [
+      { key: "degree", label_ar: "الدرجة", label_en: "Degree", type: "text", required: true, placeholder_ar: "بكالوريوس", placeholder_en: "Bachelor's" },
+      { key: "major", label_ar: "التخصّص", label_en: "Major", type: "text", required: true, placeholder_ar: "علوم حاسب", placeholder_en: "Computer Science" },
+      { key: "university", label_ar: "الجامعة", label_en: "University", type: "text", required: true, span: 2 },
+      { key: "year", label_ar: "سنة التخرّج", label_en: "Graduation year", type: "text", placeholder_ar: "2024", placeholder_en: "2024" },
+      { key: "gpa", label_ar: "المعدّل (اختياري — فقط إذا ممتاز)", label_en: "GPA (optional — only if excellent)", type: "text", placeholder_ar: "4.5/5.0", placeholder_en: "4.5/5.0" },
+    ],
+    label_ar: "مؤهّلاتك التعليمية (الأحدث أوّلاً)",
+    label_en: "Your education (most recent first)",
     hint_ar: "اذكر GPA فقط إذا ≥ ٤.٠/٥.٠ أو ٣.٥/٤.٠.",
     hint_en: "Only include GPA if ≥ 4.0/5.0 or 3.5/4.0.",
   },
@@ -129,31 +179,58 @@ const QUESTIONS: QuestionDef[] = [
     step: 9,
     field: "skills.technical",
     required: true,
-    type: "textarea",
-    label_ar: "مهاراتك التقنية / الأدوات (افصل بفاصلة).",
-    label_en: "Your technical skills / tools (comma-separated).",
-    hint_ar: "AI سيقترح المزيد بناءً على خبراتك.",
-    hint_en: "AI will suggest additional skills based on your experience.",
+    type: "chips",
+    label_ar: "مهاراتك التقنية / الأدوات",
+    label_en: "Your technical skills / tools",
+    hint_ar: "اكتب المهارة واضغط Enter لإضافتها. مثال: Excel، SQL، Power BI.",
+    hint_en: "Type a skill and press Enter to add. e.g., Excel, SQL, Power BI.",
   },
   {
     id: "languages",
     step: 10,
     field: "skills.languages",
     required: true,
-    type: "textarea",
-    label_ar: "اللغات التي تتقنها ومستواك في كل لغة.",
-    label_en: "Languages and your proficiency in each.",
-    hint_ar: "مثال: 'العربية (الأم)، الإنجليزية (طلاقة C1)'.",
-    hint_en: "Example: 'Arabic (native), English (fluent C1)'.",
+    type: "repeater",
+    item_label_ar: "لغة",
+    item_label_en: "Language",
+    fields: [
+      { key: "name", label_ar: "اللغة", label_en: "Language", type: "text", required: true, placeholder_ar: "الإنجليزية", placeholder_en: "English" },
+      {
+        key: "level",
+        label_ar: "المستوى",
+        label_en: "Proficiency",
+        type: "choice",
+        required: true,
+        choices: [
+          { value: "native", label_ar: "اللغة الأم", label_en: "Native" },
+          { value: "fluent", label_ar: "طلاقة (C1-C2)", label_en: "Fluent (C1-C2)" },
+          { value: "advanced", label_ar: "متقدّم (B2)", label_en: "Advanced (B2)" },
+          { value: "intermediate", label_ar: "متوسّط (B1)", label_en: "Intermediate (B1)" },
+          { value: "beginner", label_ar: "مبتدئ (A1-A2)", label_en: "Beginner (A1-A2)" },
+        ],
+      },
+    ],
+    label_ar: "اللغات ومستواك في كل لغة",
+    label_en: "Languages and your proficiency",
+    hint_ar: "أضف كل لغة بشكل منفصل.",
+    hint_en: "Add each language separately.",
   },
   {
     id: "certifications",
     step: 11,
     field: "certifications",
     required: false,
-    type: "textarea",
-    label_ar: "شهادات مهنية أو دورات معتمدة (اختياري).",
-    label_en: "Professional certifications or accredited courses (optional).",
+    type: "repeater",
+    item_label_ar: "شهادة",
+    item_label_en: "Certification",
+    fields: [
+      { key: "name", label_ar: "اسم الشهادة", label_en: "Certificate name", type: "text", required: true, span: 2 },
+      { key: "issuer", label_ar: "الجهة المانحة", label_en: "Issuing body", type: "text", required: true },
+      { key: "year", label_ar: "السنة", label_en: "Year", type: "text", placeholder_ar: "2024", placeholder_en: "2024" },
+      { key: "link", label_ar: "رابط التحقّق (اختياري)", label_en: "Verification link (optional)", type: "url", span: 2 },
+    ],
+    label_ar: "الشهادات المهنية (اختياري)",
+    label_en: "Professional certifications (optional)",
     hint_ar: "تجاهل دورات Udemy العامّة — فقط الشهادات المعتمدة من جهات معروفة.",
     hint_en: "Skip generic Udemy courses — only accredited certifications.",
   },
@@ -241,7 +318,7 @@ async function suggestForQuestion(
   language: string,
 ) {
   // Only suggest for free-text and textarea questions
-  if (q.type === "choice" || q.type === "text") return null;
+  if (q.type !== "textarea" && q.type !== "list_text" && q.type !== "structured_list") return null;
 
   try {
     const { apiKey, apiUrl, model } = pickProvider();
@@ -277,6 +354,20 @@ async function suggestForQuestion(
   }
 }
 
+// Try to parse a structured (JSON) answer; returns null if it's plain text
+function tryParseStructured(raw: any): any | null {
+  if (raw == null) return null;
+  if (typeof raw === "object") return raw;
+  if (typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (!s.startsWith("{") && !s.startsWith("[")) return null;
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
 // Convert accumulated answers into a cv_drafts row
 function buildDraftFromAnswers(answers: Record<string, any>) {
   const parseLines = (s: string) =>
@@ -285,56 +376,144 @@ function buildDraftFromAnswers(answers: Record<string, any>) {
       .map((l) => l.trim())
       .filter(Boolean);
 
-  // Naive parsing — the user can refine in /cv/builder afterwards
+  // ---- personal info ----
   const personalInfo: Record<string, string> = {
     full_name: answers.full_name?.answer ?? "",
   };
-  const contactLines = parseLines(answers.contact?.answer ?? "");
-  for (const line of contactLines) {
-    if (line.includes("@")) personalInfo.email = line;
-    else if (/^\+?\d/.test(line)) personalInfo.phone = line;
-    else if (line.toLowerCase().includes("linkedin")) personalInfo.linkedin = line;
-    else if (!personalInfo.city) personalInfo.city = line;
+  const contactStructured = tryParseStructured(answers.contact?.answer);
+  if (contactStructured && typeof contactStructured === "object") {
+    if (contactStructured.email) personalInfo.email = contactStructured.email;
+    if (contactStructured.phone) personalInfo.phone = contactStructured.phone;
+    if (contactStructured.city) personalInfo.city = contactStructured.city;
+    if (contactStructured.linkedin) personalInfo.linkedin = contactStructured.linkedin;
+  } else {
+    // Legacy: line-separated free text
+    const contactLines = parseLines(answers.contact?.answer ?? "");
+    for (const line of contactLines) {
+      if (line.includes("@")) personalInfo.email = line;
+      else if (/^\+?\d/.test(line)) personalInfo.phone = line;
+      else if (line.toLowerCase().includes("linkedin")) personalInfo.linkedin = line;
+      else if (!personalInfo.city) personalInfo.city = line;
+    }
   }
 
   const summaryText = answers.value_proposition?.answer ?? "";
 
-  // Experience: each blank-line-separated chunk = one job
-  const expChunks = (answers.experience_history?.answer ?? "")
-    .split(/\n\s*\n/)
-    .map((c: string) => c.trim())
-    .filter(Boolean);
-  const experience = expChunks.map((chunk: string) => {
-    const lines = chunk.split("\n").map((l) => l.trim());
-    return {
-      position: lines[0] ?? "",
-      company: lines[1] ?? "",
-      start: lines[2] ?? "",
-      end: "",
-      bullets: lines.slice(3),
-    };
-  });
+  // ---- experience ----
+  let experience: any[] = [];
+  const expStructured = tryParseStructured(answers.experience_history?.answer);
+  if (Array.isArray(expStructured)) {
+    experience = expStructured.map((item: any) => ({
+      position: item.title ?? "",
+      company: item.company ?? "",
+      start: item.from ?? "",
+      end: item.to ?? "",
+      bullets: (item.summary ?? "")
+        .split("\n")
+        .map((l: string) => l.trim())
+        .filter(Boolean),
+    }));
+  } else {
+    const expChunks = (answers.experience_history?.answer ?? "")
+      .split(/\n\s*\n/)
+      .map((c: string) => c.trim())
+      .filter(Boolean);
+    experience = expChunks.map((chunk: string) => {
+      const lines = chunk.split("\n").map((l) => l.trim());
+      return {
+        position: lines[0] ?? "",
+        company: lines[1] ?? "",
+        start: lines[2] ?? "",
+        end: "",
+        bullets: lines.slice(3),
+      };
+    });
+  }
 
-  const eduChunks = (answers.education?.answer ?? "")
-    .split(/\n\s*\n/)
-    .map((c: string) => c.trim())
-    .filter(Boolean);
-  const education = eduChunks.map((chunk: string) => {
-    const lines = chunk.split("\n").map((l) => l.trim());
-    return {
-      degree: lines[0] ?? "",
-      major: lines[1] ?? "",
-      institution: lines[2] ?? "",
+  // ---- key achievements: attach as bullets on first job, or as standalone list ----
+  const achievementsStructured = tryParseStructured(answers.key_achievements?.answer);
+  const achievementsList: string[] = Array.isArray(achievementsStructured)
+    ? achievementsStructured.map((a: any) => (typeof a === "string" ? a : a?.text ?? "")).filter(Boolean)
+    : parseLines(answers.key_achievements?.answer ?? "");
+  if (achievementsList.length && experience[0]) {
+    experience[0].bullets = [...(experience[0].bullets ?? []), ...achievementsList];
+  }
+
+  // ---- education ----
+  let education: any[] = [];
+  const eduStructured = tryParseStructured(answers.education?.answer);
+  if (Array.isArray(eduStructured)) {
+    education = eduStructured.map((item: any) => ({
+      degree: item.degree ?? "",
+      major: item.major ?? "",
+      institution: item.university ?? "",
       start: "",
-      end: lines[3] ?? "",
-    };
-  });
+      end: item.year ?? "",
+      gpa: item.gpa ?? "",
+    }));
+  } else {
+    const eduChunks = (answers.education?.answer ?? "")
+      .split(/\n\s*\n/)
+      .map((c: string) => c.trim())
+      .filter(Boolean);
+    education = eduChunks.map((chunk: string) => {
+      const lines = chunk.split("\n").map((l) => l.trim());
+      return {
+        degree: lines[0] ?? "",
+        major: lines[1] ?? "",
+        institution: lines[2] ?? "",
+        start: "",
+        end: lines[3] ?? "",
+      };
+    });
+  }
 
-  const technical = parseLines((answers.technical_skills?.answer ?? "").replace(/،/g, ","))
-    .flatMap((l) => l.split(",").map((s) => s.trim()))
-    .filter(Boolean);
-  const languages = parseLines(answers.languages?.answer ?? "");
-  const certs = parseLines(answers.certifications?.answer ?? "").map((c) => ({ name: c }));
+  // ---- technical skills ----
+  let technical: string[] = [];
+  const techStructured = tryParseStructured(answers.technical_skills?.answer);
+  if (Array.isArray(techStructured)) {
+    technical = techStructured.map((s: any) => String(s).trim()).filter(Boolean);
+  } else {
+    technical = parseLines((answers.technical_skills?.answer ?? "").replace(/،/g, ","))
+      .flatMap((l) => l.split(",").map((s) => s.trim()))
+      .filter(Boolean);
+  }
+
+  // ---- languages ----
+  let languages: string[] = [];
+  const langStructured = tryParseStructured(answers.languages?.answer);
+  if (Array.isArray(langStructured)) {
+    const levelLabels: Record<string, string> = {
+      native: "Native",
+      fluent: "Fluent",
+      advanced: "Advanced",
+      intermediate: "Intermediate",
+      beginner: "Beginner",
+    };
+    languages = langStructured
+      .map((l: any) => {
+        const name = l?.name ?? "";
+        const level = levelLabels[l?.level] ?? l?.level ?? "";
+        return name ? (level ? `${name} (${level})` : name) : "";
+      })
+      .filter(Boolean);
+  } else {
+    languages = parseLines(answers.languages?.answer ?? "");
+  }
+
+  // ---- certifications ----
+  let certs: any[] = [];
+  const certStructured = tryParseStructured(answers.certifications?.answer);
+  if (Array.isArray(certStructured)) {
+    certs = certStructured.map((c: any) => ({
+      name: c?.name ?? "",
+      issuer: c?.issuer ?? "",
+      year: c?.year ?? "",
+      link: c?.link ?? "",
+    })).filter((c) => c.name);
+  } else {
+    certs = parseLines(answers.certifications?.answer ?? "").map((c) => ({ name: c }));
+  }
 
   return {
     personal_info: personalInfo,
