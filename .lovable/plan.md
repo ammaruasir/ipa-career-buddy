@@ -1,30 +1,30 @@
-## التعديلات المطلوبة
+## Root cause
 
-**أولاً: إزالة كلمة "مجاني/مجاناً/المجاني"** من نصوص الواجهة:
+The interviewer is silent because the **`wakeb-tts` edge function is not deployed** (returns 404).
 
-| الملف | السطر | قبل | بعد |
-|---|---|---|---|
-| `src/pages/Index.tsx` | 125 | "ابدأ مجاناً" | "ابدأ الآن" |
-| `src/pages/Index.tsx` | 156 | "ابدأ مجاناً" | "ابدأ الآن" |
-| `src/pages/Index.tsx` | 211 | "ابدأ التدريب المجاني" | "ابدأ التدريب" |
-| `src/pages/Index.tsx` | 558 | "أنشئ حسابك المجاني" | "أنشئ حسابك" |
-| `src/pages/Features.tsx` | 255 | "أنشئ حسابك المجاني وادخل وضع التدريب…" | "أنشئ حسابك وادخل وضع التدريب…" |
-| `src/pages/Features.tsx` | 259 | "ابدأ مجاناً" | "ابدأ الآن" |
-| `src/demo/tour-script.ts` | 135 | label "ابدأ مجاناً" | label "ابدأ الآن" |
+Evidence:
+- Console: repeated `TypeError: Failed to fetch` in `useLiveInterview.ts` at the TTS call.
+- Supabase analytics for `wakeb-tts`:
+  ```
+  OPTIONS | 404 | https://…supabase.co/functions/v1/wakeb-tts
+  OPTIONS | 404 | …
+  ```
+- `edge_function_logs` for `wakeb-tts`: **No logs found** (function never boots).
+- All other functions (transcribe-audio, chat, evaluate-interview, etc.) boot and respond fine.
 
-**ثانياً: استبدال "آمن للفشل" بكلمة واحدة تعبّر عن المعنى (جلسات خاصة/تدريبية لا تُعرض):**
-الكلمة المقترحة: **"خاصة"** (أي جلسات خاصة بالمستخدم لا تظهر لأحد).
+So every TTS request from the live interview fails CORS preflight with 404 → the browser surfaces `Failed to fetch` → the client falls back to browser TTS, but browser TTS on this preview environment isn't producing audible Arabic output, so the interviewer appears mute.
 
-| الملف | السطر | قبل | بعد |
-|---|---|---|---|
-| `src/pages/Index.tsx` | 230 | value: "آمن للفشل" | value: "خاصة" |
-| `src/pages/Index.tsx` | 263 | title: "وضع التدريب (آمن للفشل)" | title: "وضع التدريب (خاص)" |
-| `src/pages/Features.tsx` | 30 | subtitle: "آمن للفشل — هذا هو الفرق" | subtitle: "تدريب خاص بك — هذا هو الفرق" |
-| `src/components/training/TrainingSection.tsx` | 74 | "وضع التدريب — آمن للفشل" | "وضع التدريب — خاص بك" |
-| `src/demo/feature-spec.ts` | 16 | "وضع آمن للفشل" | "وضع تدريب خاص" |
+The function source (`supabase/functions/wakeb-tts/index.ts`) is correct and unchanged. It just needs to be redeployed.
 
-**ملاحظات:**
-- لم أمسّ رسائل الأخطاء التي تستخدم كلمة "فشل" (مثل "فشل الحفظ") لأنها سياق مختلف تماماً.
-- لم أمسّ كلمة "أمن سيبراني" في `location-data.ts`.
+## Fix
 
-هل أوافق على الكلمة البديلة "**خاص/خاصة**"؟ أو تفضّل كلمة أخرى مثل "آمن" أو "تجريبي" أو "تدريبي"؟
+1. **Redeploy `wakeb-tts`** (touch the file with a no-op comment edit to trigger the auto-deploy pipeline, or use the deploy tool directly).
+2. After deploy, verify with `curl_edge_functions` (OPTIONS + a small POST) that it returns 200 and audio bytes.
+3. Confirm in the live interview that Noura speaks again.
+
+## Out of scope
+
+- No client code changes — `speakText` in `useLiveInterview.ts` is already correct (uses session access token, valid headers).
+- No changes to the function logic — only the deployment is missing.
+
+If after redeploy the function still 404s, escalate to the platform (deployment pipeline issue), since the source is committed and other functions in the same project deploy normally.
