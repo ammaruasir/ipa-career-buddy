@@ -14,6 +14,7 @@ const corsHeaders = {
 // Keep in sync with src/demo/voices.ts. Until Khaleeji clones land, all three
 // resolve to the platform's default Arabic voice.
 const ALLOWED_VOICE_IDS = new Set<string>([
+  "yXEnnEln9armDCyhkXcA",
   "gVzwmdZzRgBrNjXaTmi5",
   "usjDi9nBY6UHvtKrL4ba",
   "QsV9PCczMIklRM6xLPAS",
