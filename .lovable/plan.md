@@ -1,31 +1,43 @@
-# سبب عدم تغيّر الصوت في وضع التدريب
+## Merge health check
 
-## التشخيص
+I scanned the new code from the merge against the database and runtime logs. Most things look healthy:
 
-وضع التدريب يستخدم نفس مسار المقابلة الصوتية/المرئية (`LiveInterview` → `useLiveInterview` → `elevenlabs-tts`). الإعداد في قاعدة البيانات صحيح (`yXEnnEln9armDCyhkXcA`)، لكن الصوت المسموع لا يتطابق بسبب علتين في `src/hooks/useLiveInterview.ts`:
+- All new routes (`/cv/builder`, `/cv/review`, `/cv/interview`, `/dashboard/instructor`, `/dashboard/instructor/cohort/:id`) are registered in `App.tsx`.
+- `CVHubSection` and `TrainingSection` are mounted in `CandidateDashboard`.
+- No build/runtime errors in the dev server log or browser console (only harmless React Router v7 future-flag warnings).
+- Edge functions boot cleanly (no errors in `analyze-resume` logs).
 
-1. **Stale closure في `speakText`** (سطر 124-207): الدالة ملفوفة بـ `useCallback` مع dependencies `[speakWithBrowserTTS]` فقط، و`interviewerVoiceId` غير مذكور. هذا يجعلها تلتقط أول قيمة فقط ولا تتحدّث عند تغيّر الإعدادات أو بعد تحميلها.
+### One real problem: `instructor` role is not in the database
 
-2. **التحميل المتأخر للإعدادات**: `useSystemSettings` يبدأ بـ `DEFAULT_SETTINGS` (voice_id = `QsV9PCczMIklRM6xLPAS` — هبة منصوري) ثم يجلب القيمة الفعلية. لو ركّب `LiveInterview` قبل اكتمال الجلب (وهو الحال عادةً في التدريب لأن الانتقال سريع)، فإن `speakText` يلتقط الـ default ويبقى عليه حتى نهاية الجلسة.
+The merge added an Instructor layer in the UI:
 
-النتيجة: في وضع التدريب يُسمع صوت هبة (الافتراضي) بدلاً من الصوت المُختار من لوحة الإدارة.
+- `src/hooks/useAuth.tsx` does `if (roles.includes("instructor")) setRole("instructor")`
+- `src/pages/DashboardRouter.tsx` routes `role === "instructor"` to `/dashboard/instructor`
+- `InstructorDashboard` and `CohortDetail` pages exist
 
-## الحل
+But the `app_role` enum in the database is still:
+```
+"student" | "admin" | "hr" | "candidate"
+```
 
-### 1. `src/hooks/useLiveInterview.ts`
-- استخدام `useRef` لتخزين `interviewerVoiceId` الحالي وتحديثه عبر `useEffect` كلما تغيّر، ثم قراءته داخل `speakText` من الـ ref.
-- بديل أبسط: إضافة `interviewerVoiceId` لمصفوفة الـ deps في `useCallback` الخاصة بـ `speakText`. سنعتمد طريقة الـ ref لتفادي إعادة إنشاء كل الـ callbacks المعتمدة عليها.
+Consequences:
+- You cannot insert a row in `user_roles` with `role = 'instructor'` — Postgres rejects it as an invalid enum value.
+- Any `has_role(uid, 'instructor')` call (likely used in instructor RLS policies / cohort tables) will fail at runtime.
+- The `/dashboard/instructor` route is effectively unreachable today — no user can be flagged as an instructor.
 
-### 2. `src/components/interview/LiveInterview.tsx`
-- منع تركيب `useLiveInterview` قبل تحميل الإعدادات: إظهار loader صغير عند `settings.loading === true || !settings.id` وعدم بدء المقابلة حتى تصل القيم الفعلية من قاعدة البيانات. هذا يضمن أن `interviewerVoiceId` الذي يستقبله الـ hook هو القيمة الصحيحة من البداية.
+### Fix
 
-### 3. (تنظيف بسيط) `src/hooks/useSystemSettings.ts`
-- جعل القيمة الافتراضية أقل ضرراً (نفس القيمة الموجودة في قاعدة البيانات حالياً) ليس ضرورياً بعد الإصلاحين أعلاه، لكن سنبقي الحقل في الـ hook كما هو.
+Add `instructor` to the `app_role` enum via a migration:
 
-## الملفات المتأثرة
-- `src/hooks/useLiveInterview.ts` — ref + قراءته داخل `speakText`
-- `src/components/interview/LiveInterview.tsx` — Loader حتى تحميل الإعدادات
+```sql
+ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'instructor';
+```
 
-## التحقق
-- فتح وضع التدريب الصوتي بعد التغيير → يجب أن يُسمع صوت `yXEnnEln9armDCyhkXcA` (Jeddawi) من السجلات.
-- تبديل الصوت من لوحة الإدارة ثم بدء تدريب جديد → الصوت الجديد يُستخدم فوراً.
+After running it, `src/integrations/supabase/types.ts` will regenerate to include `'instructor'`, and you'll be able to assign the role from the admin panel.
+
+### Optional follow-ups (not blocking)
+
+- Add a UI in `AdminSettings` / `UserManagement` to assign the `instructor` role to a user.
+- Verify the `cohorts` / instructor-related RLS policies reference `has_role(auth.uid(), 'instructor')` correctly once the enum value exists.
+
+Shall I apply the migration?
