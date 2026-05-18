@@ -46,6 +46,7 @@ import { AIAssistBullets, AIAssistSummary, AIAssistSkills } from "@/components/c
 import JobAlignmentDialog from "@/components/cv-builder/JobAlignmentDialog";
 import CVDateInput from "@/components/cv-builder/CVDateInput";
 import SectionOrderPanel, { resolveSectionOrder, type SectionKey } from "@/components/cv-builder/SectionOrderPanel";
+import TemplateGallery from "@/components/cv-builder/TemplateGallery";
 
 interface PersonalInfo {
   full_name?: string;
