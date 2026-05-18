@@ -861,43 +861,49 @@ const CertsStep = ({
   );
 };
 
-const PreviewStep = ({ draft }: { draft: Draft }) => (
+const PreviewStep = ({ draft }: { draft: Draft }) => {
+  const lang = effectiveLang(draft);
+  const isAr = lang === "ar";
+  const dir = isAr ? "rtl" : "ltr";
+  const L = (s: string | undefined) => (s ? localizeDigits(s, lang) : "");
+  return (
   <div className="space-y-4">
-    <div className="p-6 rounded-xl bg-white text-black dark:bg-white dark:text-black border-4 border-double border-primary/30 space-y-4 font-arabic" dir="rtl">
+    <div className={cn("p-6 rounded-xl bg-white text-black dark:bg-white dark:text-black border-4 border-double border-primary/30 space-y-4", isAr && "font-arabic")} dir={dir}>
       <div className="text-center pb-3 border-b-2 border-primary/30">
-        <h1 className="text-2xl font-bold">{draft.personal_info.full_name || "اسم المتقدّم"}</h1>
+        <h1 className="text-2xl font-bold">{L(draft.personal_info.full_name) || (isAr ? "اسم المتقدّم" : "Applicant Name")}</h1>
         <p className="text-sm text-gray-600 mt-1">
           {[draft.personal_info.email, draft.personal_info.phone, draft.personal_info.city]
             .filter(Boolean)
+            .map((s) => L(s as string))
             .join(" • ")}
         </p>
       </div>
 
-      {draft.summary?.ar && (
+      {(isAr ? draft.summary?.ar : draft.summary?.en) && (
         <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الملخّص</h2>
-          <p className="text-sm leading-relaxed">{draft.summary.ar}</p>
+          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">{isAr ? "الملخّص" : "Summary"}</h2>
+          <p className="text-sm leading-relaxed">{L(isAr ? draft.summary.ar : draft.summary.en)}</p>
         </section>
       )}
 
       {draft.experience.length > 0 && (
         <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الخبرة العمليّة</h2>
+          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">{isAr ? "الخبرة العمليّة" : "Work Experience"}</h2>
           {draft.experience.map((e, i) => (
             <div key={i} className="mb-3">
               <div className="flex justify-between">
-                <strong className="text-sm">{e.position}</strong>
+                <strong className="text-sm">{L(e.position)}</strong>
                 <span className="text-xs text-gray-600">
-                  {e.start} – {e.end}
+                  {L(e.start)} – {L(e.end)}
                 </span>
               </div>
-              <p className="text-sm text-gray-700">{e.company}</p>
+              <p className="text-sm text-gray-700">{L(e.company)}</p>
               {e.bullets && (
                 <ul className="text-sm mt-1 space-y-0.5">
                   {e.bullets.map((b, bi) => (
                     <li key={bi} className="flex gap-2">
                       <span>•</span>
-                      <span>{b}</span>
+                      <span>{L(b)}</span>
                     </li>
                   ))}
                 </ul>
@@ -909,16 +915,16 @@ const PreviewStep = ({ draft }: { draft: Draft }) => (
 
       {draft.education.length > 0 && (
         <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">التعليم</h2>
+          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">{isAr ? "التعليم" : "Education"}</h2>
           {draft.education.map((e, i) => (
             <div key={i} className="mb-2">
               <div className="flex justify-between">
-                <strong className="text-sm">{e.degree} في {e.major}</strong>
+                <strong className="text-sm">{L(e.degree)} {isAr ? "في" : "in"} {L(e.major)}</strong>
                 <span className="text-xs text-gray-600">
-                  {e.start} – {e.end}
+                  {L(e.start)} – {L(e.end)}
                 </span>
               </div>
-              <p className="text-sm text-gray-700">{e.institution}</p>
+              <p className="text-sm text-gray-700">{L(e.institution)}</p>
             </div>
           ))}
         </section>
@@ -926,26 +932,26 @@ const PreviewStep = ({ draft }: { draft: Draft }) => (
 
       {(draft.skills.technical?.length || draft.skills.soft?.length || draft.skills.languages?.length) ? (
         <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">المهارات</h2>
+          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">{isAr ? "المهارات" : "Skills"}</h2>
           {draft.skills.technical && draft.skills.technical.length > 0 && (
-            <p className="text-sm mb-1"><strong>تقنية:</strong> {draft.skills.technical.join("، ")}</p>
+            <p className="text-sm mb-1"><strong>{isAr ? "تقنية:" : "Technical:"}</strong> {L(draft.skills.technical.join("، "))}</p>
           )}
           {draft.skills.soft && draft.skills.soft.length > 0 && (
-            <p className="text-sm mb-1"><strong>شخصية:</strong> {draft.skills.soft.join("، ")}</p>
+            <p className="text-sm mb-1"><strong>{isAr ? "شخصية:" : "Soft:"}</strong> {L(draft.skills.soft.join("، "))}</p>
           )}
           {draft.skills.languages && draft.skills.languages.length > 0 && (
-            <p className="text-sm"><strong>اللغات:</strong> {draft.skills.languages.join("، ")}</p>
+            <p className="text-sm"><strong>{isAr ? "اللغات:" : "Languages:"}</strong> {L(draft.skills.languages.join("، "))}</p>
           )}
         </section>
       ) : null}
 
       {draft.certifications.length > 0 && (
         <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الشهادات</h2>
+          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">{isAr ? "الشهادات" : "Certifications"}</h2>
           <ul className="text-sm space-y-1">
             {draft.certifications.map((c, i) => (
               <li key={i}>
-                <strong>{c.name}</strong> — {c.issuer} ({c.date})
+                <strong>{L(c.name)}</strong> — {L(c.issuer)} ({L(c.date)})
               </li>
             ))}
           </ul>
@@ -954,9 +960,12 @@ const PreviewStep = ({ draft }: { draft: Draft }) => (
     </div>
 
     <p className={cn("text-xs text-muted-foreground text-center")}>
-      هذه معاينة على الشاشة. تصدير PDF عربي بجودة عالية يحتاج اختبار RTL إضافي.
+      {isAr
+        ? "هذه معاينة على الشاشة. استخدم زر التصدير لتنزيل PDF أو Word."
+        : "On-screen preview. Use the export buttons to download PDF or Word."}
     </p>
   </div>
-);
+  );
+};
 
 export default CVBuilder;
