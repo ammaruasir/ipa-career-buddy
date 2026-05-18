@@ -494,8 +494,8 @@ const CVReview = () => {
         <CVChatPanel
           cvDocumentId={doc.id}
           language="ar"
-          onAcceptImprovement={async (improved, original) => {
-            await acceptRewrite(original, improved);
+          onAcceptImprovement={async (improved, original, section) => {
+            await acceptRewrite(original, improved, section);
           }}
         />
 

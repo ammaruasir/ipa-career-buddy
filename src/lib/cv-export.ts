@@ -53,6 +53,8 @@ const localizeData = (data: CVDocumentData, lang: CVLang): CVDocumentData => ({
 export interface AcceptedRewrite {
   original: string;
   improved: string;
+  /** Optional section hint for appended (originalless) entries: summary | experience | education | skills | achievements | certifications | other */
+  section?: string;
 }
 
 const applyRewritesToText = (text: string, rewrites: AcceptedRewrite[]): string => {
@@ -121,27 +123,45 @@ export const buildImprovedCV = (
 
   const apply = (s: string) => applyRewritesToText(s, acceptedRewrites);
 
+  // Group originalless rewrites (additions) by section
+  const additions: Record<string, string[]> = {};
+  for (const r of acceptedRewrites) {
+    if (!r.original?.trim() && r.improved?.trim()) {
+      const key = (r.section || "other").toLowerCase();
+      (additions[key] ||= []).push(r.improved.trim());
+    }
+  }
+  const take = (key: string) => additions[key] ?? [];
+
   const sections: CVSection[] = [];
 
   const summary = e.summary?.text || e.summary || "";
-  if (typeof summary === "string" && summary.trim()) {
-    sections.push({ title: "الملخّص المهني", paragraphs: [apply(summary)] });
+  const summaryAdds = take("summary");
+  if ((typeof summary === "string" && summary.trim()) || summaryAdds.length) {
+    const paras = [
+      ...(typeof summary === "string" && summary.trim() ? [apply(summary)] : []),
+      ...summaryAdds,
+    ];
+    sections.push({ title: "الملخّص المهني", paragraphs: paras });
   }
 
-  const exp = asStringArray(e.experience).map(apply);
+  const exp = [...asStringArray(e.experience).map(apply), ...take("experience")];
   if (exp.length) sections.push({ title: "الخبرة العملية", paragraphs: exp });
 
-  const edu = asStringArray(e.education).map(apply);
+  const edu = [...asStringArray(e.education).map(apply), ...take("education")];
   if (edu.length) sections.push({ title: "التعليم", paragraphs: edu });
 
-  const skills = asStringArray(e.skills).map(apply);
+  const skills = [...asStringArray(e.skills).map(apply), ...take("skills")];
   if (skills.length) sections.push({ title: "المهارات", paragraphs: skills });
 
-  const ach = asStringArray(e.achievements).map(apply);
+  const ach = [...asStringArray(e.achievements).map(apply), ...take("achievements")];
   if (ach.length) sections.push({ title: "الإنجازات", paragraphs: ach });
 
-  const certs = asStringArray(e.certifications).map(apply);
+  const certs = [...asStringArray(e.certifications).map(apply), ...take("certifications")];
   if (certs.length) sections.push({ title: "الشهادات", paragraphs: certs });
+
+  const other = take("other");
+  if (other.length) sections.push({ title: "تحسينات إضافية", paragraphs: other });
 
   return { fullName, contact, sections };
 };
