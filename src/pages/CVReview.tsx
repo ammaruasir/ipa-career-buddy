@@ -112,6 +112,8 @@ const CVReview = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [resumeUrl, setResumeUrl] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [editedImproved, setEditedImproved] = useState<Record<number, string>>({});
+  const { revision, acceptRewrite, rejectRewrite, saving } = useCvRevision(user?.id, doc?.id);
 
   const loadAnalysis = async (uid: string) => {
     const { data } = await supabase
