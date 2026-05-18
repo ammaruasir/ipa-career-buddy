@@ -1,53 +1,127 @@
-# خطة نهائية: نشر رسالة التقديم + قوالب CV متمايزة بصريًا
+# خطة Lovable: نشر "وضع العرض التفاعلي" (Demo Mode — AI Walkthrough)
 
-## السياق بعد فحص الـ PRs السابقة
-الـ pulls الـ٤ الأخيرة أكملت audit الـ CV-builder كاملًا (١٥/١٥) — لكن بقي بندان غير مكتملَين فعليًا:
+## السياق
 
-| البند | حالة Audit | الحالة الفعلية | الإصلاح |
-|---|---|---|---|
-| Cover letter | ✅ مغلق | UI + edge function code جاهزان، لكن **الدالة غير منشورة** → 404 | نشر فقط |
-| Template selector | ✅ مغلق | ٣ قوالب بنفس HTML تختلف بلون التمييز فقط → لا تمايز بصري حقيقي | إعادة هيكلة فعلية |
-
-كل ما بُني سابقًا سيُحترم: `section_order` (dnd-kit)، `custom_sections`، `CVDateInput` (هجري/ميلادي)، `mergeBilingual`، `PREVIEW_SECTION_RENDERERS`.
+تمّت إضافة ميزة "جولة AI تفاعلية" كاملة (٧ مراحل) — مرشدة عربية خليجية ("لينا") تتنقّل في المنصّة كاملةً، تشرح، وتجيب على أسئلة الزوّار. تشمل ٣٩ خطوة عبر ٨ فصول، وتغطّي مسار المرشّح + الإدارة + الـ HR + المدرّب. كل الكود جاهز ومُختبر typecheck + build. المطلوب من Lovable: تفعيل المكوّنات الخلفية بعد الـ push.
 
 ---
 
-## ١) نشر دالة `generate-cover-letter`
+## ١) نشر الدوال السحابية الجديدة
+
 ```
-supabase--deploy_edge_functions(["generate-cover-letter"])
+supabase--deploy_edge_functions([
+  "demo-chat",
+  "demo-candidate-bot",
+  "demo-transcribe",
+  "demo-session"
+])
 ```
-ثم اختبار حيّ بـ `curl_edge_functions` بمعرّف المسوّدة الحالية للتأكّد من إرجاع `{ ar: { greeting, body, signature, paragraph_count } }`.
 
-## ٢) قوالب CV متمايزة فعلًا
+كلها auth-free بتصميم (لزوّار `/demo` غير المسجّلين)، مع IP rate-limit مدمج عبر `_shared/demo-guards.ts` (يعيد استخدام `check_rate_limit` RPC الموجود). الحدود:
 
-### أ) باك-إند: `supabase/functions/render-cv-pdf/index.ts`
-استبدال كتلة `<body>` الموحّدة الحالية بدالة `renderTemplate(template, draft, sections)` تُرجع ٣ تخطيطات منفصلة. كل تخطيط يستهلك نفس `expHtml`, `eduHtml`, `skillsHtml`, إلخ المُبنية مسبقًا، ويحترم `resolveOrder(draft.section_order)`. الدمج ثنائي اللغة (`mergeBilingual`) يبقى كما هو.
+| الدالة | السقف لكل IP في الساعة |
+|---|---|
+| `demo-chat` | ٣٠ |
+| `demo-candidate-bot` | ٦٠ |
+| `demo-transcribe` | ٣٠ |
+| `demo-session` | ١٢ |
 
-| القالب | البنية | لون التمييز |
-|---|---|---|
-| **modern** (حديث) | عمود واحد، شريط أزرق علوي ممتد بعرض الصفحة، اسم كبير محاذٍ، عناوين أقسام بخط سفلي ملوّن | `#1e40af` |
-| **conservative** (محافظ) | عمود واحد كلاسيكي، ترويسة مركّزة بين خطّين أفقيين رفيعين، عناوين Caps + letter-spacing واسع، فواصل رمادية | `#374151` |
-| **executive** (تنفيذي) | عمودان (٣٥٪/٦٥٪ مع احترام `dir`)، شريط جانبي بخلفية navy داكنة `#0f172a` يحوي المعلومات الشخصية + `skills` + `languages_structured` تلقائيًا، المحتوى الرئيسي يحترم `section_order` لبقية الأقسام | `#1e3a8a` + جانبي داكن |
+**المتغيّرات المطلوبة** (Lovable لديه الأساسيات أصلًا):
+- `OPENAI_API_KEY` — موجود
+- `LOVABLE_API_KEY` — موجود (للـ STT عبر Gemini)
+- `ELEVENLABS_API_KEY` — موجود
+- `SUPABASE_SERVICE_ROLE_KEY` — موجود (للـ rate-limit RPC)
+- `DEMO_CANDIDATE_PASSWORD`, `DEMO_ADMIN_PASSWORD`, `DEMO_HR_PASSWORD`, `DEMO_INSTRUCTOR_PASSWORD` — اختياري (افتراضات آمنة في الكود)
 
-### ب) فرونت-إند: `src/components/cv-builder/TemplateGallery.tsx` (جديد)
-يستبدل الـ Select في `CVBuilder.tsx` (السطور 451-467). شبكة `grid grid-cols-3 gap-3`، كل بطاقة:
-- معاينة HTML/CSS مصغّرة (~200×280) ترسم بنية القالب الحقيقية بمستطيلات رمادية تحاكي النصوص.
-- الاسم العربي + وصف سطر واحد (مثلًا: "تنفيذي — عمودان وشريط جانبي داكن").
-- حالة محدّد: `border-2 border-primary` + ✓ في الزاوية + `bg-primary/5`.
-- النقر يستدعي `update("template", value)` الموجود.
+## ٢) تطبيق الـ migration
 
-### خارج النطاق
-- لا قوالب جديدة بخلاف الثلاثة.
-- لا تغيير على dnd-kit reorder، CVDateInput، custom sections، bilingual merge، أو أي بند audit مغلق.
-- لا تغيير على قاعدة البيانات.
+```
+supabase--apply_migration("20260518160000_demo_mode_scaffold")
+```
 
-## التحقّق
-1. **رسالة التقديم**: زر "ولّد الرسالة بـ AI" يُرجع نصًّا.
-2. **المعرض**: ٣ بطاقات بصرية، النقر يبدّل التحديد ويُحدّث Badge المعاينة.
-3. **PDF**: تصدير بكل قالب يُنتج تخطيطًا مختلفًا بصريًا (وليس مجرّد لون)، مع احترام `section_order` و `custom_sections` و bilingual merge.
+تضيف:
+- عمود `is_demo boolean DEFAULT false` على ٩ جداول (profiles, interviews, responses, evaluations, cv_drafts, cohorts, enrollments, job_vacancies, question_templates).
+- دالة `public.is_demo_account(uuid)` — تتعرّف على حسابات `demo-*@ipa-training.sa`.
+- سياسات RLS متناظرة (RESTRICTIVE) على الجداول التسعة: الحسابات التجريبية تشاهد صفوف is_demo=true **فقط**، والمستخدمون العاديون لا يشاهدونها **أبدًا**.
 
-## الملفات المتأثّرة
-- `supabase/functions/generate-cover-letter/index.ts` — نشر فقط
-- `supabase/functions/render-cv-pdf/index.ts` — إعادة هيكلة الـ body لـ ٣ تخطيطات
-- `src/components/cv-builder/TemplateGallery.tsx` — جديد
-- `src/pages/CVBuilder.tsx` — استبدال Select بالمكوّن
+**لن تتأثّر بيانات الإنتاج** — العمود الافتراضي false، والسياسات RESTRICTIVE تُضاف فوق السياسات الموجودة (AND).
+
+## ٣) بذر بيانات العرض (Seed)
+
+تشغيل سكربت البذر بعد نجاح الـ migration:
+
+```
+node scripts/seed-demo-data.ts
+# يحتاج SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY فقط
+```
+
+ينشئ ٥ حسابات بإدارة admin API:
+- `demo-candidate@ipa-training.sa` (سارة الراشد)
+- `demo-candidate2@ipa-training.sa` (خالد المطيري — للمقارنة في `/dashboard/hr/compare`)
+- `demo-admin@ipa-training.sa` + دور `admin`
+- `demo-hr@ipa-training.sa` + دور `hr`
+- `demo-instructor@ipa-training.sa` + دور `instructor`
+
+كذلك يبذر: وظيفة "مهندسة واجهات أمامية تجريبية"، ٥ أسئلة في بنك الأسئلة، دفعة تجريبية + تسجيلات. كلها بـ `is_demo=true`.
+
+**الـ idempotent**: التشغيل المتكرّر يحدّث ولا يكرّر.
+
+## ٤) التحقّق
+
+بعد النشر + الـ migration + الـ seed:
+
+```
+node scripts/demo-rls-audit.ts        # يتحقّق أن العزل بين حسابات الديمو وبيانات الإنتاج محكم
+node scripts/demo-latency-profile.ts  # يقيس latency الـ Q&A — هدف < ٤s
+```
+
+ثم اختبار يدوي:
+1. فتح `/demo` في تبويب incognito.
+2. تفعيل صندوق "السماح بالميكروفون" (اختياري).
+3. الضغط على "ابدأ الجولة" — تبدأ "لينا" بالكلام بصوت عربي.
+4. التنقّل التلقائي بين الصفحات يعمل، الـ spotlight يلتقط العنصر المناسب.
+5. الضغط على الميكروفون أثناء الكلام → الصوت يتوقّف، التسجيل يبدأ. تحرير الزر → STT → جواب من لينا.
+
+## ٥) (اختياري — تحسين تكلفة) الـ TTS Pre-cache
+
+بعد تجميد السكربت، تشغيل:
+
+```
+node scripts/precache-demo-tts.ts
+# ينشئ public/demo-audio/{step.id}.mp3 لكل خطوة ثابتة
+```
+
+يخفّض التكلفة التشغيلية من ~$6.55 إلى ~$2.50 لكل جلسة كاملة (~٧٠٪ توفير على TTS). الـ frontend يفحص `/demo-audio/{step.id}.mp3` أولًا ثم يسقط على API عند الفقدان.
+
+## ٦) Phase B.5 — أصوات خليجية (خارجي)
+
+`src/demo/voices.ts` يحتوي خطّة procurement كاملة. حاليًا ٣ الأصوات تستخدم voice ID موحّد كـ fallback، فيشتغل الديمو لكن بنفس الصوت لجميع الشخصيات. لتمييز سارة عن لينا، يحتاج فريق المنتج تسجيل عيّنتين (٣–٥ دقائق ذكر + أنثى بلهجة خليجية) ورفعها عبر ElevenLabs Pro Voice Cloning، ثم تحديث المعرّفات في `voices.ts`.
+
+---
+
+## الملفات الجديدة
+
+**Frontend (`src/`):**
+- `pages/Demo.tsx`
+- `contexts/DemoTourContext.tsx`
+- `hooks/useDemoVoice.ts`, `useDemoCandidate.ts`, `useDemoInterview.ts`
+- `components/demo/` (٥ مكوّنات)
+- `demo/` (script + persona + types + voices + feature-spec)
+
+**Backend (`supabase/`):**
+- `functions/demo-chat/`
+- `functions/demo-candidate-bot/`
+- `functions/demo-transcribe/`
+- `functions/demo-session/`
+- `functions/_shared/demo-guards.ts`
+- `migrations/20260518160000_demo_mode_scaffold.sql`
+
+**Scripts (`scripts/`):**
+- `seed-demo-data.ts` — بذر الحسابات والبيانات
+- `precache-demo-tts.ts` — تخزين MP3 ثابت
+- `demo-latency-profile.ts` — قياس الأداء
+- `demo-rls-audit.ts` — تحقّق العزل
+
+**التعديلات الموجودة:**
+- `src/App.tsx` — DemoTourProvider + DemoOverlay + مسار `/demo`
+- `src/pages/Index.tsx` — زر CTA عائم (يمين الشاشة تحت الـ header)

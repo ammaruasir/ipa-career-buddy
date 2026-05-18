@@ -1,0 +1,3 @@
+# Pre-cached MP3s for fixed demo narration land here.
+# Generate with: npx tsx scripts/precache-demo-tts.ts
+# These ARE checked in — they cut per-session TTS cost ~70%.

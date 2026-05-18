@@ -35,6 +35,7 @@ import {
   Mic,
   ShieldCheck,
   Target,
+  Play,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -162,6 +163,18 @@ const Index = () => {
           </div>
         </div>
       </header>
+
+      {/* ── Floating "Watch AI Demo" CTA — top right below header ── */}
+      <Link
+        to="/demo"
+        className="fixed top-[4.75rem] right-4 z-40 group inline-flex items-center gap-2 rounded-full bg-secondary text-secondary-foreground pl-4 pr-2 py-2 shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all border-2 border-secondary/30"
+        aria-label="مشاهدة الجولة بالذكاء الاصطناعي"
+      >
+        <span className="text-sm font-bold">شاهد جولة الـ AI</span>
+        <span className="w-7 h-7 rounded-full bg-secondary-foreground/15 flex items-center justify-center group-hover:bg-secondary-foreground/25 transition-colors">
+          <Play className="w-3.5 h-3.5 fill-current" />
+        </span>
+      </Link>
 
       {/* ── Hero ── */}
       <section className="relative overflow-hidden py-20 md:py-32">
