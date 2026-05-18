@@ -1,20 +1,20 @@
+## Problem
+
+During the demo (Act 2), the narration about password reset navigates to `/reset-password`. That page is only valid when arrived at from a real recovery email link (it checks for `type=recovery` in the URL hash). Without it, it correctly shows "رابط غير صالح. يرجى طلب رابط إعادة تعيين جديد" — which breaks the demo storytelling.
+
+The right page to showcase is the **"forgot password" request form** (email input → "send reset link"), which currently only renders when the user clicks the link on `/login` (toggled by local state `isForgotPassword`).
+
 ## Plan
 
-1. Fix the demo voice cache check in `useDemoVoice`
-   - Validate the cached `/demo-audio/*.mp3` response before treating it as audio.
-   - Reject HTML/app-shell responses and non-audio `Content-Type` values so the hook does not pass invalid blobs to `Audio`.
-   - Only use the cached file when it is a real audio response.
+1. **`src/pages/Login.tsx`** — Support a URL query param to open the forgot-password view directly:
+   - Read `searchParams.get("forgot")` on mount and initialize `isForgotPassword` to `true` when it's set (e.g. `?forgot=1`).
+   - No other behavior change.
 
-2. Preserve a reliable fallback to live demo TTS
-   - When the cached file is missing or invalid, continue to `demo-elevenlabs-tts` instead of attempting to play the bad response.
-   - Add clearer error handling so failed TTS or non-audio responses reset state cleanly instead of silently failing.
+2. **`src/demo/tour-script.ts`** — Update the `act2-reset-password` step:
+   - Change `route` from `/reset-password` to `/login?forgot=1`.
+   - Keep the same narration and spotlight selector (`input[type='email']` still matches the email field on the forgot form).
 
-3. Verify the startup path actually works
-   - Test the first tour steps (`act1-intro`, `act1-landing`, etc.) to confirm they now play through the live TTS fallback when cached MP3s are absent.
-   - Confirm the browser no longer receives HTML as “audio” for playback and that the initial demo narration is audible.
+## Out of scope
 
-## Technical details
-
-- Root cause found: `public/demo-audio/` is effectively empty (`.gitkeep` only), but `useDemoVoice` treats any `fetch('/demo-audio/<step>.mp3')` with `response.ok` as valid audio.
-- In preview, missing files are being rewritten to the SPA HTML shell with status `200`, so the hook creates an `Audio` object from HTML, which triggers `NotSupportedError`.
-- The fix is frontend-only and scoped to the demo audio flow; no backend or database changes are needed.
+- No change to `ResetPassword.tsx` (it stays as-is for real recovery flows).
+- No backend, voice, or other tour steps changed.
