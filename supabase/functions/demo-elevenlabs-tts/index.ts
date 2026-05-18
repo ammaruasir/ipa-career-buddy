@@ -77,11 +77,11 @@ serve(async (req) => {
         },
       );
 
-    let response = await callElevenLabs("eleven_flash_v2_5");
+    let response = await callElevenLabs("eleven_multilingual_v2");
     if (!response.ok) {
       const errText = await response.text();
-      console.warn(`[demo-tts] flash failed (${response.status}): ${errText}. Retrying multilingual_v2`);
-      response = await callElevenLabs("eleven_multilingual_v2");
+      console.warn(`[demo-tts] multilingual_v2 failed (${response.status}): ${errText}. Retrying flash_v2_5`);
+      response = await callElevenLabs("eleven_flash_v2_5");
     }
 
     if (!response.ok || !response.body) {
