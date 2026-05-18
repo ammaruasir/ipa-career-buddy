@@ -9,6 +9,8 @@ import {
 } from "docx";
 import { saveAs } from "file-saver";
 
+export type CVLang = "ar" | "en";
+
 export interface CVSection {
   title: string;
   paragraphs: string[]; // each line/bullet
@@ -19,6 +21,32 @@ export interface CVDocumentData {
   contact?: string; // email | phone | city
   sections: CVSection[];
 }
+
+export interface CVExportOptions {
+  language?: CVLang;
+}
+
+/* ============ Digit localization ============ */
+
+const AR_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+
+export const toArabicDigits = (s: string): string =>
+  (s ?? "").replace(/[0-9]/g, (d) => AR_DIGITS[Number(d)]);
+
+export const toEnglishDigits = (s: string): string =>
+  (s ?? "").replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660));
+
+export const localizeDigits = (s: string, lang: CVLang): string =>
+  lang === "ar" ? toArabicDigits(s) : toEnglishDigits(s);
+
+const localizeData = (data: CVDocumentData, lang: CVLang): CVDocumentData => ({
+  fullName: localizeDigits(data.fullName, lang),
+  contact: data.contact ? localizeDigits(data.contact, lang) : data.contact,
+  sections: data.sections.map((s) => ({
+    title: localizeDigits(s.title, lang),
+    paragraphs: s.paragraphs.map((p) => localizeDigits(p, lang)),
+  })),
+});
 
 /* ============ Build improved CV from extraction + accepted rewrites ============ */
 
@@ -46,7 +74,6 @@ const asStringArray = (v: unknown): string[] => {
         if (typeof x === "string") return x;
         if (x && typeof x === "object") {
           const o = x as Record<string, unknown>;
-          // common shapes
           if (o.text) return String(o.text);
           if (o.title || o.role || o.position) {
             const parts = [
@@ -79,10 +106,6 @@ const asStringArray = (v: unknown): string[] => {
   return [];
 };
 
-/**
- * Build an improved CV doc structure from cv_documents.extraction
- * and the user-accepted rewrites.
- */
 export const buildImprovedCV = (
   extraction: any,
   acceptedRewrites: AcceptedRewrite[],
@@ -125,14 +148,21 @@ export const buildImprovedCV = (
 
 /* ============ DOCX Export ============ */
 
-export const exportToDocx = async (data: CVDocumentData, filename = "cv.docx") => {
-  const rtl = true;
+export const exportToDocx = async (
+  rawData: CVDocumentData,
+  filename = "cv.docx",
+  opts: CVExportOptions = {},
+) => {
+  const lang: CVLang = opts.language ?? "ar";
+  const data = localizeData(rawData, lang);
+  const rtl = lang === "ar";
+  const align = rtl ? AlignmentType.RIGHT : AlignmentType.LEFT;
 
   const heading = (text: string) =>
     new Paragraph({
       heading: HeadingLevel.HEADING_2,
       bidirectional: rtl,
-      alignment: AlignmentType.RIGHT,
+      alignment: align,
       spacing: { before: 240, after: 120 },
       children: [new TextRun({ text, bold: true, font: "Arial", size: 28, rightToLeft: rtl })],
     });
@@ -140,7 +170,7 @@ export const exportToDocx = async (data: CVDocumentData, filename = "cv.docx") =
   const body = (text: string) =>
     new Paragraph({
       bidirectional: rtl,
-      alignment: AlignmentType.RIGHT,
+      alignment: align,
       spacing: { after: 100 },
       children: [new TextRun({ text, font: "Arial", size: 24, rightToLeft: rtl })],
     });
@@ -148,7 +178,7 @@ export const exportToDocx = async (data: CVDocumentData, filename = "cv.docx") =
   const bullet = (text: string) =>
     new Paragraph({
       bidirectional: rtl,
-      alignment: AlignmentType.RIGHT,
+      alignment: align,
       spacing: { after: 80 },
       numbering: { reference: "bullets", level: 0 },
       children: [new TextRun({ text, font: "Arial", size: 24, rightToLeft: rtl })],
@@ -156,7 +186,6 @@ export const exportToDocx = async (data: CVDocumentData, filename = "cv.docx") =
 
   const children: Paragraph[] = [];
 
-  // Name (title)
   children.push(
     new Paragraph({
       bidirectional: rtl,
@@ -207,8 +236,12 @@ export const exportToDocx = async (data: CVDocumentData, filename = "cv.docx") =
               level: 0,
               format: LevelFormat.BULLET,
               text: "•",
-              alignment: AlignmentType.RIGHT,
-              style: { paragraph: { indent: { right: 720, hanging: 360 } } },
+              alignment: align,
+              style: {
+                paragraph: {
+                  indent: rtl ? { right: 720, hanging: 360 } : { left: 720, hanging: 360 },
+                },
+              },
             },
           ],
         },
@@ -233,10 +266,22 @@ export const exportToDocx = async (data: CVDocumentData, filename = "cv.docx") =
 
 /* ============ PDF Export (via print dialog – preserves Arabic perfectly) ============ */
 
-export const exportToPdf = (data: CVDocumentData, filename = "cv.pdf") => {
+export const exportToPdf = (
+  rawData: CVDocumentData,
+  filename = "cv.pdf",
+  opts: CVExportOptions = {},
+) => {
+  const lang: CVLang = opts.language ?? "ar";
+  const data = localizeData(rawData, lang);
+  const rtl = lang === "ar";
+
   const w = window.open("", "_blank", "width=900,height=1000");
   if (!w) {
-    throw new Error("نافذة الطباعة محظورة من المتصفح. فعّل النوافذ المنبثقة وحاول مجدداً.");
+    throw new Error(
+      rtl
+        ? "نافذة الطباعة محظورة من المتصفح. فعّل النوافذ المنبثقة وحاول مجدداً."
+        : "Print window blocked by the browser. Enable popups and try again.",
+    );
   }
   const sectionHtml = data.sections
     .map(
@@ -257,8 +302,15 @@ export const exportToPdf = (data: CVDocumentData, filename = "cv.pdf") => {
     )
     .join("");
 
+  const htmlLang = rtl ? "ar" : "en";
+  const htmlDir = rtl ? "rtl" : "ltr";
+  const fontStack = rtl
+    ? `"Tahoma", "Arial", "Segoe UI", sans-serif`
+    : `"Calibri", "Arial", "Segoe UI", sans-serif`;
+  const ulSidePad = rtl ? "padding-right: 18px; padding-left: 0;" : "padding-left: 18px; padding-right: 0;";
+
   w.document.write(`<!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="${htmlLang}" dir="${htmlDir}">
 <head>
 <meta charset="utf-8" />
 <title>${escapeHtml(filename)}</title>
@@ -266,7 +318,7 @@ export const exportToPdf = (data: CVDocumentData, filename = "cv.pdf") => {
   @page { size: A4; margin: 18mm; }
   * { box-sizing: border-box; }
   body {
-    font-family: "Tahoma", "Arial", "Segoe UI", sans-serif;
+    font-family: ${fontStack};
     color: #111827;
     line-height: 1.7;
     margin: 0;
@@ -281,7 +333,7 @@ export const exportToPdf = (data: CVDocumentData, filename = "cv.pdf") => {
     margin: 18px 0 8px;
     color: #0c2340;
   }
-  ul { padding-right: 18px; margin: 4px 0 12px; }
+  ul { ${ulSidePad} margin: 4px 0 12px; }
   li { margin-bottom: 4px; font-size: 13px; white-space: pre-wrap; }
   @media print { body { padding: 0; } }
 </style>
