@@ -597,6 +597,38 @@ const CVInterview = () => {
                     </button>
                   ))}
                 </div>
+              ) : question.type === "form" ? (
+                <FormFields
+                  fields={question.fields ?? []}
+                  value={structuredAnswer ?? {}}
+                  onChange={setStructuredAnswer}
+                  lang={uiLang}
+                  dir={dir}
+                />
+              ) : question.type === "repeater" ? (
+                <Repeater
+                  fields={question.fields ?? []}
+                  itemLabel={uiLang === "en" ? question.item_label_en ?? "Item" : question.item_label_ar ?? "عنصر"}
+                  value={Array.isArray(structuredAnswer) ? structuredAnswer : []}
+                  onChange={setStructuredAnswer}
+                  lang={uiLang}
+                  dir={dir}
+                />
+              ) : question.type === "repeater_simple" ? (
+                <RepeaterSimple
+                  itemLabel={uiLang === "en" ? question.item_label_en ?? "Item" : question.item_label_ar ?? "عنصر"}
+                  value={Array.isArray(structuredAnswer) ? structuredAnswer : []}
+                  onChange={setStructuredAnswer}
+                  lang={uiLang}
+                  dir={dir}
+                />
+              ) : question.type === "chips" ? (
+                <ChipsInput
+                  value={Array.isArray(structuredAnswer) ? structuredAnswer : []}
+                  onChange={setStructuredAnswer}
+                  lang={uiLang}
+                  dir={dir}
+                />
               ) : question.type === "textarea" ? (
                 <Textarea
                   value={answer}
