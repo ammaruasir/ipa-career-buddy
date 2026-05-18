@@ -192,13 +192,16 @@ const CVReview = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 px-4" dir="rtl">
         <FileText className="w-12 h-12 text-muted-foreground" />
-        {hasResume ? (
+        {resumeUrl ? (
           <>
             <p className="text-muted-foreground text-lg text-center">
               سيرتك الذاتية مرفوعة. اضغط لتحليلها بالذكاء الاصطناعي.
             </p>
-            <Button onClick={triggerAnalysis} disabled={analyzing}>
-              {analyzing ? "جارٍ التحليل..." : "حلّل سيرتي الآن"}
+            {analyzeError && (
+              <p className="text-sm text-destructive text-center max-w-md">{analyzeError}</p>
+            )}
+            <Button onClick={() => triggerAnalysis()} disabled={analyzing}>
+              {analyzing ? "جارٍ التحليل..." : analyzeError ? "إعادة المحاولة" : "حلّل سيرتي الآن"}
             </Button>
           </>
         ) : (
