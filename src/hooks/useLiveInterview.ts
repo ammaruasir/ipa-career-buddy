@@ -504,8 +504,8 @@ export const useLiveInterview = ({
         user_id: user?.id,
         current_question: questionCountRef.current + 1,
         total_questions: totalQuestions,
-        interviewer_name: interviewerName,
-        interviewer_gender: interviewerGender,
+        interviewer_name: interviewerNameRef.current,
+        interviewer_gender: interviewerGenderRef.current,
         // Force closing if core has overrun; otherwise pass the tracked phase.
         current_phase: overrunCore ? "closing" : currentPhaseRef.current,
         core_question_count: coreQuestionCountRef.current,
@@ -526,15 +526,13 @@ export const useLiveInterview = ({
 
       if (error) throw error;
 
-      let aiText = data?.choices?.[0]?.message?.content || data?.content || "";
-      if (!aiText) throw new Error("Empty AI response");
+      const rawAi = data?.choices?.[0]?.message?.content || data?.content || "";
+      if (!rawAi) throw new Error("Empty AI response");
 
-      // Parse phase tag from response (case-insensitive, flexible format).
-      // Only strip the LEADING tag — the global strip on plain words would
-      // erase legitimate Arabic-mixed-English content (e.g. "CORE banking").
-      const phaseMatch = aiText.match(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i);
-      const phaseTag = phaseMatch ? phaseMatch[1].toUpperCase() : null;
-      aiText = aiText.replace(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i, "").trim();
+      // Prefer server-returned phase metadata; fall back to scanning text.
+      const { cleaned, phase: localPhase } = stripPhaseTags(rawAi);
+      const phaseTag = (data?.phase as string | undefined)?.toUpperCase() || localPhase || null;
+      const aiText = cleaned;
 
       // Handle [END] — interview complete
       if (phaseTag === "END") {
