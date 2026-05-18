@@ -1037,10 +1037,12 @@ export const useLiveInterview = ({
       }
 
       // Build conversational system prompt - uses chat function's prompt, just a lightweight version for greeting
-      const isFemale = interviewerGender === "female";
+      const ivName = interviewerNameRef.current;
+      const ivGender = interviewerGenderRef.current;
+      const isFemale = ivGender === "female";
       const systemPrompt = `CRITICAL INSTRUCTION: You MUST speak ONLY in Arabic (العربية). Never use English.
-اسمك "${interviewerName}" و${isFemale ? "أنتِ محاورة وظيفية ودودة ومحترفة" : "أنت محاور وظيفي ودود ومحترف"} ${isFemale ? "تعملين" : "تعمل"} في السعودية.
-الوظيفة: ${jobPosition}. ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية ودودة.
+اسمك "${ivName}" و${isFemale ? "أنتِ محاورة وظيفية محترفة" : "أنت محاور وظيفي محترف"} ${isFemale ? "تعملين" : "تعمل"} في السعودية.
+الوظيفة: ${jobPosition}. ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية ومنضبطة.
 ابدأ ردك بـ [INTRO].`;
 
       // Fetch dynamic opening from AI
@@ -1054,12 +1056,12 @@ export const useLiveInterview = ({
           body: {
             messages: [
               { role: "system", content: systemPrompt },
-              { role: "user", content: `ابدأ المقابلة بتحية ودية ومختلفة كل مرة. عرّف نفسك (اسمك ${interviewerName}، ${isFemale ? "محاورة" : "محاور"} واكب ${isFemale ? "الذكية" : "الذكي"})، اذكر الوظيفة (${jobPosition}). خاطب المرشح باسمه إذا توفر في بياناته. لا تذكر عدد الأسئلة. اجعلها دافئة وطبيعية. لا تكرر نفس الصيغة. ابدأ بـ [INTRO].` },
+              { role: "user", content: `ابدأ المقابلة بتحية مهنية موجزة (تحية + تعريف نفسك باسمك ودورك في محرك واكب الذكي + ذكر الوظيفة "${jobPosition}" + سؤال تعريفي مفتوح واحد). يجوز ذكر اسم المرشح مرة واحدة فقط في التحية. لا تذكر عدد الأسئلة. تجنّب العبارات العامية الزائدة. ابدأ بـ [INTRO].` },
             ],
             job_position: jobPosition,
             interview_type: type,
-            interviewer_name: interviewerName,
-            interviewer_gender: interviewerGender,
+            interviewer_name: ivName,
+            interviewer_gender: ivGender,
             current_phase: "intro",
             core_question_count: 0,
             total_questions: totalQuestions,
@@ -1067,14 +1069,12 @@ export const useLiveInterview = ({
           },
         });
         if (!greetErr && greetData?.choices?.[0]?.message?.content) {
-          firstMessage = greetData.choices[0].message.content
-            .replace(/^\[?(INTRO|CORE|NEW_Q|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i, "")
-            .replace(/\b(INTRO|CORE|NEW_Q|FOLLOW_UP|CLOSING|END)\b\s*:?\s*/gi, "").trim();
+          firstMessage = stripPhaseTags(greetData.choices[0].message.content).cleaned;
         }
       } catch {}
-      
+
       if (!firstMessage) {
-        firstMessage = `هلا والله! أنا ${interviewerName} من ${isFemale ? "محاورة" : "محاور"} واكب ${isFemale ? "الذكية" : "الذكي"}، بكون معك اليوم في المقابلة لوظيفة ${jobPosition}. خلّها دردشة عادية. جاهز نبدأ؟ عرّفني على نفسك.`;
+        firstMessage = `السلام عليكم، أنا ${ivName} من محرك واكب الذكي. سأجري معك اليوم مقابلة لوظيفة ${jobPosition}. لنبدأ — عرّفني على نفسك وخلفيتك المهنية.`;
       }
 
       conversationRef.current.push({ role: "assistant", content: firstMessage });
