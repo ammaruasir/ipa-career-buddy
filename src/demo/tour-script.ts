@@ -18,7 +18,7 @@ export const tourScript: TourStep[] = [
     spotlight: { selector: "form", label: "نموذج التسجيل" },
     action: { kind: "type", selector: "input[type='email']", text: "demo.candidate@ipa.sa", speedMs: 40 },
     durationEstimateMs: 15_000 },
-  { id: "act2-reset-password", act: "Act 2 — Signup", route: "/reset-password",
+  { id: "act2-reset-password", act: "Act 2 — Signup", route: "/login?forgot=1",
     narration: "إذا نسيت كلمة المرور، تقدر تستعيدها من هنا. تكتب بريدك، يوصلك رابط، تعيّن كلمة جديدة. بسيط وآمن.",
     spotlight: { selector: "input[type='email']", label: "استعادة كلمة المرور" }, durationEstimateMs: 10_000 },
   { id: "act2-session-swap-candidate", act: "Act 2 — Signup",
