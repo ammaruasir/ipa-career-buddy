@@ -438,6 +438,15 @@ const CVInterview = () => {
                 />
               )}
 
+              {prefilled && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  {uiLang === "en"
+                    ? "Filled from your profile — you can edit it"
+                    : "تم تعبئتها من ملفك — يمكنك التعديل"}
+                </p>
+              )}
+
               {/* AI suggestion (when present) */}
               {suggestion && (
                 <Card className="border-primary/30 bg-primary/5 rounded-xl">
