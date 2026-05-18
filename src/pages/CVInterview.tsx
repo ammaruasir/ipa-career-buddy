@@ -314,11 +314,31 @@ const CVInterview = () => {
   const submit = async (opts: { withSuggestion?: boolean; skip?: boolean } = {}) => {
     if (!sessionId || !question) return;
 
-    const finalAnswer = opts.skip ? "" : answer;
-
-    if (question.required && !opts.skip && !finalAnswer.trim()) {
-      toast.error(t.required);
-      return;
+    const isStructured = STRUCTURED_TYPES.includes(question.type);
+    let finalAnswer: string;
+    if (opts.skip) {
+      finalAnswer = "";
+    } else if (isStructured) {
+      if (question.required && !isStructuredAnswerMeaningful(question, structuredAnswer)) {
+        toast.error(t.required);
+        return;
+      }
+      // Clean: drop empty items in repeaters
+      let payload = structuredAnswer;
+      if (question.type === "repeater") {
+        payload = (Array.isArray(payload) ? payload : []).filter((item: any) =>
+          Object.values(item ?? {}).some((v) => String(v ?? "").trim()),
+        );
+      } else if (question.type === "repeater_simple") {
+        payload = (Array.isArray(payload) ? payload : []).map((s: any) => String(s ?? "").trim()).filter(Boolean);
+      }
+      finalAnswer = JSON.stringify(payload ?? (question.type === "form" ? {} : []));
+    } else {
+      finalAnswer = answer;
+      if (question.required && !finalAnswer.trim()) {
+        toast.error(t.required);
+        return;
+      }
     }
 
     setLoading(true);
@@ -345,6 +365,7 @@ const CVInterview = () => {
       setQuestion(data.question);
       setSuggestion(data.suggestion);
       setAnswer("");
+      setStructuredAnswer(null);
     } catch (e) {
       console.error(e);
       toast.error(uiLang === "en" ? "Failed to save answer" : "فشل حفظ الإجابة");
