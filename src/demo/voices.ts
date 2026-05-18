@@ -1,17 +1,18 @@
-// Voice IDs used by Demo Mode (Lina + Sara) and the platform interviewer.
-// All three must speak Khaleeji (Gulf) Arabic. Phase B.5 (voice procurement)
-// is external work — until cloned voices land, all three IDs fall back to
-// the platform's existing default Arabic voice. See plan for full procurement
-// checklist: audit AdminSettings 24 voices → record 1F + 1M Khaleeji samples
-// → Wakeb AI Engine voice cloning → blind-listen test with 3 Gulf natives.
+// Voice IDs used by Demo Mode (عبدالله + سعد) and the platform interviewer.
+// All three currently resolve to a single male Hijazi (Jeddawi) Arabic voice
+// as a fallback. Phase B.5 (voice procurement) is external work — once
+// cloned voices land, the presenter and candidate will get distinct voices
+// via Wakeb AI Engine voice cloning. Procurement checklist: audit
+// AdminSettings voices → record 1F + 1M Khaleeji/Hijazi samples → clone
+// → blind-listen test with native speakers.
 
-const FALLBACK_AR_VOICE = "QsV9PCczMIklRM6xLPAS";
+const JEDDAWI_MALE_VOICE = "yXEnnEln9armDCyhkXcA";
 
-/** Female Khaleeji Arabic voice — the presenter ("لينا"). REPLACE after cloning. */
-export const presenterVoiceId = FALLBACK_AR_VOICE;
+/** Male Jeddawi (Hijazi) Arabic voice — the presenter ("عبدالله"). */
+export const presenterVoiceId = JEDDAWI_MALE_VOICE;
 
-/** Male Khaleeji Arabic voice — the demo candidate ("سارة"). REPLACE after cloning. */
-export const candidateVoiceId = FALLBACK_AR_VOICE;
+/** Male Jeddawi (Hijazi) Arabic voice — the demo candidate ("سعد"). */
+export const candidateVoiceId = JEDDAWI_MALE_VOICE;
 
-/** Existing production interviewer voice — leave unchanged. */
-export const interviewerVoiceId = FALLBACK_AR_VOICE;
+/** Existing production interviewer voice — same Jeddawi male for now. */
+export const interviewerVoiceId = JEDDAWI_MALE_VOICE;

@@ -33,6 +33,9 @@ verify_jwt = false
 [functions.wakeb-voices]
 verify_jwt = false
 
+[functions.demo-wakeb-tts]
+verify_jwt = false
+
 [functions.complete-interview]
 verify_jwt = false
 

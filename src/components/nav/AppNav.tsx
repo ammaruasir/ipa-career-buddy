@@ -49,6 +49,7 @@ const AppNav = () => {
   };
 
   if (!user) return null;
+  if (role === "admin" || role === "hr") return null; // admin/HR have their own dashboards
 
   // Hide on the public landing and on the live interview screens (immersive flows)
   const hideOn = ["/", "/login", "/reset-password"];
@@ -66,12 +67,8 @@ const AppNav = () => {
   };
 
   const dashHref =
-    role === "hr"
-      ? "/dashboard/hr"
-      : role === "instructor"
+    role === "instructor"
       ? "/dashboard/instructor"
-      : role === "admin"
-      ? "/dashboard/admin"
       : "/dashboard/candidate";
 
   return (

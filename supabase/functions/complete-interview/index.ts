@@ -49,8 +49,9 @@ Deno.serve(async (req) => {
         global: { headers: { Authorization: authHeader } },
       });
       const token = authHeader.replace("Bearer ", "");
-      const { data: { user } } = await userClient.auth.getUser(token);
-      if (!user || user.id !== (iv as any).user_id) {
+      const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
+      const userId = claimsData?.claims?.sub as string | undefined;
+      if (claimsErr || !userId || userId !== (iv as any).user_id) {
         return new Response(JSON.stringify({ error: "Forbidden" }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

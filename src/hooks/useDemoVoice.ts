@@ -1,9 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { presenterVoiceId } from "@/demo/voices";
-
-const cleanTextForTTS = (text: string): string => text.replace(/(.)\1{2,}/g, "$1");
+import { cleanTextForTTS } from "@/demo/clean-tts";
 
 // 1×1px silent WAV used to unlock the autoplay policy under a user gesture.
 // Once primed, subsequent audio.play() calls in the same tab succeed.
@@ -54,6 +52,25 @@ export function useDemoVoice() {
     setIsSpeaking(false);
   }, []);
 
+  /** Pause without releasing the audio element. Used during AI-vs-AI live
+   *  interview cameos so the demo narrator yields the audio bus to the real
+   *  interview pipeline, then resumes from the same script position. */
+  const pause = useCallback(() => {
+    if (currentAudioRef.current && !currentAudioRef.current.paused) {
+      currentAudioRef.current.pause();
+    }
+  }, []);
+
+  const resume = useCallback(async () => {
+    if (currentAudioRef.current && currentAudioRef.current.paused) {
+      try {
+        await currentAudioRef.current.play();
+      } catch (e) {
+        console.warn("voice.resume failed:", e);
+      }
+    }
+  }, []);
+
   const playAudioFromUrl = useCallback((audio: HTMLAudioElement, urlsToRevoke: string[]) => {
     currentAudioRef.current = audio;
     return new Promise<void>((resolve) => {
@@ -75,7 +92,7 @@ export function useDemoVoice() {
         if (isAutoplayBlock && !autoplayWarnedRef.current) {
           autoplayWarnedRef.current = true;
           toast.error(
-            "تعذّر تشغيل صوت المرشدة — اضغط مكاناً ما في الصفحة ثم 'ابدأ الجولة' مرّة أخرى.",
+            "تعذّر تشغيل صوت المرشد — اضغط مكاناً ما في الصفحة ثم 'ابدأ الجولة' مرّة أخرى.",
             { duration: 8000 },
           );
         } else if (!isAutoplayBlock) {
@@ -91,11 +108,14 @@ export function useDemoVoice() {
       stop();
       setIsSpeaking(true);
 
-      // Try pre-cached MP3 first (Phase F cost-saver).
+      // Try pre-cached MP3 first (Phase F cost-saver). Validate Content-Type
+      // because in dev/preview missing files are rewritten to the SPA HTML
+      // shell with status 200, which would otherwise be played as "audio".
       if (cacheKey) {
         try {
           const cacheResp = await fetch(`/demo-audio/${encodeURIComponent(cacheKey)}.mp3`);
-          if (cacheResp.ok) {
+          const ct = cacheResp.headers.get("content-type") ?? "";
+          if (cacheResp.ok && /^audio\//i.test(ct)) {
             const blob = await cacheResp.blob();
             const url = URL.createObjectURL(blob);
             const audio = new Audio(url);
@@ -106,18 +126,13 @@ export function useDemoVoice() {
         }
       }
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken =
-        sessionData.session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/wakeb-tts`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-wakeb-tts`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ text: cleanTextForTTS(text), voiceId }),
         }
@@ -190,6 +205,8 @@ export function useDemoVoice() {
   return {
     speak,
     stop,
+    pause,
+    resume,
     isSpeaking,
     startRecording,
     stopRecording,

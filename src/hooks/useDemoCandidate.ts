@@ -1,9 +1,7 @@
 import { useCallback, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { candidateVoiceId } from "@/demo/voices";
 import { demoCandidate } from "@/demo/demo-candidate";
-
-const cleanTextForTTS = (text: string): string => text.replace(/(.)\1{2,}/g, "$1");
+import { cleanTextForTTS } from "@/demo/clean-tts";
 
 export type CandidateContext = "cv_chat" | "practice_interview" | "assessment_interview";
 export type CandidateTurn = { q: string; a: string };
@@ -56,18 +54,13 @@ export function useDemoCandidate() {
 
       setIsAnswering(true);
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken =
-          sessionData.session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
         const ttsResp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/wakeb-tts`,
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-wakeb-tts`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              Authorization: `Bearer ${accessToken}`,
             },
             body: JSON.stringify({ text: cleanTextForTTS(answer), voiceId: candidateVoiceId }),
           }
