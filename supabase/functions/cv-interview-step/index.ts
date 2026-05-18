@@ -354,6 +354,20 @@ async function suggestForQuestion(
   }
 }
 
+// Try to parse a structured (JSON) answer; returns null if it's plain text
+function tryParseStructured(raw: any): any | null {
+  if (raw == null) return null;
+  if (typeof raw === "object") return raw;
+  if (typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (!s.startsWith("{") && !s.startsWith("[")) return null;
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
 // Convert accumulated answers into a cv_drafts row
 function buildDraftFromAnswers(answers: Record<string, any>) {
   const parseLines = (s: string) =>
@@ -362,56 +376,144 @@ function buildDraftFromAnswers(answers: Record<string, any>) {
       .map((l) => l.trim())
       .filter(Boolean);
 
-  // Naive parsing — the user can refine in /cv/builder afterwards
+  // ---- personal info ----
   const personalInfo: Record<string, string> = {
     full_name: answers.full_name?.answer ?? "",
   };
-  const contactLines = parseLines(answers.contact?.answer ?? "");
-  for (const line of contactLines) {
-    if (line.includes("@")) personalInfo.email = line;
-    else if (/^\+?\d/.test(line)) personalInfo.phone = line;
-    else if (line.toLowerCase().includes("linkedin")) personalInfo.linkedin = line;
-    else if (!personalInfo.city) personalInfo.city = line;
+  const contactStructured = tryParseStructured(answers.contact?.answer);
+  if (contactStructured && typeof contactStructured === "object") {
+    if (contactStructured.email) personalInfo.email = contactStructured.email;
+    if (contactStructured.phone) personalInfo.phone = contactStructured.phone;
+    if (contactStructured.city) personalInfo.city = contactStructured.city;
+    if (contactStructured.linkedin) personalInfo.linkedin = contactStructured.linkedin;
+  } else {
+    // Legacy: line-separated free text
+    const contactLines = parseLines(answers.contact?.answer ?? "");
+    for (const line of contactLines) {
+      if (line.includes("@")) personalInfo.email = line;
+      else if (/^\+?\d/.test(line)) personalInfo.phone = line;
+      else if (line.toLowerCase().includes("linkedin")) personalInfo.linkedin = line;
+      else if (!personalInfo.city) personalInfo.city = line;
+    }
   }
 
   const summaryText = answers.value_proposition?.answer ?? "";
 
-  // Experience: each blank-line-separated chunk = one job
-  const expChunks = (answers.experience_history?.answer ?? "")
-    .split(/\n\s*\n/)
-    .map((c: string) => c.trim())
-    .filter(Boolean);
-  const experience = expChunks.map((chunk: string) => {
-    const lines = chunk.split("\n").map((l) => l.trim());
-    return {
-      position: lines[0] ?? "",
-      company: lines[1] ?? "",
-      start: lines[2] ?? "",
-      end: "",
-      bullets: lines.slice(3),
-    };
-  });
+  // ---- experience ----
+  let experience: any[] = [];
+  const expStructured = tryParseStructured(answers.experience_history?.answer);
+  if (Array.isArray(expStructured)) {
+    experience = expStructured.map((item: any) => ({
+      position: item.title ?? "",
+      company: item.company ?? "",
+      start: item.from ?? "",
+      end: item.to ?? "",
+      bullets: (item.summary ?? "")
+        .split("\n")
+        .map((l: string) => l.trim())
+        .filter(Boolean),
+    }));
+  } else {
+    const expChunks = (answers.experience_history?.answer ?? "")
+      .split(/\n\s*\n/)
+      .map((c: string) => c.trim())
+      .filter(Boolean);
+    experience = expChunks.map((chunk: string) => {
+      const lines = chunk.split("\n").map((l) => l.trim());
+      return {
+        position: lines[0] ?? "",
+        company: lines[1] ?? "",
+        start: lines[2] ?? "",
+        end: "",
+        bullets: lines.slice(3),
+      };
+    });
+  }
 
-  const eduChunks = (answers.education?.answer ?? "")
-    .split(/\n\s*\n/)
-    .map((c: string) => c.trim())
-    .filter(Boolean);
-  const education = eduChunks.map((chunk: string) => {
-    const lines = chunk.split("\n").map((l) => l.trim());
-    return {
-      degree: lines[0] ?? "",
-      major: lines[1] ?? "",
-      institution: lines[2] ?? "",
+  // ---- key achievements: attach as bullets on first job, or as standalone list ----
+  const achievementsStructured = tryParseStructured(answers.key_achievements?.answer);
+  const achievementsList: string[] = Array.isArray(achievementsStructured)
+    ? achievementsStructured.map((a: any) => (typeof a === "string" ? a : a?.text ?? "")).filter(Boolean)
+    : parseLines(answers.key_achievements?.answer ?? "");
+  if (achievementsList.length && experience[0]) {
+    experience[0].bullets = [...(experience[0].bullets ?? []), ...achievementsList];
+  }
+
+  // ---- education ----
+  let education: any[] = [];
+  const eduStructured = tryParseStructured(answers.education?.answer);
+  if (Array.isArray(eduStructured)) {
+    education = eduStructured.map((item: any) => ({
+      degree: item.degree ?? "",
+      major: item.major ?? "",
+      institution: item.university ?? "",
       start: "",
-      end: lines[3] ?? "",
-    };
-  });
+      end: item.year ?? "",
+      gpa: item.gpa ?? "",
+    }));
+  } else {
+    const eduChunks = (answers.education?.answer ?? "")
+      .split(/\n\s*\n/)
+      .map((c: string) => c.trim())
+      .filter(Boolean);
+    education = eduChunks.map((chunk: string) => {
+      const lines = chunk.split("\n").map((l) => l.trim());
+      return {
+        degree: lines[0] ?? "",
+        major: lines[1] ?? "",
+        institution: lines[2] ?? "",
+        start: "",
+        end: lines[3] ?? "",
+      };
+    });
+  }
 
-  const technical = parseLines((answers.technical_skills?.answer ?? "").replace(/،/g, ","))
-    .flatMap((l) => l.split(",").map((s) => s.trim()))
-    .filter(Boolean);
-  const languages = parseLines(answers.languages?.answer ?? "");
-  const certs = parseLines(answers.certifications?.answer ?? "").map((c) => ({ name: c }));
+  // ---- technical skills ----
+  let technical: string[] = [];
+  const techStructured = tryParseStructured(answers.technical_skills?.answer);
+  if (Array.isArray(techStructured)) {
+    technical = techStructured.map((s: any) => String(s).trim()).filter(Boolean);
+  } else {
+    technical = parseLines((answers.technical_skills?.answer ?? "").replace(/،/g, ","))
+      .flatMap((l) => l.split(",").map((s) => s.trim()))
+      .filter(Boolean);
+  }
+
+  // ---- languages ----
+  let languages: string[] = [];
+  const langStructured = tryParseStructured(answers.languages?.answer);
+  if (Array.isArray(langStructured)) {
+    const levelLabels: Record<string, string> = {
+      native: "Native",
+      fluent: "Fluent",
+      advanced: "Advanced",
+      intermediate: "Intermediate",
+      beginner: "Beginner",
+    };
+    languages = langStructured
+      .map((l: any) => {
+        const name = l?.name ?? "";
+        const level = levelLabels[l?.level] ?? l?.level ?? "";
+        return name ? (level ? `${name} (${level})` : name) : "";
+      })
+      .filter(Boolean);
+  } else {
+    languages = parseLines(answers.languages?.answer ?? "");
+  }
+
+  // ---- certifications ----
+  let certs: any[] = [];
+  const certStructured = tryParseStructured(answers.certifications?.answer);
+  if (Array.isArray(certStructured)) {
+    certs = certStructured.map((c: any) => ({
+      name: c?.name ?? "",
+      issuer: c?.issuer ?? "",
+      year: c?.year ?? "",
+      link: c?.link ?? "",
+    })).filter((c) => c.name);
+  } else {
+    certs = parseLines(answers.certifications?.answer ?? "").map((c) => ({ name: c }));
+  }
 
   return {
     personal_info: personalInfo,
