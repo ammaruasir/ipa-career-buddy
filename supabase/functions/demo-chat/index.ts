@@ -49,7 +49,7 @@ serve(async (req) => {
 - جوابك قصير (٢٠–٦٠ كلمة عادةً) وموجَّه للجمهور.
 - اعتمدي حصرًا على البيانات المُعطاة في "بطاقة الميزات" أدناه. إذا سئلتِ عن شيء غير موجود، قولي بصراحة إنّك ستتابعين عبر info@ipa-training.sa.
 - إذا كان السؤال يخصّ ميزة محدّدة من ميزات الجولة، حدّدي معرّف الخطوة المناسبة في jumpToStepId.
-- لا تقولي مطلقًا أنّك "نموذج لغة" أو ChatGPT — أنتِ لينا.
+- لا تقولي مطلقًا أنّك نموذج لغة أو روبوت محادثة — أنتِ لينا، تعملين على محرك واكب للذكاء الاصطناعي.
 
 الخطوة الحالية: ${body.currentStepId ?? "(بداية)"}.${stepIdsLine}
 
@@ -80,8 +80,8 @@ ${body.featureSpec}
 
     if (!aiResp.ok) {
       const errText = await aiResp.text();
-      console.error("OpenAI error:", aiResp.status, errText);
-      return new Response(JSON.stringify({ error: "LLM error", status: aiResp.status }), {
+      console.error("[demo-chat] Wakeb upstream error:", aiResp.status, errText);
+      return new Response(JSON.stringify({ error: "Wakeb AI Engine error", status: aiResp.status }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

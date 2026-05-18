@@ -21,8 +21,8 @@ export interface SystemSettings {
   filler_words: string[];
   /**
    * Historical engine toggle. The only engine implemented is the built-in
-   * one (chat + elevenlabs-tts). The DB column is retained for backward
-   * compatibility but no code path branches on it anymore.
+   * one (Wakeb AI Engine: chat + TTS). The DB column is retained for
+   * backward compatibility but no code path branches on it anymore.
    */
   interview_engine: "built_in";
   interviewer_voice: InterviewerVoice;
@@ -34,7 +34,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
   questions_per_type: { text: 8, voice: 5, video: 5 },
   time_per_question: { text: 0, voice: 300, video: 300 },
   job_positions: ["محلل أعمال", "أخصائي موارد بشرية", "مدير مشاريع", "مطور برمجيات", "محاسب", "أخصائي تسويق"],
-  ai_model: "google/gemini-3-flash-preview",
+  ai_model: "wakeb-default",
   maintenance_mode: false,
   brand_color: "#006C35",
   evaluation_thresholds: { highly_recommended: 80, recommended: 60 },

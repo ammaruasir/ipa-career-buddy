@@ -105,7 +105,7 @@ export function consentRequiredResponse(
 }
 
 /**
- * Standard handler for Lovable AI Gateway / OpenAI error responses.
+ * Standard handler for Wakeb AI Engine upstream error responses.
  * Returns a Response if the status maps to a user-facing message; null if caller should continue.
  *   402 → "اشحن رصيد Lovable" (matches analyze-resume convention)
  *   429 → "تجاوزت الحدّ" (rate-limited by provider, not us)
@@ -122,7 +122,7 @@ export function handleAiGatewayError(
   if (resp.status === 402) {
     return new Response(
       JSON.stringify({
-        error: "يرجى شحن رصيد محرك واكب للذكاء الاصطناعي / AI gateway credit exhausted",
+        error: "يرجى شحن رصيد محرك واكب للذكاء الاصطناعي / Wakeb AI Engine credit exhausted",
       }),
       { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

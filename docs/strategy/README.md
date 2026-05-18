@@ -50,8 +50,8 @@ P0.4 (منشئ السيرة الذاتية)
 
 - ✅ واجهة عربية كاملة + RTL
 - ✅ Avatar ثقافي قابل للتخصيص (`AIAvatarScene.tsx`)
-- ✅ أصوات عربية ElevenLabs (هيثم/سناء)
-- ✅ محرك تقييم DISC + 5 أبعاد عبر **GPT-4.1** (`evaluate-interview`)
+- ✅ أصوات عربية أصلية عبر محرك واكب للذكاء الاصطناعي
+- ✅ محرك تقييم DISC + 5 أبعاد عبر **محرك واكب للذكاء الاصطناعي** (`evaluate-interview`)
 - ✅ مراحل مقابلة حيّة: INTRO → CORE → CLOSING → END
 - ✅ كشف صمت RMS (threshold 30، 800ms)
 - ✅ مزامنة TTS عبر AudioContext
@@ -70,7 +70,7 @@ P0.4 (منشئ السيرة الذاتية)
 
 - **Backend:** Supabase (Postgres + Edge Functions + Storage + Auth)
 - **Frontend:** Vite + React + TypeScript + TailwindCSS + shadcn/ui
-- **AI:** OpenAI GPT-4.1 (تقييم) + Gemini-3-Flash-Preview (سيرة ذاتية + توجيه مهني) + ElevenLabs (TTS عربي)
+- **AI:** محرك واكب للذكاء الاصطناعي — وحدة نصية (تقييم) + وحدة متعدّدة الوسائط (سيرة ذاتية + توجيه مهني) + وحدة صوتية (TTS عربي)
 - **النشر:** Lovable.dev (تطوير سريع للواجهة)
 - **الرسوم البيانية:** recharts ^2.15.4
 

@@ -623,7 +623,7 @@ CREATE INDEX idx_questions_status ON public.question_templates(status);
 
 ### الحالة الحالية
 
-`analyze-resume/index.ts` يستخدم Gemini-3-Flash-Preview لاستخراج بنية مهيكلة:
+`analyze-resume/index.ts` يستخدم وحدة محرك واكب متعدّدة الوسائط لاستخراج بنية مهيكلة:
 - technical_skills, soft_skills, certifications
 - experience_years, education_level, major
 - languages, summary

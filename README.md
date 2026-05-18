@@ -66,11 +66,14 @@ This project uses several edge functions that call external AI providers.
 Before deploying, set these secrets in the Supabase dashboard
 (Project Settings → Edge Functions → Manage secrets):
 
+All three are internal upstream credentials used by the Wakeb AI Engine
+functions. They are NOT surfaced anywhere on the platform.
+
 | Secret | Used by | Purpose |
 |--------|---------|---------|
-| `LOVABLE_API_KEY` | analyze-resume, analyze-video, transcribe-audio, career-guidance, check-eligibility, coach-response, chat-with-cv, cv-interview-step, generate-cv-bullets, improve-cv-summary, suggest-cv-skills | Lovable AI Gateway (Gemini) |
-| `OPENAI_API_KEY` | chat, evaluate-interview; fallback for above | OpenAI direct (GPT-4.1 family) |
-| `ELEVENLABS_API_KEY` | elevenlabs-tts | Arabic interviewer voices |
+| `LOVABLE_API_KEY` | analyze-resume, analyze-video, transcribe-audio, career-guidance, check-eligibility, coach-response, chat-with-cv, cv-interview-step, generate-cv-bullets, improve-cv-summary, suggest-cv-skills | Wakeb AI Engine multimodal upstream |
+| `OPENAI_API_KEY` | chat, evaluate-interview; fallback for the above | Wakeb AI Engine text upstream |
+| `ELEVENLABS_API_KEY` | wakeb-tts, wakeb-voices | Wakeb AI Engine voice upstream |
 
 Auto-injected by Supabase: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 

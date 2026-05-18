@@ -3,7 +3,7 @@
 // is external work — until cloned voices land, all three IDs fall back to
 // the platform's existing default Arabic voice. See plan for full procurement
 // checklist: audit AdminSettings 24 voices → record 1F + 1M Khaleeji samples
-// → ElevenLabs Pro Voice Cloning → blind-listen test with 3 Gulf natives.
+// → Wakeb AI Engine voice cloning → blind-listen test with 3 Gulf natives.
 
 const FALLBACK_AR_VOICE = "QsV9PCczMIklRM6xLPAS";
 

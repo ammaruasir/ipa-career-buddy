@@ -1207,7 +1207,7 @@ function computeAtsScore(d: Draft): number {
 // NOTE: section renderers used to live here as a local map; they were moved
 // into the template components themselves so each template controls its own
 // section layout. Kept as a dead export below for one cycle in case any
-// internal tooling still references it — safe to delete after Lovable resync.
+// internal tooling still references it — safe to delete in the next cycle.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _legacy_PREVIEW_SECTION_RENDERERS: Record<SectionKey, (draft: Draft) => React.ReactNode> = {
   summary: (draft) =>

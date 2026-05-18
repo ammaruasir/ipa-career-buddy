@@ -79,7 +79,7 @@ serve(async (req) => {
     // Determine MIME type
     const mimeType = audioFile.type || "audio/webm";
 
-    // Use Gemini multimodal to transcribe — with retry-on-429 (audit #20)
+    // Wakeb AI Engine multimodal upstream for transcription — with retry-on-429.
     const response = await fetchWithBackoff("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {

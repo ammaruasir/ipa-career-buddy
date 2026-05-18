@@ -27,7 +27,10 @@ verify_jwt = false
 [functions.vapi-token]
 verify_jwt = false
 
-[functions.elevenlabs-tts]
+[functions.wakeb-tts]
+verify_jwt = false
+
+[functions.wakeb-voices]
 verify_jwt = false
 
 [functions.complete-interview]

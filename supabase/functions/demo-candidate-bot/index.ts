@@ -83,8 +83,8 @@ ${JSON.stringify(body.persona, null, 2)}
 
     if (!aiResp.ok) {
       const errText = await aiResp.text();
-      console.error("OpenAI error:", aiResp.status, errText);
-      return new Response(JSON.stringify({ error: "LLM error", status: aiResp.status }), {
+      console.error("[demo-candidate-bot] Wakeb upstream error:", aiResp.status, errText);
+      return new Response(JSON.stringify({ error: "Wakeb AI Engine error", status: aiResp.status }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

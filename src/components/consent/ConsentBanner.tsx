@@ -14,9 +14,9 @@ const CONSENT_TYPES = [
     title_ar: "تحويل الصوت إلى نص",
     title_en: "Audio transcription",
     desc_ar:
-      "تستخدم المنصة Google Gemini (عبر Lovable AI Gateway) لتحويل تسجيلاتك الصوتية إلى نص. التسجيلات تُرسَل عبر اتصال HTTPS مشفّر ولا تُحتفَظ بها لدى الطرف الثالث بحسب سياساته.",
+      "تستخدم المنصة محرك واكب للذكاء الاصطناعي لتحويل تسجيلاتك الصوتية إلى نص. التسجيلات تُرسَل عبر اتصال HTTPS مشفّر ولا تُحتفَظ بها بعد المعالجة.",
     desc_en:
-      "The platform uses Google Gemini (via Lovable AI Gateway) to transcribe your audio recordings. Recordings are sent over encrypted HTTPS; the third party does not retain them per their policy.",
+      "The platform uses the Wakeb AI Engine to transcribe your audio recordings. Recordings are sent over encrypted HTTPS and are not retained after processing.",
     required: true,
   },
   {
