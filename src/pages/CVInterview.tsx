@@ -524,20 +524,33 @@ const CVInterview = () => {
         )}
 
         {/* Navigation */}
-        <div className="flex items-center justify-between gap-3">
-          {!question?.required ? (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
             <Button
-              variant="ghost"
-              onClick={() => submit({ skip: true })}
-              disabled={loading}
+              variant="outline"
+              onClick={goBack}
+              disabled={loading || currentStep <= 0}
               className="rounded-xl"
             >
-              <SkipForward className="w-4 h-4 ml-2" />
-              {t.skip}
+              {uiLang === "ar" ? (
+                <ArrowRight className="w-4 h-4 ml-2" />
+              ) : (
+                <ArrowLeft className="w-4 h-4 mr-2" />
+              )}
+              {uiLang === "en" ? "Previous question" : "السؤال السابق"}
             </Button>
-          ) : (
-            <div />
-          )}
+            {!question?.required && (
+              <Button
+                variant="ghost"
+                onClick={() => submit({ skip: true })}
+                disabled={loading}
+                className="rounded-xl"
+              >
+                <SkipForward className="w-4 h-4 ml-2" />
+                {t.skip}
+              </Button>
+            )}
+          </div>
           <Button
             onClick={() => submit()}
             disabled={loading || (question?.required && !answer.trim())}
