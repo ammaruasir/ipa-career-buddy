@@ -19,6 +19,7 @@ import {
   MessagesSquare,
   CheckCircle2,
   SkipForward,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProfilePrefill } from "@/hooks/useProfilePrefill";
