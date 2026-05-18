@@ -90,8 +90,9 @@ export const AIAssistBullets = ({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-tour="ai-assist-bullets">
       <Button
+        data-tour="generate-bullets"
         variant="outline"
         size="sm"
         onClick={generate}
@@ -271,8 +272,9 @@ export const AIAssistSummary = ({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-tour="ai-assist-summary">
       <Button
+        data-tour="generate-summary"
         variant="outline"
         size="sm"
         onClick={generate}

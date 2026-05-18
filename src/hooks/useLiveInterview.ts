@@ -1164,6 +1164,44 @@ export const useLiveInterview = ({
     }
   };
 
+  /** Inject a candidate answer as plain text — bypasses microphone capture
+   *  and STT. Used by the demo presenter so an AI candidate persona can drive
+   *  the interview turn-by-turn against the real interviewer pipeline. Mirrors
+   *  the state mutations handleRecordingComplete performs after a real
+   *  transcription, minus the audio handling. */
+  const submitAnswerText = useCallback(async (userText: string): Promise<void> => {
+    const text = (userText ?? "").trim();
+    if (!text || !activeRef.current || stoppedManuallyRef.current) return;
+
+    const userEntry: TranscriptEntry = { role: "user", text };
+    setTranscript((prev) => [...prev, userEntry]);
+    conversationRef.current.push({ role: "user", content: text });
+
+    if (interviewIdRef.current) {
+      const lastAssistant = conversationRef.current
+        .filter((m) => m.role === "assistant")
+        .pop();
+      try {
+        await supabase.from("responses").insert({
+          interview_id: interviewIdRef.current,
+          question_text: lastAssistant?.content || "",
+          answer_text: text,
+        });
+      } catch (e) {
+        console.warn("submitAnswerText: response insert failed (non-fatal):", e);
+      }
+    }
+
+    contextSummaryRef.current += `\nسؤال ${questionCountRef.current}: ${
+      conversationRef.current
+        .filter((m) => m.role === "assistant")
+        .pop()
+        ?.content?.substring(0, 100) || ""
+    }\nإجابة مختصرة: ${text.substring(0, 150)}`;
+
+    await getNextAIResponse(text);
+  }, []);
+
   return {
     isCallActive: isActive,
     isConnecting: isStarting,
@@ -1181,6 +1219,7 @@ export const useLiveInterview = ({
     startCall,
     endCall,
     submitAnswer,
+    submitAnswerText,
     videoStream: videoStreamRef.current,
     videoElementRef,
     activeProctors,

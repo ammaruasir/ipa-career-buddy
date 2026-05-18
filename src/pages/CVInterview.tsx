@@ -503,6 +503,7 @@ const CVInterview = () => {
                 </div>
               </div>
               <Button
+                data-tour="cv-interview-start"
                 onClick={startInterview}
                 disabled={loading}
                 className="w-full rounded-xl"
@@ -631,6 +632,7 @@ const CVInterview = () => {
                 />
               ) : question.type === "textarea" ? (
                 <Textarea
+                  data-tour="cv-interview-answer"
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
                   placeholder={t.yourAnswer}
@@ -639,6 +641,7 @@ const CVInterview = () => {
                 />
               ) : (
                 <Input
+                  data-tour="cv-interview-answer"
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
                   placeholder={t.yourAnswer}
@@ -731,6 +734,7 @@ const CVInterview = () => {
             )}
           </div>
           <Button
+            data-tour="cv-interview-next"
             onClick={() => submit()}
             disabled={
               loading ||

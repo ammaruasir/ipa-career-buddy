@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import AppNav from "@/components/nav/AppNav";
 import { DemoTourProvider } from "@/contexts/DemoTourContext";
 import { DemoOverlay } from "@/components/demo/DemoOverlay";
+import { DemoCursor } from "@/components/demo/DemoCursor";
 import { lazy, Suspense } from "react";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -81,6 +82,7 @@ const App = () => (
           <DemoTourProvider>
             <AppNav />
             <DemoOverlay />
+            <DemoCursor />
             <Suspense fallback={<LazyFallback />}>
               <Routes>
                 <Route path="/" element={<Index />} />
