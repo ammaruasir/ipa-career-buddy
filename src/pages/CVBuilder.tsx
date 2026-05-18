@@ -575,10 +575,53 @@ const EducationStep = ({
 const SkillsStep = ({
   value,
   onChange,
+  experience,
+  education,
+  language,
 }: {
   value: Skills;
   onChange: (v: Skills) => void;
+  experience: ExperienceItem[];
+  education: EducationItem[];
+  language: "ar" | "en" | "bilingual";
 }) => {
+  const [suggesting, setSuggesting] = useState(false);
+
+  const suggest = async () => {
+    setSuggesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("suggest-cv-skills", {
+        body: {
+          experience,
+          education,
+          target_role: experience[0]?.position ?? "",
+          language: language === "bilingual" ? "ar" : language,
+        },
+      });
+      if (error) throw error;
+      const bucket = data?.ar ?? data?.en;
+      if (!bucket) {
+        toast.error("لم تُرجَع اقتراحات");
+        return;
+      }
+      const merge = (current: string[] = [], suggested: { name: string }[] = []) => {
+        const set = new Set(current.map((s) => s.trim()).filter(Boolean));
+        suggested.forEach((s) => s?.name && set.add(s.name.trim()));
+        return Array.from(set);
+      };
+      onChange({
+        technical: merge(value.technical, bucket.technical),
+        soft: merge(value.soft, bucket.soft),
+        languages: merge(value.languages, bucket.languages),
+      });
+      toast.success("تم اقتراح المهارات");
+    } catch (e: any) {
+      toast.error(e?.message ?? "تعذّر الاقتراح");
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
   const tagInput = (
     label: string,
     key: keyof Skills,
@@ -607,6 +650,23 @@ const SkillsStep = ({
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={suggest}
+          disabled={suggesting || (experience.length === 0 && education.length === 0)}
+          className="rounded-xl"
+        >
+          {suggesting ? (
+            <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+          ) : (
+            <Wrench className="w-4 h-4 ml-2" />
+          )}
+          اقترح المهارات بالذكاء الاصطناعي
+        </Button>
+      </div>
       {tagInput("المهارات التقنية", "technical", "Python، إدارة قواعد البيانات، Excel متقدّم")}
       {tagInput("المهارات الشخصية", "soft", "العمل الجماعي، إدارة الوقت، التواصل")}
       {tagInput("اللغات", "languages", "العربية (الأم)، الإنجليزية (طلاقة)")}
