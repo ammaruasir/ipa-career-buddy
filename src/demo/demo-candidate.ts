@@ -1,18 +1,18 @@
 // Demo candidate persona used by demo-candidate-bot and seeded into the demo
-// data tables so the same Sara appears in CV chat → practice interview →
+// data tables so the same سعد appears in CV chat → practice interview →
 // assessment interview → admin views → HR comparison.
 
 export const demoCandidate = {
-  fullName: "سارة الراشد",
-  arabicGivenName: "سارة",
+  fullName: "سعد الراشد",
+  arabicGivenName: "سعد",
   email: "demo-candidate@ipa-training.sa",
-  targetRole: "مهندسة واجهات أمامية (Frontend Engineer)",
+  targetRole: "مهندس واجهات أمامية (Frontend Engineer)",
   background: {
     yearsExperience: 3,
     currentRoleSummary:
-      "مهندسة واجهات أمامية في شركة فينتك ناشئة في الرياض، تعمل على لوحات تحكّم داخلية ومنتج موجَّه للعملاء.",
-    education: "بكالوريوس علوم حاسب من جامعة الملك عبدالعزيز، تخرّجت ٢٠٢٢ بمرتبة الشرف.",
-    city: "الرياض",
+      "مهندس واجهات أمامية في شركة فينتك ناشئة في جدّة، يعمل على لوحات تحكّم داخلية ومنتج موجَّه للعملاء.",
+    education: "بكالوريوس علوم حاسب من جامعة الملك عبدالعزيز، تخرّج ٢٠٢٢ بمرتبة الشرف.",
+    city: "جدّة",
   },
   skills: {
     technical: ["React", "TypeScript", "Next.js", "Tailwind CSS", "WCAG accessibility", "Design Systems"],

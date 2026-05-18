@@ -9,9 +9,9 @@ type Props = {
 export function CandidateBadge({ visible, state }: Props) {
   if (!visible) return null;
   const labels: Record<Props["state"], string> = {
-    thinking: "سارة تفكّر…",
-    answering: "سارة تجيب",
-    idle: "سارة",
+    thinking: "سعد يفكّر…",
+    answering: "سعد يجيب",
+    idle: "سعد",
   };
   return (
     <Card
@@ -26,7 +26,7 @@ export function CandidateBadge({ visible, state }: Props) {
         <User className="w-4 h-4 text-secondary" />
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-bold text-foreground leading-tight">سارة الراشد</p>
+        <p className="text-sm font-bold text-foreground leading-tight">سعد الراشد</p>
         <p className="text-[11px] text-muted-foreground">{labels[state]}</p>
       </div>
     </Card>

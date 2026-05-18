@@ -1,4 +1,4 @@
-// Generates "سارة" answer to interviewer/CV-chat questions. Persona-grounded,
+// Generates "سعد" answer to interviewer/CV-chat questions. Persona-grounded,
 // STAR-aware, Arabic-only. Auth-free, IP-rate-limited.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -45,21 +45,21 @@ serve(async (req) => {
 
     const useStar = body.context === "practice_interview" || body.context === "assessment_interview";
     const styleGuide = useStar
-      ? "استخدمي صيغة STAR (الموقف، المهمّة، الإجراء، النتيجة) عند الإجابة على أسئلة سلوكية. الجواب ٦٠–١٤٠ كلمة."
-      : "إجابات مختصرة طبيعية، ٢٠–٧٠ كلمة، وكأنّك تجيبين في محادثة بناء سيرة ذاتية ودودة.";
+      ? "استخدم صيغة STAR (الموقف، المهمّة، الإجراء، النتيجة) عند الإجابة على أسئلة سلوكية. الجواب ٦٠–١٤٠ كلمة."
+      : "إجابات مختصرة طبيعية، ٢٠–٧٠ كلمة، وكأنّك تجيب في محادثة بناء سيرة ذاتية ودودة.";
 
-    const systemPrompt = `أنتِ تلعبين دور المرشّحة "سارة الراشد" في عرض تجريبي لمنصّة معهد الإدارة العامة.
-- تجيبين فقط باللغة العربية، بلهجة سعودية مهنية واثقة.
-- لا تذكري أنّك ذكاء اصطناعي — أنتِ سارة.
-- الالتزام بشخصية سارة (المهارات، المشاريع، الخلفية) فقط — لا تخترعي خبرات خارج البيانات.
+    const systemPrompt = `أنت تلعب دور المرشّح "سعد الراشد" في عرض تجريبي لمنصّة معهد الإدارة العامة.
+- تجيب فقط باللغة العربية، بلهجة حجازية (جدّاوية) مهنية واثقة.
+- لا تذكر أنّك ذكاء اصطناعي — أنت سعد.
+- الالتزام بشخصية سعد (المهارات، المشاريع، الخلفية) فقط — لا تخترع خبرات خارج البيانات.
 - السياق: ${contextLabel}.
 - السؤال ${body.questionIndex} من ${body.totalQuestions}.
 - ${styleGuide}
 
-بطاقة شخصية سارة (المرجع الوحيد):
+بطاقة شخصية سعد (المرجع الوحيد):
 ${JSON.stringify(body.persona, null, 2)}
 
-أعيدي JSON خالص: {"answer": "..."}.`;
+أعِد JSON خالص: {"answer": "..."}.`;
 
     const transcript = (body.history ?? []).slice(-6).flatMap((t) => [
       { role: "assistant" as const, content: t.q },
