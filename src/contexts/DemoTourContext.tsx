@@ -174,6 +174,10 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
   const runtimeCtxRef = useRef<DemoRuntimeContext>({ lastInterviewId: null });
 
   const cancelRef = useRef(false);
+  // Map<stepId, Promise<Blob|null>> — provider-side preloads (currently just
+  // step 0) so the first click feels instant instead of waiting on a TTS
+  // round-trip while the page sits silent.
+  const preloadedAudioRef = useRef<Map<string, Promise<Blob | null>>>(new Map());
   const currentStep: TourStep | null = tourScript[stepIndex] ?? null;
 
   // ── Cursor helpers ────────────────────────────────────────────────────────
