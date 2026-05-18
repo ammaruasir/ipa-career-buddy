@@ -23,6 +23,7 @@ interface ChatMessage {
 interface CVChatPanelProps {
   cvDocumentId: string;
   language?: Lang;
+  onAcceptImprovement?: (improved: string, original: string) => Promise<void> | void;
 }
 
 const TEXT = {
