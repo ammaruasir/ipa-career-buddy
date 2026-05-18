@@ -868,6 +868,7 @@ export type Database = {
           language: string | null
           primary_color: string | null
           custom_sections: Json | null
+          section_order: string[] | null
           created_at: string | null
           updated_at: string | null
           last_exported_at: string | null
@@ -886,6 +887,7 @@ export type Database = {
           language?: string | null
           primary_color?: string | null
           custom_sections?: Json | null
+          section_order?: string[] | null
           created_at?: string | null
           updated_at?: string | null
           last_exported_at?: string | null
@@ -904,6 +906,7 @@ export type Database = {
           language?: string | null
           primary_color?: string | null
           custom_sections?: Json | null
+          section_order?: string[] | null
           created_at?: string | null
           updated_at?: string | null
           last_exported_at?: string | null

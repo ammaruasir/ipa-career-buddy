@@ -44,6 +44,8 @@ import {
 import { cn } from "@/lib/utils";
 import { AIAssistBullets, AIAssistSummary, AIAssistSkills } from "@/components/cv-builder/AIAssistButton";
 import JobAlignmentDialog from "@/components/cv-builder/JobAlignmentDialog";
+import CVDateInput from "@/components/cv-builder/CVDateInput";
+import SectionOrderPanel, { resolveSectionOrder, type SectionKey } from "@/components/cv-builder/SectionOrderPanel";
 
 interface PersonalInfo {
   full_name?: string;
@@ -125,6 +127,7 @@ interface Draft {
   skills: Skills;
   certifications: CertItem[];
   custom_sections: CustomSections;
+  section_order: string[] | null;
   template: "conservative" | "modern" | "executive";
   language: "ar" | "en" | "bilingual";
 }
@@ -183,6 +186,7 @@ const EMPTY_DRAFT: Draft = {
   skills: { technical: [], soft: [], languages: [] },
   certifications: [],
   custom_sections: {},
+  section_order: null,
   template: "modern",
   language: "ar",
 };
@@ -226,6 +230,7 @@ const CVBuilder = () => {
             skills: d.skills ?? { technical: [], soft: [], languages: [] },
             certifications: d.certifications ?? [],
             custom_sections: d.custom_sections ?? {},
+            section_order: d.section_order ?? null,
             template: d.template ?? "modern",
             language: d.language ?? "ar",
           });
@@ -296,6 +301,7 @@ const CVBuilder = () => {
               skills: payload.skills,
               certifications: payload.certifications,
               custom_sections: payload.custom_sections,
+              section_order: payload.section_order,
               template: payload.template,
               language: payload.language,
             })
@@ -312,6 +318,7 @@ const CVBuilder = () => {
               skills: payload.skills,
               certifications: payload.certifications,
               custom_sections: payload.custom_sections,
+              section_order: payload.section_order,
               template: payload.template,
               language: payload.language,
             })
@@ -532,10 +539,33 @@ const CVBuilder = () => {
               />
             )}
             {step === 6 && (
-              <CustomSectionsStep
-                value={draft.custom_sections}
-                onChange={(v) => update("custom_sections", v)}
-              />
+              <>
+                <CustomSectionsStep
+                  value={draft.custom_sections}
+                  onChange={(v) => update("custom_sections", v)}
+                />
+                <div className="pt-6 border-t border-border mt-6">
+                  <SectionOrderPanel
+                    order={draft.section_order}
+                    onChange={(o) => update("section_order", o)}
+                    hasContent={{
+                      summary: !!(draft.summary?.ar || draft.summary?.en),
+                      experience: draft.experience.length > 0,
+                      education: draft.education.length > 0,
+                      skills:
+                        (draft.skills.technical ?? []).length > 0 ||
+                        (draft.skills.soft ?? []).length > 0 ||
+                        (draft.skills.languages ?? []).length > 0,
+                      certifications: draft.certifications.length > 0,
+                      volunteer: (draft.custom_sections?.volunteer ?? []).length > 0,
+                      projects: (draft.custom_sections?.projects ?? []).length > 0,
+                      awards: (draft.custom_sections?.awards ?? []).length > 0,
+                      languages_structured:
+                        (draft.custom_sections?.languages_structured ?? []).length > 0,
+                    }}
+                  />
+                </div>
+              </>
             )}
             {step === 7 && <PreviewStep draft={draft} />}
           </CardContent>
@@ -721,15 +751,15 @@ const ExperienceStep = ({
                 value={exp.position ?? ""}
                 onChange={(e) => updateItem(idx, { position: e.target.value })}
               />
-              <Input
+              <CVDateInput
                 placeholder="تاريخ البداية"
                 value={exp.start ?? ""}
-                onChange={(e) => updateItem(idx, { start: e.target.value })}
+                onChange={(v) => updateItem(idx, { start: v })}
               />
-              <Input
+              <CVDateInput
                 placeholder="تاريخ النهاية (أو 'حتى الآن')"
                 value={exp.end ?? ""}
-                onChange={(e) => updateItem(idx, { end: e.target.value })}
+                onChange={(v) => updateItem(idx, { end: v })}
               />
             </div>
             <Textarea
@@ -804,15 +834,15 @@ const EducationStep = ({
                 value={ed.gpa ?? ""}
                 onChange={(e) => updateItem(idx, { gpa: e.target.value })}
               />
-              <Input
+              <CVDateInput
                 placeholder="تاريخ البداية"
                 value={ed.start ?? ""}
-                onChange={(e) => updateItem(idx, { start: e.target.value })}
+                onChange={(v) => updateItem(idx, { start: v })}
               />
-              <Input
+              <CVDateInput
                 placeholder="تاريخ التخرّج"
                 value={ed.end ?? ""}
-                onChange={(e) => updateItem(idx, { end: e.target.value })}
+                onChange={(v) => updateItem(idx, { end: v })}
               />
             </div>
           </CardContent>
@@ -988,8 +1018,8 @@ const CustomSectionsStep = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <Input placeholder="الجهة" value={item.organization ?? ""} onChange={(e) => updateItem({ organization: e.target.value })} />
               <Input placeholder="دورك" value={item.role ?? ""} onChange={(e) => updateItem({ role: e.target.value })} />
-              <Input placeholder="من" value={item.start ?? ""} onChange={(e) => updateItem({ start: e.target.value })} />
-              <Input placeholder="إلى (أو 'حتى الآن')" value={item.end ?? ""} onChange={(e) => updateItem({ end: e.target.value })} />
+              <CVDateInput placeholder="من" value={item.start ?? ""} onChange={(v) => updateItem({ start: v })} />
+              <CVDateInput placeholder="إلى (أو 'حتى الآن')" value={item.end ?? ""} onChange={(v) => updateItem({ end: v })} />
             </div>
             <Textarea placeholder="ماذا فعلت؟" value={item.description ?? ""} onChange={(e) => updateItem({ description: e.target.value })} rows={2} dir="rtl" />
           </>
@@ -1176,176 +1206,195 @@ function computeAtsScore(d: Draft): number {
   return Math.max(0, Math.min(100, Math.round(s)));
 }
 
-const PreviewStep = ({ draft }: { draft: Draft }) => (
-  <div className="space-y-4">
-    <div className="p-6 rounded-xl bg-white text-black dark:bg-white dark:text-black border-4 border-double border-primary/30 space-y-4 font-arabic" dir="rtl">
-      <div className="text-center pb-3 border-b-2 border-primary/30">
-        <h1 className="text-2xl font-bold">{draft.personal_info.full_name || "اسم المتقدّم"}</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          {[draft.personal_info.email, draft.personal_info.phone, draft.personal_info.city]
-            .filter(Boolean)
-            .join(" • ")}
-        </p>
+// Section renderers indexed by SectionKey. Each returns the JSX for that
+// section, or null if the section has no content.
+const PREVIEW_SECTION_RENDERERS: Record<SectionKey, (draft: Draft) => React.ReactNode> = {
+  summary: (draft) =>
+    draft.summary?.ar || draft.summary?.en ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الملخّص</h2>
+        <p className="text-sm leading-relaxed">{draft.summary?.ar || draft.summary?.en}</p>
+      </section>
+    ) : null,
+
+  experience: (draft) =>
+    draft.experience.length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الخبرة العمليّة</h2>
+        {draft.experience.map((e, i) => (
+          <div key={i} className="mb-3">
+            <div className="flex justify-between">
+              <strong className="text-sm">{e.position}</strong>
+              <span className="text-xs text-gray-600">{e.start} – {e.end}</span>
+            </div>
+            <p className="text-sm text-gray-700">{e.company}</p>
+            {e.bullets && (
+              <ul className="text-sm mt-1 space-y-0.5">
+                {e.bullets.map((b, bi) => (
+                  <li key={bi} className="flex gap-2">
+                    <span>•</span>
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </section>
+    ) : null,
+
+  education: (draft) =>
+    draft.education.length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">التعليم</h2>
+        {draft.education.map((e, i) => (
+          <div key={i} className="mb-2">
+            <div className="flex justify-between">
+              <strong className="text-sm">{e.degree} في {e.major}</strong>
+              <span className="text-xs text-gray-600">{e.start} – {e.end}</span>
+            </div>
+            <p className="text-sm text-gray-700">{e.institution}</p>
+          </div>
+        ))}
+      </section>
+    ) : null,
+
+  skills: (draft) =>
+    draft.skills.technical?.length || draft.skills.soft?.length || draft.skills.languages?.length ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">المهارات</h2>
+        {draft.skills.technical && draft.skills.technical.length > 0 && (
+          <p className="text-sm mb-1"><strong>تقنية:</strong> {draft.skills.technical.join("، ")}</p>
+        )}
+        {draft.skills.soft && draft.skills.soft.length > 0 && (
+          <p className="text-sm mb-1"><strong>شخصية:</strong> {draft.skills.soft.join("، ")}</p>
+        )}
+        {draft.skills.languages && draft.skills.languages.length > 0 && (
+          <p className="text-sm"><strong>اللغات:</strong> {draft.skills.languages.join("، ")}</p>
+        )}
+      </section>
+    ) : null,
+
+  certifications: (draft) =>
+    draft.certifications.length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الشهادات</h2>
+        <ul className="text-sm space-y-1">
+          {draft.certifications.map((c, i) => (
+            <li key={i}>
+              <strong>{c.name}</strong> — {c.issuer} ({c.date})
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null,
+
+  volunteer: (draft) =>
+    (draft.custom_sections?.volunteer ?? []).length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">العمل التطوّعي</h2>
+        {(draft.custom_sections.volunteer ?? []).map((v, i) => (
+          <div key={i} className="mb-2">
+            <div className="flex justify-between">
+              <strong className="text-sm">{v.role}</strong>
+              <span className="text-xs text-gray-600">{v.start} – {v.end}</span>
+            </div>
+            <p className="text-sm text-gray-700">{v.organization}</p>
+            {v.description && <p className="text-sm mt-0.5">{v.description}</p>}
+          </div>
+        ))}
+      </section>
+    ) : null,
+
+  projects: (draft) =>
+    (draft.custom_sections?.projects ?? []).length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">المشاريع</h2>
+        {(draft.custom_sections.projects ?? []).map((p, i) => (
+          <div key={i} className="mb-2">
+            <div className="flex justify-between gap-2">
+              <strong className="text-sm">
+                {p.name}
+                {p.role && <span className="font-normal text-gray-600"> — {p.role}</span>}
+              </strong>
+              {p.link && (
+                <a href={p.link} className="text-xs text-blue-600 truncate max-w-[40%]" dir="ltr">
+                  {p.link.replace(/^https?:\/\//, "")}
+                </a>
+              )}
+            </div>
+            {p.description && <p className="text-sm mt-0.5">{p.description}</p>}
+            {p.tech && p.tech.length > 0 && (
+              <p className="text-xs text-gray-600 mt-0.5">
+                <strong>التقنيات:</strong> {p.tech.join("، ")}
+              </p>
+            )}
+          </div>
+        ))}
+      </section>
+    ) : null,
+
+  awards: (draft) =>
+    (draft.custom_sections?.awards ?? []).length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الجوائز والتقديرات</h2>
+        <ul className="text-sm space-y-1">
+          {(draft.custom_sections.awards ?? []).map((a, i) => (
+            <li key={i}>
+              <strong>{a.title}</strong>
+              {a.issuer && <> — {a.issuer}</>}
+              {a.date && <span className="text-gray-600"> ({a.date})</span>}
+              {a.description && <div className="text-xs text-gray-600 mt-0.5">{a.description}</div>}
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null,
+
+  languages_structured: (draft) =>
+    (draft.custom_sections?.languages_structured ?? []).length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">اللغات</h2>
+        <ul className="text-sm space-y-0.5">
+          {(draft.custom_sections.languages_structured ?? []).map((l, i) => (
+            <li key={i}>
+              <strong>{l.name}</strong>
+              {l.cefr && <span className="text-gray-600"> — {l.cefr === "native" ? "الأم" : l.cefr}</span>}
+              {l.label && <span className="text-gray-500"> · {l.label}</span>}
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null,
+};
+
+const PreviewStep = ({ draft }: { draft: Draft }) => {
+  const orderedSections = resolveSectionOrder(draft.section_order);
+  return (
+    <div className="space-y-4">
+      <div
+        className="p-6 rounded-xl bg-white text-black dark:bg-white dark:text-black border-4 border-double border-primary/30 space-y-4 font-arabic"
+        dir="rtl"
+      >
+        <div className="text-center pb-3 border-b-2 border-primary/30">
+          <h1 className="text-2xl font-bold">{draft.personal_info.full_name || "اسم المتقدّم"}</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            {[draft.personal_info.email, draft.personal_info.phone, draft.personal_info.city]
+              .filter(Boolean)
+              .join(" • ")}
+          </p>
+        </div>
+
+        {orderedSections.map((key) => (
+          <div key={key}>{PREVIEW_SECTION_RENDERERS[key]?.(draft) ?? null}</div>
+        ))}
       </div>
 
-      {draft.summary?.ar && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الملخّص</h2>
-          <p className="text-sm leading-relaxed">{draft.summary.ar}</p>
-        </section>
-      )}
-
-      {draft.experience.length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الخبرة العمليّة</h2>
-          {draft.experience.map((e, i) => (
-            <div key={i} className="mb-3">
-              <div className="flex justify-between">
-                <strong className="text-sm">{e.position}</strong>
-                <span className="text-xs text-gray-600">
-                  {e.start} – {e.end}
-                </span>
-              </div>
-              <p className="text-sm text-gray-700">{e.company}</p>
-              {e.bullets && (
-                <ul className="text-sm mt-1 space-y-0.5">
-                  {e.bullets.map((b, bi) => (
-                    <li key={bi} className="flex gap-2">
-                      <span>•</span>
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </section>
-      )}
-
-      {draft.education.length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">التعليم</h2>
-          {draft.education.map((e, i) => (
-            <div key={i} className="mb-2">
-              <div className="flex justify-between">
-                <strong className="text-sm">{e.degree} في {e.major}</strong>
-                <span className="text-xs text-gray-600">
-                  {e.start} – {e.end}
-                </span>
-              </div>
-              <p className="text-sm text-gray-700">{e.institution}</p>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {(draft.skills.technical?.length || draft.skills.soft?.length || draft.skills.languages?.length) ? (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">المهارات</h2>
-          {draft.skills.technical && draft.skills.technical.length > 0 && (
-            <p className="text-sm mb-1"><strong>تقنية:</strong> {draft.skills.technical.join("، ")}</p>
-          )}
-          {draft.skills.soft && draft.skills.soft.length > 0 && (
-            <p className="text-sm mb-1"><strong>شخصية:</strong> {draft.skills.soft.join("، ")}</p>
-          )}
-          {draft.skills.languages && draft.skills.languages.length > 0 && (
-            <p className="text-sm"><strong>اللغات:</strong> {draft.skills.languages.join("، ")}</p>
-          )}
-        </section>
-      ) : null}
-
-      {draft.certifications.length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الشهادات</h2>
-          <ul className="text-sm space-y-1">
-            {draft.certifications.map((c, i) => (
-              <li key={i}>
-                <strong>{c.name}</strong> — {c.issuer} ({c.date})
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {(draft.custom_sections?.volunteer ?? []).length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">العمل التطوّعي</h2>
-          {(draft.custom_sections.volunteer ?? []).map((v, i) => (
-            <div key={i} className="mb-2">
-              <div className="flex justify-between">
-                <strong className="text-sm">{v.role}</strong>
-                <span className="text-xs text-gray-600">{v.start} – {v.end}</span>
-              </div>
-              <p className="text-sm text-gray-700">{v.organization}</p>
-              {v.description && <p className="text-sm mt-0.5">{v.description}</p>}
-            </div>
-          ))}
-        </section>
-      )}
-
-      {(draft.custom_sections?.projects ?? []).length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">المشاريع</h2>
-          {(draft.custom_sections.projects ?? []).map((p, i) => (
-            <div key={i} className="mb-2">
-              <div className="flex justify-between gap-2">
-                <strong className="text-sm">
-                  {p.name}
-                  {p.role && <span className="font-normal text-gray-600"> — {p.role}</span>}
-                </strong>
-                {p.link && (
-                  <a href={p.link} className="text-xs text-blue-600 truncate max-w-[40%]" dir="ltr">
-                    {p.link.replace(/^https?:\/\//, "")}
-                  </a>
-                )}
-              </div>
-              {p.description && <p className="text-sm mt-0.5">{p.description}</p>}
-              {p.tech && p.tech.length > 0 && (
-                <p className="text-xs text-gray-600 mt-0.5">
-                  <strong>التقنيات:</strong> {p.tech.join("، ")}
-                </p>
-              )}
-            </div>
-          ))}
-        </section>
-      )}
-
-      {(draft.custom_sections?.awards ?? []).length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الجوائز والتقديرات</h2>
-          <ul className="text-sm space-y-1">
-            {(draft.custom_sections.awards ?? []).map((a, i) => (
-              <li key={i}>
-                <strong>{a.title}</strong>
-                {a.issuer && <> — {a.issuer}</>}
-                {a.date && <span className="text-gray-600"> ({a.date})</span>}
-                {a.description && <div className="text-xs text-gray-600 mt-0.5">{a.description}</div>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {(draft.custom_sections?.languages_structured ?? []).length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">اللغات</h2>
-          <ul className="text-sm space-y-0.5">
-            {(draft.custom_sections.languages_structured ?? []).map((l, i) => (
-              <li key={i}>
-                <strong>{l.name}</strong>
-                {l.cefr && <span className="text-gray-600"> — {l.cefr === "native" ? "الأم" : l.cefr}</span>}
-                {l.label && <span className="text-gray-500"> · {l.label}</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <p className={cn("text-xs text-muted-foreground text-center")}>
+        هذه معاينة على الشاشة. اسحب الأقسام في الخطوة السابقة لتغيير ترتيبها.
+      </p>
     </div>
-
-    <p className={cn("text-xs text-muted-foreground text-center")}>
-      هذه معاينة على الشاشة. تصدير PDF عربي بجودة عالية يحتاج اختبار RTL إضافي.
-    </p>
-  </div>
-);
+  );
+};
 
 export default CVBuilder;

@@ -33,8 +33,27 @@ interface Draft {
     projects?: any[];
     languages_structured?: any[];
   };
+  section_order?: string[] | null;
   template: "conservative" | "modern" | "executive";
   language: "ar" | "en" | "bilingual";
+}
+
+const DEFAULT_SECTION_ORDER = [
+  "summary",
+  "experience",
+  "education",
+  "skills",
+  "certifications",
+  "volunteer",
+  "projects",
+  "awards",
+  "languages_structured",
+] as const;
+
+function resolveOrder(stored: string[] | null | undefined): string[] {
+  const base = (stored ?? []).filter((k) => (DEFAULT_SECTION_ORDER as readonly string[]).includes(k));
+  const missing = DEFAULT_SECTION_ORDER.filter((k) => !base.includes(k));
+  return [...base, ...missing];
 }
 
 function escapeHtml(s: any): string {
@@ -250,23 +269,72 @@ function renderHtml(draft: Draft, lang: "ar" | "en"): string {
     ${contactLine ? `<div class="contact">${contactLine}</div>` : ""}
   </div>
 
-  ${summary ? `<section><h2>${t.summary}</h2><p>${escapeHtml(summary)}</p></section>` : ""}
+  ${resolveOrder(draft.section_order).map((key) => {
+    switch (key) {
+      case "summary":
+        return summary ? `<section><h2>${t.summary}</h2><p>${escapeHtml(summary)}</p></section>` : "";
+      case "experience":
+        return expHtml ? `<section><h2>${t.experience}</h2>${expHtml}</section>` : "";
+      case "education":
+        return eduHtml ? `<section><h2>${t.education}</h2>${eduHtml}</section>` : "";
+      case "skills":
+        return skillsHtml ? `<section><h2>${t.skills}</h2>${skillsHtml}</section>` : "";
+      case "certifications":
+        return certHtml ? `<section><h2>${t.certifications}</h2><ul>${certHtml}</ul></section>` : "";
+      case "volunteer":
+        return volunteerHtml ? `<section><h2>${t.volunteer}</h2>${volunteerHtml}</section>` : "";
+      case "projects":
+        return projectsHtml ? `<section><h2>${t.projects}</h2>${projectsHtml}</section>` : "";
+      case "awards":
+        return awardsHtml ? `<section><h2>${t.awards}</h2><ul>${awardsHtml}</ul></section>` : "";
+      case "languages_structured":
+        return langsHtml ? `<section><h2>${t.languages}</h2><ul>${langsHtml}</ul></section>` : "";
+      default:
+        return "";
+    }
+  }).join("\n")}
+</body>
+</html>`;
+}
 
-  ${expHtml ? `<section><h2>${t.experience}</h2>${expHtml}</section>` : ""}
+// Merge two single-language HTML documents into one bilingual page.
+// Strategy: take the body of each (everything inside <body>...</body>),
+// stack into one document with a page-break between, and a shared <head>
+// that pulls fonts for both scripts. Each body is wrapped in a section
+// with its own dir so RTL/LTR behave correctly per page.
+function mergeBilingual(arHtml: string, enHtml: string): string {
+  const bodyOf = (full: string): string => {
+    const m = full.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    return m ? m[1] : full;
+  };
+  const arBody = bodyOf(arHtml);
+  const enBody = bodyOf(enHtml);
 
-  ${eduHtml ? `<section><h2>${t.education}</h2>${eduHtml}</section>` : ""}
-
-  ${skillsHtml ? `<section><h2>${t.skills}</h2>${skillsHtml}</section>` : ""}
-
-  ${certHtml ? `<section><h2>${t.certifications}</h2><ul>${certHtml}</ul></section>` : ""}
-
-  ${volunteerHtml ? `<section><h2>${t.volunteer}</h2>${volunteerHtml}</section>` : ""}
-
-  ${projectsHtml ? `<section><h2>${t.projects}</h2>${projectsHtml}</section>` : ""}
-
-  ${awardsHtml ? `<section><h2>${t.awards}</h2><ul>${awardsHtml}</ul></section>` : ""}
-
-  ${langsHtml ? `<section><h2>${t.languages}</h2><ul>${langsHtml}</ul></section>` : ""}
+  return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <title>CV (AR + EN)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; color: #111; }
+    body { font-size: 11pt; line-height: 1.55; }
+    .lang-section { padding: 24mm 20mm; max-width: 210mm; margin: 0 auto; }
+    .lang-section[dir="rtl"] { font-family: 'Noto Naskh Arabic', 'Tajawal', serif; }
+    .lang-section[dir="ltr"] { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; }
+    .page-break { page-break-before: always; }
+    @media print {
+      .lang-section { padding: 18mm 16mm; }
+      @page { size: A4; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="lang-section" dir="rtl">${arBody}</div>
+  <div class="lang-section page-break" dir="ltr">${enBody}</div>
 </body>
 </html>`;
 }
@@ -362,14 +430,29 @@ serve(async (req) => {
     }
 
     const draft = draftRow as unknown as Draft;
-    const html = renderHtml(draft, requestedLang);
+    const draftLang = (draft as any).language as "ar" | "en" | "bilingual" | undefined;
+
+    // Determine output: if draft is bilingual OR caller explicitly asks for bilingual,
+    // produce a single merged PDF (Arabic pages first, then English).
+    const wantsBilingual =
+      body.language === "bilingual" || (draftLang === "bilingual" && !body.language);
+
+    let html: string;
+    if (wantsBilingual) {
+      const arHtml = renderHtml(draft, "ar");
+      const enHtml = renderHtml(draft, "en");
+      html = mergeBilingual(arHtml, enHtml);
+    } else {
+      html = renderHtml(draft, requestedLang);
+    }
 
     // Try to render via external service
     const pdfBytes = await htmlToPdfViaService(html);
 
     if (pdfBytes) {
       // Upload to storage and return signed URL
-      const filename = `exported/${user.id}/${draftId}_${requestedLang}_${Date.now()}.pdf`;
+      const langSuffix = wantsBilingual ? "bilingual" : requestedLang;
+      const filename = `exported/${user.id}/${draftId}_${langSuffix}_${Date.now()}.pdf`;
       const { error: upErr } = await adminClient.storage
         .from("resumes")
         .upload(filename, pdfBytes, {
