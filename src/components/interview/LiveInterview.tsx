@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveInterview } from "@/hooks/useLiveInterview";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
-import { useCheatCamera } from "@/hooks/useCheatCamera";
+
 import { useSystemSettings } from "@/hooks/useSystemSettings";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
@@ -49,11 +49,6 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
     interviewerVoiceId: iv.voice_id,
   });
 
-  // Cheat camera for voice mode (video mode already has camera via useLiveInterview)
-  const cheatCamera = useCheatCamera({
-    enabled: type === "voice" && live.isCallActive,
-    interviewId: live.interviewId,
-  });
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
@@ -202,23 +197,6 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
                 className="w-full h-full object-cover mirror"
                 style={{ transform: "scaleX(-1)" }}
               />
-            </div>
-          )}
-          {/* Candidate PiP Camera - voice mode (cheat detection) */}
-          {type === "voice" && cheatCamera.stream && (
-            <div className="absolute bottom-3 left-3 w-28 h-20 rounded-xl overflow-hidden border-2 border-background shadow-lg bg-black">
-              <video
-                ref={cheatCamera.videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-                style={{ transform: "scaleX(-1)" }}
-              />
-              <div className="absolute top-1 right-1 flex items-center gap-1 bg-black/60 rounded-full px-1.5 py-0.5">
-                <Camera className="w-3 h-3 text-red-400" />
-                <span className="text-[9px] text-red-400 font-medium">REC</span>
-              </div>
             </div>
           )}
         </div>
