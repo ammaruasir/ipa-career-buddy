@@ -199,23 +199,6 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
               />
             </div>
           )}
-          {/* Candidate PiP Camera - voice mode (cheat detection) */}
-          {type === "voice" && cheatCamera.stream && (
-            <div className="absolute bottom-3 left-3 w-28 h-20 rounded-xl overflow-hidden border-2 border-background shadow-lg bg-black">
-              <video
-                ref={cheatCamera.videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-                style={{ transform: "scaleX(-1)" }}
-              />
-              <div className="absolute top-1 right-1 flex items-center gap-1 bg-black/60 rounded-full px-1.5 py-0.5">
-                <Camera className="w-3 h-3 text-red-400" />
-                <span className="text-[9px] text-red-400 font-medium">REC</span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Status indicator */}
