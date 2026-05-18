@@ -262,10 +262,22 @@ ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية
     }
 
     const data = await response.json();
+    let detectedPhase: string | null = null;
     if (data?.choices?.[0]?.message?.content) {
-      data.choices[0].message.content = data.choices[0].message.content.replace(/(.)\1{2,}/g, '$1');
+      const raw: string = data.choices[0].message.content;
+      // Detect leading phase tag (in the first ~40 chars) for the metadata field.
+      const head = raw.slice(0, 40);
+      const leading = head.match(/\[?\s*(INTRO|CORE|FOLLOW_UP|NEW_Q|CLOSING|END)\s*\]?/i);
+      detectedPhase = leading ? leading[1].toUpperCase() : null;
+      // Globally strip ALL phase-tag occurrences (bracketed OR bare) and
+      // collapse repeated chars/whitespace so nothing leaks into TTS.
+      data.choices[0].message.content = raw
+        .replace(/\[?\s*(INTRO|CORE|FOLLOW_UP|NEW_Q|CLOSING|END)\s*\]?\s*:?\s*/gi, "")
+        .replace(/(.)\1{2,}/g, "$1")
+        .replace(/\s{2,}/g, " ")
+        .trim();
     }
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify({ ...data, phase: detectedPhase }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
