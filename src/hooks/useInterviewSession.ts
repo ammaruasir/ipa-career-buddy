@@ -188,11 +188,9 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
         },
       });
       if (resp.error) throw resp.error;
-      let aiReply = resp.data?.choices?.[0]?.message?.content || "";
-
-      const phaseMatch = aiReply.match(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i);
-      const phaseTag = phaseMatch ? phaseMatch[1].toUpperCase() : null;
-      aiReply = aiReply.replace(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i, "").trim();
+      const rawReply = resp.data?.choices?.[0]?.message?.content || "";
+      const { cleaned: aiReply, phase: localPhase } = stripPhaseTags(rawReply);
+      const phaseTag = (resp.data?.phase as string | undefined)?.toUpperCase() || localPhase || null;
 
       setMessages((prev) => [...prev, { role: "assistant", content: aiReply }]);
 
