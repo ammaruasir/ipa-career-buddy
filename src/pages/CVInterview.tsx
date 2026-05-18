@@ -201,10 +201,7 @@ const CVInterview = () => {
     switch (q.field) {
       case "personal_info.full_name":
         return pi.full_name ?? "";
-      case "target_role":
-        return prefill.major ?? "";
-      case "target_industry":
-        return prefill.major ?? "";
+      // target_role و target_industry: لا نعبّئها من التخصّص — يكتبها المستخدم بنفسه
       case "experience_level": {
         const yrs = prefill.experience_years ?? -1;
         if (yrs < 0 || !q.choices) return "";
