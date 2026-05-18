@@ -30,17 +30,81 @@ interface QuestionChoice {
   label_en: string;
 }
 
+interface SubFieldDef {
+  key: string;
+  label_ar: string;
+  label_en: string;
+  type: "text" | "email" | "tel" | "url" | "date" | "textarea" | "choice";
+  required?: boolean;
+  placeholder_ar?: string;
+  placeholder_en?: string;
+  choices?: QuestionChoice[];
+  span?: 1 | 2;
+}
+
+type QType =
+  | "text"
+  | "textarea"
+  | "list_text"
+  | "structured_list"
+  | "choice"
+  | "form"
+  | "repeater"
+  | "repeater_simple"
+  | "chips";
+
 interface Question {
   id: string;
   step: number;
   field: string;
   required: boolean;
-  type: "text" | "textarea" | "list_text" | "structured_list" | "choice";
+  type: QType;
   choices?: QuestionChoice[];
+  fields?: SubFieldDef[];
+  item_label_ar?: string;
+  item_label_en?: string;
   label_ar: string;
   label_en: string;
   hint_ar: string;
   hint_en: string;
+}
+
+const STRUCTURED_TYPES: QType[] = ["form", "repeater", "repeater_simple", "chips"];
+
+function emptyStructuredFor(q: Question): any {
+  if (q.type === "form") {
+    const obj: Record<string, string> = {};
+    (q.fields ?? []).forEach((f) => (obj[f.key] = ""));
+    return obj;
+  }
+  if (q.type === "repeater") {
+    const item: Record<string, string> = {};
+    (q.fields ?? []).forEach((f) => (item[f.key] = ""));
+    return [item];
+  }
+  if (q.type === "repeater_simple") return [""];
+  if (q.type === "chips") return [];
+  return null;
+}
+
+function isStructuredAnswerMeaningful(q: Question, val: any): boolean {
+  if (val == null) return false;
+  if (q.type === "form") {
+    const required = (q.fields ?? []).filter((f) => f.required);
+    return required.every((f) => String(val?.[f.key] ?? "").trim().length > 0);
+  }
+  if (q.type === "repeater") {
+    if (!Array.isArray(val) || val.length === 0) return false;
+    const required = (q.fields ?? []).filter((f) => f.required);
+    return val.some((item) => required.every((f) => String(item?.[f.key] ?? "").trim().length > 0));
+  }
+  if (q.type === "repeater_simple") {
+    return Array.isArray(val) && val.some((s) => String(s ?? "").trim().length > 0);
+  }
+  if (q.type === "chips") {
+    return Array.isArray(val) && val.length > 0;
+  }
+  return false;
 }
 
 type Lang = "ar" | "en" | "bilingual";
