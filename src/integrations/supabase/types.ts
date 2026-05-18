@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      assignments: {
+        Row: {
+          cohort_id: string
+          created_at: string
+          description: string | null
+          due_at: string
+          id: string
+          target_track: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          cohort_id: string
+          created_at?: string
+          description?: string | null
+          due_at: string
+          id?: string
+          target_track?: string | null
+          title: string
+          type: string
+        }
+        Update: {
+          cohort_id?: string
+          created_at?: string
+          description?: string | null
+          due_at?: string
+          id?: string
+          target_track?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignments_cohort_id_fkey"
+            columns: ["cohort_id"]
+            isOneToOne: false
+            referencedRelation: "cohorts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cheat_events: {
         Row: {
           created_at: string
@@ -48,6 +89,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cohorts: {
+        Row: {
+          capacity: number
+          created_at: string
+          description: string | null
+          end_date: string
+          id: string
+          instructor_id: string | null
+          name: string
+          start_date: string
+          status: string
+          track: string | null
+          updated_at: string
+        }
+        Insert: {
+          capacity?: number
+          created_at?: string
+          description?: string | null
+          end_date: string
+          id?: string
+          instructor_id?: string | null
+          name: string
+          start_date: string
+          status?: string
+          track?: string | null
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number
+          created_at?: string
+          description?: string | null
+          end_date?: string
+          id?: string
+          instructor_id?: string | null
+          name?: string
+          start_date?: string
+          status?: string
+          track?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       cv_conversations: {
         Row: {
@@ -176,7 +259,7 @@ export type Database = {
           last_exported_at: string | null
           personal_info: Json | null
           primary_color: string | null
-          section_order: string[] | null
+          section_order: Json | null
           skills: Json | null
           summary: Json | null
           template: string | null
@@ -195,7 +278,7 @@ export type Database = {
           last_exported_at?: string | null
           personal_info?: Json | null
           primary_color?: string | null
-          section_order?: string[] | null
+          section_order?: Json | null
           skills?: Json | null
           summary?: Json | null
           template?: string | null
@@ -214,7 +297,7 @@ export type Database = {
           last_exported_at?: string | null
           personal_info?: Json | null
           primary_color?: string | null
-          section_order?: string[] | null
+          section_order?: Json | null
           skills?: Json | null
           summary?: Json | null
           template?: string | null
@@ -311,6 +394,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      enrollments: {
+        Row: {
+          cohort_id: string
+          enrolled_at: string
+          id: string
+          status: string
+          student_id: string
+        }
+        Insert: {
+          cohort_id: string
+          enrolled_at?: string
+          id?: string
+          status?: string
+          student_id: string
+        }
+        Update: {
+          cohort_id?: string
+          enrolled_at?: string
+          id?: string
+          status?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollments_cohort_id_fkey"
+            columns: ["cohort_id"]
+            isOneToOne: false
+            referencedRelation: "cohorts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       evaluations: {
         Row: {
@@ -597,6 +712,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      proctor_sessions: {
+        Row: {
+          events: Json
+          id: string
+          interview_id: string
+          joined_at: string
+          left_at: string | null
+          proctor_id: string
+          role: string
+        }
+        Insert: {
+          events?: Json
+          id?: string
+          interview_id: string
+          joined_at?: string
+          left_at?: string | null
+          proctor_id: string
+          role: string
+        }
+        Update: {
+          events?: Json
+          id?: string
+          interview_id?: string
+          joined_at?: string
+          left_at?: string | null
+          proctor_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proctor_sessions_interview_id_fkey"
+            columns: ["interview_id"]
+            isOneToOne: false
+            referencedRelation: "interviews"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

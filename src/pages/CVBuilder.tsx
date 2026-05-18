@@ -47,6 +47,7 @@ import JobAlignmentDialog from "@/components/cv-builder/JobAlignmentDialog";
 import CVDateInput from "@/components/cv-builder/CVDateInput";
 import SectionOrderPanel, { resolveSectionOrder, type SectionKey } from "@/components/cv-builder/SectionOrderPanel";
 import { getTemplate, type CVTDraft } from "@/components/cv-templates";
+import TemplateGallery from "@/components/cv-builder/TemplateGallery";
 
 interface PersonalInfo {
   full_name?: string;
@@ -259,6 +260,8 @@ const CVBuilder = () => {
           education: d.education ?? [],
           skills: d.skills ?? { technical: [], soft: [], languages: [] },
           certifications: d.certifications ?? [],
+          custom_sections: d.custom_sections ?? {},
+          section_order: d.section_order ?? null,
           template: d.template ?? "modern",
           language: d.language ?? "ar",
         });
@@ -295,14 +298,14 @@ const CVBuilder = () => {
           await supabase
             .from("cv_drafts")
             .update({
-              personal_info: payload.personal_info,
-              summary: payload.summary,
-              experience: payload.experience,
-              education: payload.education,
-              skills: payload.skills,
-              certifications: payload.certifications,
-              custom_sections: payload.custom_sections,
-              section_order: payload.section_order,
+              personal_info: payload.personal_info as any,
+              summary: payload.summary as any,
+              experience: payload.experience as any,
+              education: payload.education as any,
+              skills: payload.skills as any,
+              certifications: payload.certifications as any,
+              custom_sections: payload.custom_sections as any,
+              section_order: payload.section_order as any,
               template: payload.template,
               language: payload.language,
             })
@@ -312,14 +315,14 @@ const CVBuilder = () => {
             .from("cv_drafts")
             .insert({
               user_id: user.id,
-              personal_info: payload.personal_info,
-              summary: payload.summary,
-              experience: payload.experience,
-              education: payload.education,
-              skills: payload.skills,
-              certifications: payload.certifications,
-              custom_sections: payload.custom_sections,
-              section_order: payload.section_order,
+              personal_info: payload.personal_info as any,
+              summary: payload.summary as any,
+              experience: payload.experience as any,
+              education: payload.education as any,
+              skills: payload.skills as any,
+              certifications: payload.certifications as any,
+              custom_sections: payload.custom_sections as any,
+              section_order: payload.section_order as any,
               template: payload.template,
               language: payload.language,
             })
@@ -448,23 +451,17 @@ const CVBuilder = () => {
 
             <Progress value={progress} className="h-2" />
 
-            {/* Template + Language selector row */}
-            <div className="grid grid-cols-2 gap-2 pt-2">
-              <div className="space-y-1">
+            {/* Template gallery + Language selector row */}
+            <div className="space-y-3 pt-2">
+              <div className="space-y-1.5">
                 <Label className="text-xs flex items-center gap-1.5 text-muted-foreground">
                   <Palette className="w-3 h-3" />
                   القالب
                 </Label>
-                <Select value={draft.template} onValueChange={(v) => update("template", v as Draft["template"])}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="modern">حديث</SelectItem>
-                    <SelectItem value="conservative">محافظ</SelectItem>
-                    <SelectItem value="executive">تنفيذي</SelectItem>
-                  </SelectContent>
-                </Select>
+                <TemplateGallery
+                  value={draft.template}
+                  onChange={(v) => update("template", v)}
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs flex items-center gap-1.5 text-muted-foreground">
