@@ -761,4 +761,243 @@ const CVInterview = () => {
   );
 };
 
+// =================== Structured input sub-components ===================
+
+interface FormFieldsProps {
+  fields: SubFieldDef[];
+  value: Record<string, string>;
+  onChange: (v: Record<string, string>) => void;
+  lang: "ar" | "en";
+  dir: "rtl" | "ltr";
+}
+
+const FormFields = ({ fields, value, onChange, lang, dir }: FormFieldsProps) => {
+  const update = (key: string, v: string) => onChange({ ...value, [key]: v });
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {fields.map((f) => {
+        const label = lang === "en" ? f.label_en : f.label_ar;
+        const placeholder = lang === "en" ? f.placeholder_en ?? "" : f.placeholder_ar ?? "";
+        const colSpan = f.span === 2 ? "sm:col-span-2" : "";
+        if (f.type === "choice" && f.choices) {
+          return (
+            <div key={f.key} className={cn("space-y-1.5", colSpan)}>
+              <label className="text-xs font-medium text-foreground">
+                {label} {f.required && <span className="text-destructive">*</span>}
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {f.choices.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => update(f.key, c.value)}
+                    className={cn(
+                      "px-2 py-2 rounded-lg border-2 text-xs transition-all text-center",
+                      value[f.key] === c.value
+                        ? "border-primary bg-primary/10 text-primary font-semibold"
+                        : "border-border hover:border-primary/40",
+                    )}
+                  >
+                    {lang === "en" ? c.label_en : c.label_ar}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        if (f.type === "textarea") {
+          return (
+            <div key={f.key} className={cn("space-y-1.5", colSpan)}>
+              <label className="text-xs font-medium text-foreground">
+                {label} {f.required && <span className="text-destructive">*</span>}
+              </label>
+              <Textarea
+                value={value[f.key] ?? ""}
+                onChange={(e) => update(f.key, e.target.value)}
+                placeholder={placeholder}
+                rows={3}
+                dir={dir}
+              />
+            </div>
+          );
+        }
+        return (
+          <div key={f.key} className={cn("space-y-1.5", colSpan)}>
+            <label className="text-xs font-medium text-foreground">
+              {label} {f.required && <span className="text-destructive">*</span>}
+            </label>
+            <Input
+              type={f.type === "tel" || f.type === "email" || f.type === "url" || f.type === "date" ? f.type : "text"}
+              value={value[f.key] ?? ""}
+              onChange={(e) => update(f.key, e.target.value)}
+              placeholder={placeholder}
+              dir={f.type === "email" || f.type === "url" || f.type === "tel" ? "ltr" : dir}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+interface RepeaterProps {
+  fields: SubFieldDef[];
+  itemLabel: string;
+  value: Record<string, string>[];
+  onChange: (v: Record<string, string>[]) => void;
+  lang: "ar" | "en";
+  dir: "rtl" | "ltr";
+}
+
+const Repeater = ({ fields, itemLabel, value, onChange, lang, dir }: RepeaterProps) => {
+  const items = Array.isArray(value) && value.length > 0 ? value : [Object.fromEntries(fields.map((f) => [f.key, ""]))];
+  const updateItem = (idx: number, newItem: Record<string, string>) => {
+    const copy = [...items];
+    copy[idx] = newItem;
+    onChange(copy);
+  };
+  const removeItem = (idx: number) => {
+    const copy = items.filter((_, i) => i !== idx);
+    onChange(copy.length ? copy : [Object.fromEntries(fields.map((f) => [f.key, ""]))]);
+  };
+  const addItem = () => onChange([...items, Object.fromEntries(fields.map((f) => [f.key, ""]))]);
+  return (
+    <div className="space-y-3">
+      {items.map((item, idx) => (
+        <div key={idx} className="border-2 border-dashed border-border rounded-xl p-3 space-y-2 bg-muted/30">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground">
+              {itemLabel} #{idx + 1}
+            </span>
+            {items.length > 1 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => removeItem(idx)}
+                className="h-7 px-2 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
+          <FormFields fields={fields} value={item} onChange={(v) => updateItem(idx, v)} lang={lang} dir={dir} />
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={addItem} className="rounded-xl w-full">
+        <Plus className="w-4 h-4 ml-1.5" />
+        {lang === "en" ? `Add ${itemLabel}` : `إضافة ${itemLabel}`}
+      </Button>
+    </div>
+  );
+};
+
+interface RepeaterSimpleProps {
+  itemLabel: string;
+  value: string[];
+  onChange: (v: string[]) => void;
+  lang: "ar" | "en";
+  dir: "rtl" | "ltr";
+}
+
+const RepeaterSimple = ({ itemLabel, value, onChange, lang, dir }: RepeaterSimpleProps) => {
+  const items = Array.isArray(value) && value.length > 0 ? value : [""];
+  const update = (idx: number, v: string) => {
+    const copy = [...items];
+    copy[idx] = v;
+    onChange(copy);
+  };
+  const remove = (idx: number) => {
+    const copy = items.filter((_, i) => i !== idx);
+    onChange(copy.length ? copy : [""]);
+  };
+  const add = () => onChange([...items, ""]);
+  return (
+    <div className="space-y-2">
+      {items.map((it, idx) => (
+        <div key={idx} className="flex items-center gap-2">
+          <Input
+            value={it}
+            onChange={(e) => update(idx, e.target.value)}
+            placeholder={`${itemLabel} #${idx + 1}`}
+            dir={dir}
+            className="flex-1"
+          />
+          {items.length > 1 && (
+            <Button type="button" size="sm" variant="ghost" onClick={() => remove(idx)} className="h-9 px-2 text-destructive">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={add} className="rounded-xl w-full">
+        <Plus className="w-4 h-4 ml-1.5" />
+        {lang === "en" ? `Add ${itemLabel}` : `إضافة ${itemLabel}`}
+      </Button>
+    </div>
+  );
+};
+
+interface ChipsInputProps {
+  value: string[];
+  onChange: (v: string[]) => void;
+  lang: "ar" | "en";
+  dir: "rtl" | "ltr";
+}
+
+const ChipsInput = ({ value, onChange, lang, dir }: ChipsInputProps) => {
+  const [draft, setDraft] = useState("");
+  const chips = Array.isArray(value) ? value : [];
+  const add = (raw: string) => {
+    const parts = raw.split(/[,،]/).map((s) => s.trim()).filter(Boolean);
+    if (!parts.length) return;
+    const next = Array.from(new Set([...chips, ...parts]));
+    onChange(next);
+    setDraft("");
+  };
+  const remove = (idx: number) => onChange(chips.filter((_, i) => i !== idx));
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5 min-h-[2.5rem] p-2 rounded-xl border-2 border-dashed border-border bg-muted/30">
+        {chips.length === 0 && (
+          <span className="text-xs text-muted-foreground self-center">
+            {lang === "en" ? "No skills yet — add your first below." : "لا توجد مهارات بعد — أضف أوّل مهارة أدناه."}
+          </span>
+        )}
+        {chips.map((chip, idx) => (
+          <span
+            key={idx}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium"
+          >
+            {chip}
+            <button type="button" onClick={() => remove(idx)} className="hover:text-destructive">
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              add(draft);
+            } else if (e.key === "Backspace" && !draft && chips.length) {
+              remove(chips.length - 1);
+            }
+          }}
+          placeholder={lang === "en" ? "Type a skill, press Enter" : "اكتب مهارة واضغط Enter"}
+          dir={dir}
+          className="flex-1"
+        />
+        <Button type="button" variant="outline" onClick={() => add(draft)} className="rounded-xl">
+          <Plus className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 export default CVInterview;
