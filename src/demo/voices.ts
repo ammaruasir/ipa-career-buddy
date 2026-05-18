@@ -5,7 +5,7 @@
 // checklist: audit AdminSettings 24 voices → record 1F + 1M Khaleeji samples
 // → ElevenLabs Pro Voice Cloning → blind-listen test with 3 Gulf natives.
 
-const FALLBACK_AR_VOICE = "QsV9PCczMIklRM6xLPAS";
+const FALLBACK_AR_VOICE = "usjDi9nBY6UHvtKrL4ba";
 
 /** Female Khaleeji Arabic voice — the presenter ("لينا"). REPLACE after cloning. */
 export const presenterVoiceId = FALLBACK_AR_VOICE;
