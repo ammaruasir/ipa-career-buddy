@@ -213,86 +213,181 @@ function renderHtml(draft: Draft, lang: "ar" | "en"): string {
     )
     .join("");
 
-  // Template variations via accent color
-  const accent =
-    draft.template === "executive"
-      ? "#1e3a8a"
-      : draft.template === "conservative"
-      ? "#374151"
-      : "#1e40af"; // modern
+  // Pre-built section HTML keyed by section key so each template assembles them in its own way.
+  const sectionHtml: Record<string, string> = {
+    summary: summary ? `<section><h2>${t.summary}</h2><p>${escapeHtml(summary)}</p></section>` : "",
+    experience: expHtml ? `<section><h2>${t.experience}</h2>${expHtml}</section>` : "",
+    education: eduHtml ? `<section><h2>${t.education}</h2>${eduHtml}</section>` : "",
+    skills: skillsHtml ? `<section><h2>${t.skills}</h2>${skillsHtml}</section>` : "",
+    certifications: certHtml ? `<section><h2>${t.certifications}</h2><ul>${certHtml}</ul></section>` : "",
+    volunteer: volunteerHtml ? `<section><h2>${t.volunteer}</h2>${volunteerHtml}</section>` : "",
+    projects: projectsHtml ? `<section><h2>${t.projects}</h2>${projectsHtml}</section>` : "",
+    awards: awardsHtml ? `<section><h2>${t.awards}</h2><ul>${awardsHtml}</ul></section>` : "",
+    languages_structured: langsHtml ? `<section><h2>${t.languages}</h2><ul>${langsHtml}</ul></section>` : "",
+  };
 
-  return `<!doctype html>
+  const orderedKeys = resolveOrder(draft.section_order);
+
+  // ── Sidebar/main split for Modern template ──
+  const SIDEBAR_KEYS = new Set(["skills", "certifications", "languages_structured"]);
+  const mainKeys = orderedKeys.filter((k) => !SIDEBAR_KEYS.has(k));
+  const sidebarKeys = orderedKeys.filter((k) => SIDEBAR_KEYS.has(k));
+
+  // Variables shared across template branches
+  const headerName = escapeHtml(pi.full_name ?? "");
+  const FONT_LINK = `<link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;700&family=Inter:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />`;
+
+  // ─────────── CONSERVATIVE TEMPLATE ───────────
+  if (draft.template === "conservative") {
+    const accent = "#374151";
+    const conservativeFontFamily = isAr
+      ? "'Noto Naskh Arabic', serif"
+      : "'Times New Roman', Georgia, serif";
+
+    return `<!doctype html>
 <html lang="${lang}" dir="${dir}">
 <head>
-  <meta charset="utf-8" />
-  <title>${escapeHtml(pi.full_name ?? "CV")}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <meta charset="utf-8" /><title>${escapeHtml(pi.full_name ?? "CV")}</title>
+  ${FONT_LINK}
   <style>
     * { box-sizing: border-box; }
-    html, body {
-      margin: 0; padding: 0;
-      font-family: ${fontFamily};
-      color: #111;
-      line-height: 1.55;
-      font-size: 11pt;
-    }
-    body { padding: 24mm 20mm; max-width: 210mm; margin: 0 auto; }
-    .header { text-align: center; border-bottom: 2px solid ${accent}; padding-bottom: 12px; margin-bottom: 16px; }
-    .header h1 { font-size: 22pt; margin: 0; color: ${accent}; font-weight: 700; }
-    .header .contact { color: #555; font-size: 10pt; margin-top: 4px; }
-    section { margin-top: 14px; }
-    section h2 {
-      font-size: 13pt; color: ${accent};
-      border-bottom: 1px solid ${accent}33;
-      padding-bottom: 3px; margin: 0 0 8px;
-      text-align: ${align};
-    }
-    .entry { margin-bottom: 10px; }
+    html, body { margin: 0; padding: 0; font-family: ${conservativeFontFamily}; color: #111; line-height: 1.6; font-size: 11pt; }
+    body { padding: 22mm 22mm; max-width: 210mm; margin: 0 auto; }
+    .header { text-align: center; border-bottom: 2px solid ${accent}; padding-bottom: 12px; margin-bottom: 18px; }
+    .header h1 { font-size: 22pt; margin: 0; color: #111; font-weight: 700; letter-spacing: 0.5px; }
+    .header .contact { color: #444; font-size: 10pt; margin-top: 6px; }
+    section { margin-top: 16px; }
+    section h2 { font-size: 12pt; color: #111; border-bottom: 1px solid #666; padding-bottom: 2px; margin: 0 0 10px; text-align: ${align}; text-transform: uppercase; letter-spacing: 1px; }
+    .entry { margin-bottom: 12px; }
     .entry-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
     .entry-head strong { font-size: 11pt; }
-    .dates { color: #666; font-size: 9pt; white-space: nowrap; }
-    .company { color: #444; font-size: 10pt; margin-bottom: 2px; }
-    ul { margin: 4px 0 0; padding-${isAr ? "right" : "left"}: 16px; }
-    li { margin-bottom: 2px; font-size: 10.5pt; }
+    .dates { color: #555; font-size: 9.5pt; white-space: nowrap; }
+    .company { color: #555; font-size: 10pt; margin-bottom: 2px; font-style: italic; }
+    ul { margin: 4px 0 0; padding-${isAr ? "right" : "left"}: 18px; }
+    li { margin-bottom: 3px; font-size: 10.5pt; }
     p { margin: 4px 0; font-size: 10.5pt; }
-    @media print {
-      body { padding: 18mm 16mm; }
-      @page { size: A4; margin: 0; }
-    }
+    @media print { body { padding: 18mm 18mm; } @page { size: A4; margin: 0; } }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>${escapeHtml(pi.full_name ?? "")}</h1>
+    <h1>${headerName}</h1>
     ${contactLine ? `<div class="contact">${contactLine}</div>` : ""}
   </div>
+  ${orderedKeys.map((k) => sectionHtml[k] ?? "").join("\n")}
+</body>
+</html>`;
+  }
 
-  ${resolveOrder(draft.section_order).map((key) => {
-    switch (key) {
-      case "summary":
-        return summary ? `<section><h2>${t.summary}</h2><p>${escapeHtml(summary)}</p></section>` : "";
-      case "experience":
-        return expHtml ? `<section><h2>${t.experience}</h2>${expHtml}</section>` : "";
-      case "education":
-        return eduHtml ? `<section><h2>${t.education}</h2>${eduHtml}</section>` : "";
-      case "skills":
-        return skillsHtml ? `<section><h2>${t.skills}</h2>${skillsHtml}</section>` : "";
-      case "certifications":
-        return certHtml ? `<section><h2>${t.certifications}</h2><ul>${certHtml}</ul></section>` : "";
-      case "volunteer":
-        return volunteerHtml ? `<section><h2>${t.volunteer}</h2>${volunteerHtml}</section>` : "";
-      case "projects":
-        return projectsHtml ? `<section><h2>${t.projects}</h2>${projectsHtml}</section>` : "";
-      case "awards":
-        return awardsHtml ? `<section><h2>${t.awards}</h2><ul>${awardsHtml}</ul></section>` : "";
-      case "languages_structured":
-        return langsHtml ? `<section><h2>${t.languages}</h2><ul>${langsHtml}</ul></section>` : "";
-      default:
-        return "";
-    }
-  }).join("\n")}
+  // ─────────── EXECUTIVE TEMPLATE ───────────
+  if (draft.template === "executive") {
+    const accent = "#1e3a8a";
+    const execFontFamily = isAr ? "'Noto Naskh Arabic', serif" : "Georgia, 'Times New Roman', serif";
+
+    // Build summary as a highlighted block instead of regular section
+    const summaryBlock = summary
+      ? `<div class="summary-block"><p>${escapeHtml(summary)}</p></div>`
+      : "";
+    const nonSummaryKeys = orderedKeys.filter((k) => k !== "summary");
+
+    return `<!doctype html>
+<html lang="${lang}" dir="${dir}">
+<head>
+  <meta charset="utf-8" /><title>${escapeHtml(pi.full_name ?? "CV")}</title>
+  ${FONT_LINK}
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: ${execFontFamily}; color: #111; line-height: 1.55; font-size: 11pt; }
+    body { max-width: 210mm; margin: 0 auto; }
+    .exec-header { background: ${accent}; color: white; padding: 28mm 22mm 14mm; }
+    .exec-header h1 { font-size: 26pt; margin: 0; font-weight: 700; letter-spacing: -0.3px; }
+    .exec-header .contact { color: rgba(255,255,255,0.85); font-size: 10pt; margin-top: 8px; letter-spacing: 0.3px; }
+    .body { padding: 8mm 22mm 22mm; }
+    .summary-block { border-${isAr ? "right" : "left"}: 4px solid ${accent}; background: #f8fafc; padding: 16px 18px; margin: 18px 0 0; }
+    .summary-block p { font-size: 11.5pt; font-style: italic; color: #333; line-height: 1.7; margin: 0; }
+    section { margin-top: 18px; }
+    section h2 { font-size: 11pt; color: ${accent}; border-bottom: 1px solid ${accent}; padding-bottom: 4px; margin: 0 0 12px; text-align: ${align}; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
+    .entry { margin-bottom: 14px; }
+    .entry-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .entry-head strong { font-size: 12pt; letter-spacing: -0.2px; }
+    .dates { color: #666; font-size: 9.5pt; white-space: nowrap; }
+    .company { color: #444; font-size: 10.5pt; margin-bottom: 2px; }
+    ul { margin: 6px 0 0; padding-${isAr ? "right" : "left"}: 18px; list-style: none; }
+    li { margin-bottom: 4px; font-size: 11pt; position: relative; padding-${isAr ? "right" : "left"}: 14px; }
+    li:before { content: "—"; position: absolute; ${isAr ? "right" : "left"}: 0; color: #999; }
+    p { margin: 4px 0; font-size: 10.5pt; }
+    @media print { @page { size: A4; margin: 0; } }
+  </style>
+</head>
+<body>
+  <div class="exec-header">
+    <h1>${headerName}</h1>
+    ${contactLine ? `<div class="contact">${contactLine}</div>` : ""}
+  </div>
+  <div class="body">
+    ${summaryBlock}
+    ${nonSummaryKeys.map((k) => sectionHtml[k] ?? "").join("\n")}
+  </div>
+</body>
+</html>`;
+  }
+
+  // ─────────── MODERN TEMPLATE (default) ───────────
+  const accent = "#1e40af";
+  const sidebarBg = "#1f3a8a";
+  const modernFontFamily = isAr
+    ? "'Tajawal', 'Noto Naskh Arabic', sans-serif"
+    : "'Inter', 'Helvetica Neue', Arial, sans-serif";
+
+  return `<!doctype html>
+<html lang="${lang}" dir="${dir}">
+<head>
+  <meta charset="utf-8" /><title>${escapeHtml(pi.full_name ?? "CV")}</title>
+  ${FONT_LINK}
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: ${modernFontFamily}; color: #111; line-height: 1.55; font-size: 11pt; }
+    body { max-width: 210mm; margin: 0 auto; }
+    .modern-header { background: ${accent}; color: white; padding: 18px 24px; }
+    .modern-header h1 { font-size: 22pt; margin: 0; font-weight: 700; line-height: 1.2; }
+    .modern-header .contact { color: rgba(255,255,255,0.85); font-size: 10pt; margin-top: 4px; }
+    .grid { display: table; width: 100%; }
+    .grid > .sidebar, .grid > .main { display: table-cell; vertical-align: top; }
+    .sidebar { width: 30%; background: ${sidebarBg}; color: white; padding: 22px 18px; }
+    .sidebar h3 { font-size: 10pt; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.9); margin: 0 0 8px; font-weight: 700; }
+    .sidebar section { margin-bottom: 18px; }
+    .sidebar p, .sidebar li { font-size: 9.5pt; color: rgba(255,255,255,0.92); }
+    .sidebar ul { margin: 4px 0; padding-${isAr ? "right" : "left"}: 14px; }
+    .main { width: 70%; padding: 22px 26px; }
+    .main section { margin-bottom: 14px; }
+    .main h2 { font-size: 12pt; color: ${accent}; border-bottom: 2px solid ${accent}; padding-bottom: 3px; margin: 0 0 8px; text-align: ${align}; font-weight: 700; }
+    .entry { margin-bottom: 10px; }
+    .entry-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .entry-head strong { font-size: 11.5pt; color: #111; }
+    .dates { color: #777; font-size: 9.5pt; white-space: nowrap; }
+    .company { color: #444; font-size: 10pt; margin-bottom: 2px; }
+    .main ul { margin: 4px 0 0; padding-${isAr ? "right" : "left"}: 16px; list-style: none; }
+    .main li { margin-bottom: 2px; font-size: 10.5pt; position: relative; padding-${isAr ? "right" : "left"}: 12px; }
+    .main li:before { content: "${isAr ? "◀" : "▶"}"; color: ${accent}; position: absolute; ${isAr ? "right" : "left"}: 0; font-size: 8pt; top: 2px; }
+    p { margin: 3px 0; font-size: 10.5pt; }
+    @media print { @page { size: A4; margin: 0; } }
+  </style>
+</head>
+<body>
+  <div class="modern-header">
+    <h1>${headerName}</h1>
+    ${contactLine ? `<div class="contact">${contactLine}</div>` : ""}
+  </div>
+  <div class="grid">
+    <div class="sidebar">
+      ${sidebarKeys.map((k) => sectionHtml[k] ?? "").join("\n")}
+    </div>
+    <div class="main">
+      ${mainKeys.map((k) => sectionHtml[k] ?? "").join("\n")}
+    </div>
+  </div>
 </body>
 </html>`;
 }

@@ -46,6 +46,7 @@ import { AIAssistBullets, AIAssistSummary, AIAssistSkills } from "@/components/c
 import JobAlignmentDialog from "@/components/cv-builder/JobAlignmentDialog";
 import CVDateInput from "@/components/cv-builder/CVDateInput";
 import SectionOrderPanel, { resolveSectionOrder, type SectionKey } from "@/components/cv-builder/SectionOrderPanel";
+import { getTemplate, type CVTDraft } from "@/components/cv-templates";
 
 interface PersonalInfo {
   full_name?: string;
@@ -1206,9 +1207,12 @@ function computeAtsScore(d: Draft): number {
   return Math.max(0, Math.min(100, Math.round(s)));
 }
 
-// Section renderers indexed by SectionKey. Each returns the JSX for that
-// section, or null if the section has no content.
-const PREVIEW_SECTION_RENDERERS: Record<SectionKey, (draft: Draft) => React.ReactNode> = {
+// NOTE: section renderers used to live here as a local map; they were moved
+// into the template components themselves so each template controls its own
+// section layout. Kept as a dead export below for one cycle in case any
+// internal tooling still references it — safe to delete after Lovable resync.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _legacy_PREVIEW_SECTION_RENDERERS: Record<SectionKey, (draft: Draft) => React.ReactNode> = {
   summary: (draft) =>
     draft.summary?.ar || draft.summary?.en ? (
       <section>
@@ -1369,29 +1373,18 @@ const PREVIEW_SECTION_RENDERERS: Record<SectionKey, (draft: Draft) => React.Reac
 };
 
 const PreviewStep = ({ draft }: { draft: Draft }) => {
-  const orderedSections = resolveSectionOrder(draft.section_order);
+  // Delegate to the template-specific component so switching the template
+  // dropdown in the header produces a genuinely different layout — not just
+  // a different accent color.
+  const { Component } = getTemplate(draft.template);
   return (
     <div className="space-y-4">
-      <div
-        className="p-6 rounded-xl bg-white text-black dark:bg-white dark:text-black border-4 border-double border-primary/30 space-y-4 font-arabic"
-        dir="rtl"
-      >
-        <div className="text-center pb-3 border-b-2 border-primary/30">
-          <h1 className="text-2xl font-bold">{draft.personal_info.full_name || "اسم المتقدّم"}</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            {[draft.personal_info.email, draft.personal_info.phone, draft.personal_info.city]
-              .filter(Boolean)
-              .join(" • ")}
-          </p>
-        </div>
-
-        {orderedSections.map((key) => (
-          <div key={key}>{PREVIEW_SECTION_RENDERERS[key]?.(draft) ?? null}</div>
-        ))}
+      <div className="rounded-xl overflow-hidden border-4 border-double border-primary/30 shadow-md">
+        <Component draft={draft as unknown as CVTDraft} />
       </div>
 
       <p className={cn("text-xs text-muted-foreground text-center")}>
-        هذه معاينة على الشاشة. اسحب الأقسام في الخطوة السابقة لتغيير ترتيبها.
+        المعاينة تعكس القالب المختار. غيّر القالب من أعلى الصفحة لرؤية تخطيط مختلف.
       </p>
     </div>
   );
