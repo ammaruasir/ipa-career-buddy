@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Briefcase, Loader2, Shield, GraduationCap, ArrowRight } from "lucide-react";
+import { Briefcase, Loader2, Shield, GraduationCap, ArrowRight, Users } from "lucide-react";
 
 const QUICK_ACCOUNTS = [
   { label: "مسؤول", email: "admin@test.com", password: "00000000", role: "admin" as const },
+  { label: "موارد بشرية", email: "hr@test.com", password: "00000000", role: "hr" as const },
   { label: "مرشح", email: "student1@test.com", password: "00000000", role: "candidate" as const },
   { label: "مرشح", email: "ammar@admin.com", password: "00000000", role: "candidate" as const },
 ];
@@ -228,7 +229,7 @@ const Login = () => {
               </div>
               <div className="space-y-2">
                 {QUICK_ACCOUNTS.map((acc) => {
-                  const Icon = acc.role === "admin" ? Shield : GraduationCap;
+                  const Icon = acc.role === "admin" ? Shield : acc.role === "hr" ? Users : GraduationCap;
                   return (
                     <Button
                       key={acc.email}
