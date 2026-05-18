@@ -29,7 +29,15 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import CVChatPanel from "@/components/cv-builder/CVChatPanel";
+
+// Extract storage path "<user_id>/<file>" from a full Supabase public/signed URL
+const extractResumePath = (resumeUrl: string | null, userId: string): string => {
+  if (!resumeUrl) return `${userId}/resume.pdf`;
+  const m = resumeUrl.match(/\/resumes\/(.+?)(?:\?|$)/);
+  return m?.[1] ?? `${userId}/resume.pdf`;
+};
 
 interface Weakness {
   section: string;
@@ -97,7 +105,8 @@ const CVReview = () => {
   const [doc, setDoc] = useState<CVDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const [hasResume, setHasResume] = useState(false);
+  const [resumeUrl, setResumeUrl] = useState<string | null>(null);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   const loadAnalysis = async (uid: string) => {
     const { data } = await supabase
@@ -110,19 +119,30 @@ const CVReview = () => {
     return (data as unknown as CVDocument) ?? null;
   };
 
-  const triggerAnalysis = async () => {
+  const triggerAnalysis = async (overrideUrl?: string | null) => {
     if (!user) return;
     setAnalyzing(true);
+    setAnalyzeError(null);
+    const loadingId = toast.loading("جارٍ تحليل سيرتك… قد يستغرق حتى دقيقة");
     try {
-      const path = `${user.id}/resume.pdf`;
-      const { error } = await supabase.functions.invoke("analyze-resume", {
+      const path = extractResumePath(overrideUrl ?? resumeUrl, user.id);
+      const { data, error } = await supabase.functions.invoke("analyze-resume", {
         body: { resume_path: path },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       const fresh = await loadAnalysis(user.id);
+      if (!fresh) throw new Error("تعذّر حفظ نتيجة التحليل");
       setDoc(fresh);
-    } catch (e) {
+      toast.success("اكتمل تحليل سيرتك الذاتية", { id: loadingId });
+    } catch (e: any) {
       console.error("analyze-resume failed:", e);
+      const msg =
+        e?.message?.includes("Failed to fetch") || e?.name === "FunctionsFetchError"
+          ? "تعذّر الاتصال بخدمة التحليل، تحقّق من اتصالك وحاول مجدداً"
+          : e?.message || "حدث خطأ غير متوقّع أثناء التحليل";
+      setAnalyzeError(msg);
+      toast.error(msg, { id: loadingId });
     } finally {
       setAnalyzing(false);
     }
@@ -137,26 +157,24 @@ const CVReview = () => {
 
     const load = async () => {
       const existing = await loadAnalysis(user.id);
-      if (existing) {
-        setDoc(existing);
-        setHasResume(true);
-        setLoading(false);
-        return;
-      }
-      // No analysis yet — check if a resume exists in the profile, and analyze it automatically.
       const { data: profile } = await supabase
         .from("profiles")
         .select("resume_url")
         .eq("user_id", user.id)
         .maybeSingle();
-      const resumeExists = !!(profile as any)?.resume_url;
-      setHasResume(resumeExists);
-      if (resumeExists) {
+      const url = (profile as any)?.resume_url ?? null;
+      setResumeUrl(url);
+      
+
+      if (existing) {
+        setDoc(existing);
         setLoading(false);
+        return;
+      }
+      setLoading(false);
+      if (url) {
         // Auto-trigger analysis on first visit
-        await triggerAnalysis();
-      } else {
-        setLoading(false);
+        await triggerAnalysis(url);
       }
     };
     load();
@@ -174,13 +192,16 @@ const CVReview = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 px-4" dir="rtl">
         <FileText className="w-12 h-12 text-muted-foreground" />
-        {hasResume ? (
+        {resumeUrl ? (
           <>
             <p className="text-muted-foreground text-lg text-center">
               سيرتك الذاتية مرفوعة. اضغط لتحليلها بالذكاء الاصطناعي.
             </p>
-            <Button onClick={triggerAnalysis} disabled={analyzing}>
-              {analyzing ? "جارٍ التحليل..." : "حلّل سيرتي الآن"}
+            {analyzeError && (
+              <p className="text-sm text-destructive text-center max-w-md">{analyzeError}</p>
+            )}
+            <Button onClick={() => triggerAnalysis()} disabled={analyzing}>
+              {analyzing ? "جارٍ التحليل..." : analyzeError ? "إعادة المحاولة" : "حلّل سيرتي الآن"}
             </Button>
           </>
         ) : (
