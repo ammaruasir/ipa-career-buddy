@@ -49,6 +49,233 @@ export type Database = {
           },
         ]
       }
+      cv_conversations: {
+        Row: {
+          created_at: string | null
+          cv_document_id: string | null
+          cv_draft_id: string | null
+          id: string
+          language: string | null
+          last_message_at: string | null
+          messages: Json | null
+          total_messages: number | null
+          total_tokens: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          cv_document_id?: string | null
+          cv_draft_id?: string | null
+          id?: string
+          language?: string | null
+          last_message_at?: string | null
+          messages?: Json | null
+          total_messages?: number | null
+          total_tokens?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          cv_document_id?: string | null
+          cv_draft_id?: string | null
+          id?: string
+          language?: string | null
+          last_message_at?: string | null
+          messages?: Json | null
+          total_messages?: number | null
+          total_tokens?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cv_conversations_cv_document_id_fkey"
+            columns: ["cv_document_id"]
+            isOneToOne: false
+            referencedRelation: "cv_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cv_conversations_cv_draft_id_fkey"
+            columns: ["cv_draft_id"]
+            isOneToOne: false
+            referencedRelation: "cv_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cv_documents: {
+        Row: {
+          alignment_score: number | null
+          analyzed_at: string | null
+          extraction: Json | null
+          file_name: string | null
+          file_size: number | null
+          file_url: string
+          id: string
+          model_used: string | null
+          rewrites: Json | null
+          saudi_compliance: Json | null
+          section_scores: Json | null
+          target_role: string | null
+          tokens_used: number | null
+          uploaded_at: string | null
+          user_id: string
+          weaknesses: Json | null
+        }
+        Insert: {
+          alignment_score?: number | null
+          analyzed_at?: string | null
+          extraction?: Json | null
+          file_name?: string | null
+          file_size?: number | null
+          file_url: string
+          id?: string
+          model_used?: string | null
+          rewrites?: Json | null
+          saudi_compliance?: Json | null
+          section_scores?: Json | null
+          target_role?: string | null
+          tokens_used?: number | null
+          uploaded_at?: string | null
+          user_id: string
+          weaknesses?: Json | null
+        }
+        Update: {
+          alignment_score?: number | null
+          analyzed_at?: string | null
+          extraction?: Json | null
+          file_name?: string | null
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          model_used?: string | null
+          rewrites?: Json | null
+          saudi_compliance?: Json | null
+          section_scores?: Json | null
+          target_role?: string | null
+          tokens_used?: number | null
+          uploaded_at?: string | null
+          user_id?: string
+          weaknesses?: Json | null
+        }
+        Relationships: []
+      }
+      cv_drafts: {
+        Row: {
+          certifications: Json | null
+          created_at: string | null
+          education: Json | null
+          experience: Json | null
+          export_count: number | null
+          id: string
+          language: string | null
+          last_exported_at: string | null
+          personal_info: Json | null
+          primary_color: string | null
+          skills: Json | null
+          summary: Json | null
+          template: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          certifications?: Json | null
+          created_at?: string | null
+          education?: Json | null
+          experience?: Json | null
+          export_count?: number | null
+          id?: string
+          language?: string | null
+          last_exported_at?: string | null
+          personal_info?: Json | null
+          primary_color?: string | null
+          skills?: Json | null
+          summary?: Json | null
+          template?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          certifications?: Json | null
+          created_at?: string | null
+          education?: Json | null
+          experience?: Json | null
+          export_count?: number | null
+          id?: string
+          language?: string | null
+          last_exported_at?: string | null
+          personal_info?: Json | null
+          primary_color?: string | null
+          skills?: Json | null
+          summary?: Json | null
+          template?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cv_interview_sessions: {
+        Row: {
+          answers: Json | null
+          completed_at: string | null
+          created_at: string | null
+          current_step: number | null
+          experience_level: string | null
+          generated_draft_id: string | null
+          id: string
+          language: string | null
+          status: string | null
+          target_industry: string | null
+          target_role: string | null
+          total_steps: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          answers?: Json | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_step?: number | null
+          experience_level?: string | null
+          generated_draft_id?: string | null
+          id?: string
+          language?: string | null
+          status?: string | null
+          target_industry?: string | null
+          target_role?: string | null
+          total_steps?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          answers?: Json | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_step?: number | null
+          experience_level?: string | null
+          generated_draft_id?: string | null
+          id?: string
+          language?: string | null
+          status?: string | null
+          target_industry?: string | null
+          target_role?: string | null
+          total_steps?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cv_interview_sessions_generated_draft_id_fkey"
+            columns: ["generated_draft_id"]
+            isOneToOne: false
+            referencedRelation: "cv_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evaluations: {
         Row: {
           ai_feedback_ar: string | null
@@ -425,6 +652,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          id: number
+          occurred_at: string
+          scope: string
+          user_id: string
+        }
+        Insert: {
+          id?: number
+          occurred_at?: string
+          scope: string
+          user_id: string
+        }
+        Update: {
+          id?: number
+          occurred_at?: string
+          scope?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       responses: {
         Row: {
           ai_analysis: Json | null
@@ -517,6 +765,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_consents: {
+        Row: {
+          consent_type: string
+          granted: boolean
+          granted_at: string
+          id: string
+          ip_address: string | null
+          revoked_at: string | null
+          user_id: string
+          version: string | null
+        }
+        Insert: {
+          consent_type: string
+          granted: boolean
+          granted_at?: string
+          id?: string
+          ip_address?: string | null
+          revoked_at?: string | null
+          user_id: string
+          version?: string | null
+        }
+        Update: {
+          consent_type?: string
+          granted?: boolean
+          granted_at?: string
+          id?: string
+          ip_address?: string | null
+          revoked_at?: string | null
+          user_id?: string
+          version?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -543,9 +824,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          p_max: number
+          p_scope: string
+          p_user_id: string
+          p_window_seconds: number
+        }
+        Returns: {
+          allowed: boolean
+          current_count: number
+          retry_after_seconds: number
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_active_consent: {
+        Args: { p_consent_type: string; p_user_id: string }
+        Returns: boolean
       }
       has_role: {
         Args: {
