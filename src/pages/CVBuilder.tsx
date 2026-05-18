@@ -30,6 +30,14 @@ import { cn } from "@/lib/utils";
 import { AIAssistBullets } from "@/components/cv-builder/AIAssistButton";
 import { ProofreadInput, ProofreadTextarea } from "@/components/cv-builder/ProofreadInput";
 import { useProfilePrefill } from "@/hooks/useProfilePrefill";
+import {
+  exportToDocx,
+  exportToPdf,
+  localizeDigits,
+  type CVDocumentData,
+  type CVLang,
+  type CVSection,
+} from "@/lib/cv-export";
 
 interface PersonalInfo {
   full_name?: string;
