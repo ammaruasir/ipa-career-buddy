@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -97,6 +97,8 @@ const CVInterview = () => {
   const { user, loading: authLoading } = useAuth();
   const prefill = useProfilePrefill();
   const [prefilled, setPrefilled] = useState(false);
+  // When user navigates back, we restore their saved answer; suppress the prefill effect once.
+  const skipPrefillOnceRef = useRef(false);
 
   // Pre-interview language picker
   const [language, setLanguage] = useState<Lang>("ar");
@@ -174,6 +176,12 @@ const CVInterview = () => {
   // When a new question loads, pre-fill the answer from the profile when possible.
   useEffect(() => {
     if (!question) {
+      setPrefilled(false);
+      return;
+    }
+    // After "Previous question", the saved answer is already in state — don't overwrite it.
+    if (skipPrefillOnceRef.current) {
+      skipPrefillOnceRef.current = false;
       setPrefilled(false);
       return;
     }
@@ -259,9 +267,11 @@ const CVInterview = () => {
         body: { action: "back", session_id: sessionId, language },
       });
       if (error) throw error;
+      // Mark that the next prefill effect should NOT overwrite the restored answer
+      skipPrefillOnceRef.current = true;
+      setAnswer(data.previous_answer ?? "");
       setCurrentStep(data.current_step);
       setQuestion(data.question);
-      setAnswer(data.previous_answer ?? "");
     } catch (e) {
       console.error(e);
       toast.error(uiLang === "en" ? "Failed to go back" : "تعذّر الرجوع");
