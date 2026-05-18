@@ -1,43 +1,40 @@
-## Merge health check
+## AI integration & wiring audit (post-merge)
 
-I scanned the new code from the merge against the database and runtime logs. Most things look healthy:
+### Edge functions added by the merge
 
-- All new routes (`/cv/builder`, `/cv/review`, `/cv/interview`, `/dashboard/instructor`, `/dashboard/instructor/cohort/:id`) are registered in `App.tsx`.
-- `CVHubSection` and `TrainingSection` are mounted in `CandidateDashboard`.
-- No build/runtime errors in the dev server log or browser console (only harmless React Router v7 future-flag warnings).
-- Edge functions boot cleanly (no errors in `analyze-resume` logs).
+| Function | AI provider | Model | Called from |
+|---|---|---|---|
+| `coach-response` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | `CoachingSection.tsx` ✅ |
+| `chat-with-cv` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | `CVChatPanel.tsx` ✅ |
+| `cv-interview-step` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | `CVInterview.tsx` ✅ |
+| `generate-cv-bullets` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | `AIAssistButton.tsx` ✅ |
+| `improve-cv-summary` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | `CVInterview.tsx` ✅ |
+| `suggest-cv-skills` | Lovable AI Gateway (fallback: OpenAI) | `gemini-2.5-flash` / `gpt-4.1-mini` | **Not called from anywhere** ⚠️ |
 
-### One real problem: `instructor` role is not in the database
+### Verdict
 
-The merge added an Instructor layer in the UI:
+The wiring is solid overall:
 
-- `src/hooks/useAuth.tsx` does `if (roles.includes("instructor")) setRole("instructor")`
-- `src/pages/DashboardRouter.tsx` routes `role === "instructor"` to `/dashboard/instructor`
-- `InstructorDashboard` and `CohortDetail` pages exist
+- **Secrets**: `LOVABLE_API_KEY` and `OPENAI_API_KEY` are both already set in the project — no missing keys.
+- **Provider pattern**: Every new function prefers Lovable AI Gateway and falls back to OpenAI automatically. Consistent and safe.
+- **Models**: All use `google/gemini-2.5-flash` (a supported gateway model) — good cost/latency balance for CV/coaching tasks.
+- **Client wiring**: 5 of 6 functions are correctly invoked via `supabase.functions.invoke(...)` in the matching React components.
+- **CORS / auth**: Functions use the standard `_shared/guards.ts` pattern from the existing codebase.
 
-But the `app_role` enum in the database is still:
-```
-"student" | "admin" | "hr" | "candidate"
-```
+### Issues to address
 
-Consequences:
-- You cannot insert a row in `user_roles` with `role = 'instructor'` — Postgres rejects it as an invalid enum value.
-- Any `has_role(uid, 'instructor')` call (likely used in instructor RLS policies / cohort tables) will fail at runtime.
-- The `/dashboard/instructor` route is effectively unreachable today — no user can be flagged as an instructor.
+1. **`suggest-cv-skills` is orphaned** — deployed but no component calls it. Either:
+   - Wire it into the `CVBuilder` skills step as a "Suggest skills with AI" button, **or**
+   - Remove it to avoid dead code.
 
-### Fix
+2. **`gpt-4.1-mini` fallback model** — `gpt-4.1-mini` is fine on the OpenAI direct API, but if `LOVABLE_API_KEY` is ever removed the fallback would activate; worth knowing it sends data through OpenAI directly rather than the gateway. Today it never triggers because `LOVABLE_API_KEY` is present.
 
-Add `instructor` to the `app_role` enum via a migration:
+3. **Model choice for `coach-response`** — coaching is the longest-context call (full transcript + STAR evaluation). Consider upgrading to `google/gemini-2.5-pro` if you see truncated or shallow coaching output. No action required today; flagging for tuning.
 
-```sql
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'instructor';
-```
+### Optional cleanup
 
-After running it, `src/integrations/supabase/types.ts` will regenerate to include `'instructor'`, and you'll be able to assign the role from the admin panel.
+- Add `[functions.coach-response]` (and the 5 others) blocks to `supabase/config.toml` only if you want explicit `verify_jwt` overrides. They currently deploy with the Lovable default (`verify_jwt = false` + in-code JWT validation), which matches the rest of the project.
 
-### Optional follow-ups (not blocking)
+### Recommended next step
 
-- Add a UI in `AdminSettings` / `UserManagement` to assign the `instructor` role to a user.
-- Verify the `cohorts` / instructor-related RLS policies reference `has_role(auth.uid(), 'instructor')` correctly once the enum value exists.
-
-Shall I apply the migration?
+Wire `suggest-cv-skills` into `CVBuilder` as an "AI suggest skills" button on the skills step (matches the existing `AIAssistButton` pattern). Want me to do that?
