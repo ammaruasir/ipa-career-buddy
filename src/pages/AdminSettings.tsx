@@ -16,12 +16,37 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import AIAvatarScene from "@/components/interview/AIAvatarScene";
 import {
   ArrowRight, Palette, BookOpen, SlidersHorizontal, Key, Users, Settings,
   Plus, Pencil, X, Loader2, Shield, Download, Server, Briefcase, Clock,
   MapPin, Building2, ToggleLeft, ToggleRight, Mic
 } from "lucide-react";
+
+// Fallback when the live ElevenLabs voice list can't be fetched (e.g. function
+// not deployed yet or upstream 5xx). Mirrors the previous hard-coded list.
+const FALLBACK_VOICES: Array<{ voice_id: string; label: string }> = [
+  { voice_id: "QsV9PCczMIklRM6xLPAS", label: "هبة منصوري — أنثى سعودية (محادثة/خدمة عملاء) ⭐" },
+  { voice_id: "IK7YYZcSpmlkjKrQxbSn", label: "رائد — ذكر سعودي (رسمي/سرد)" },
+  { voice_id: "yXEnnEln9armDCyhkXcA", label: "جدّاوي — ذكر سعودي شاب (هادئ/عميق)" },
+  { voice_id: "IES4nrmZdUBHByLBde0P", label: "هيثم — عربي (لكنة مصرية)" },
+  { voice_id: "mRdG9GYEjJmIzqbYTidv", label: "سناء — عربي أصلي (أنثوي)" },
+  { voice_id: "tavIIPLplRB883FzWU0V", label: "منى — لهجة خليجية (أنثوي)" },
+  { voice_id: "SAz9YHcvj6GT2YYXdXww", label: "River (أنثوي)" },
+  { voice_id: "EXAVITQu4vr4xnSDxMaL", label: "Sarah (أنثوي)" },
+  { voice_id: "FGY2WhTYpPnrIDTdsKH5", label: "Laura (أنثوي)" },
+  { voice_id: "Xb7hH8MSUJpSbSDYk0k2", label: "Alice (أنثوي)" },
+  { voice_id: "pFZP5JQG7iQjIQuC4Bku", label: "Lily (أنثوي)" },
+  { voice_id: "cgSgspJ2msm6clMCkdW9", label: "Jessica (أنثوي)" },
+  { voice_id: "XrExE9yKIg1WjnnlVkGX", label: "Matilda (أنثوي)" },
+  { voice_id: "CwhRBWXzGAHq8TQ4Fs17", label: "Roger (ذكوري)" },
+  { voice_id: "JBFqnCBsd6RMkjVDRZzb", label: "George (ذكوري)" },
+  { voice_id: "TX3LPaxmHKxFdv7VOQHJ", label: "Liam (ذكوري)" },
+  { voice_id: "onwK4e9ZLuTAKqWW03F9", label: "Daniel (ذكوري)" },
+  { voice_id: "nPczCjzI2devNBz1zQrb", label: "Brian (ذكوري)" },
+  { voice_id: "IKne3meq5aSn9XLyUdCD", label: "Charlie (ذكوري)" },
+  { voice_id: "cjVigY5qzO86Huf0OWal", label: "Eric (ذكوري)" },
+  { voice_id: "N2lVS1w4EtoT3dr4eOWO", label: "Callum (ذكوري)" },
+];
 
 interface QuestionTemplate {
   id: string;
@@ -73,6 +98,39 @@ const AdminSettings = () => {
   const [savingVoice, setSavingVoice] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState(false);
 
+  // ElevenLabs voices: try to fetch live list; fall back to hard-coded curated set
+  const [voiceOptions, setVoiceOptions] = useState<Array<{ voice_id: string; label: string }>>([]);
+  const [voicesLoading, setVoicesLoading] = useState(false);
+
+  useEffect(() => {
+    if (role !== "admin") return;
+    let cancelled = false;
+    (async () => {
+      setVoicesLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("elevenlabs-voices", { body: {} });
+        if (cancelled) return;
+        if (error || !data?.voices?.length) throw error || new Error("empty");
+        const opts = (data.voices as Array<any>)
+          .map((v) => ({
+            voice_id: v.voice_id,
+            label: [
+              v.name,
+              v.gender ? (v.gender === "female" ? "أنثوي" : "ذكوري") : null,
+              v.accent || v.language,
+            ].filter(Boolean).join(" — "),
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label, "ar"));
+        setVoiceOptions(opts);
+      } catch {
+        // Fallback to hard-coded list below.
+      } finally {
+        if (!cancelled) setVoicesLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [role]);
+
   useEffect(() => {
     if (settings.interviewer_voice && !voiceDraft) {
       setVoiceDraft({
@@ -87,7 +145,8 @@ const AdminSettings = () => {
   const voiceDirty = voiceDraft && settings.interviewer_voice && (
     voiceDraft.name !== settings.interviewer_voice.name ||
     voiceDraft.gender !== settings.interviewer_voice.gender ||
-    voiceDraft.voice_id !== settings.interviewer_voice.voice_id
+    voiceDraft.voice_id !== settings.interviewer_voice.voice_id ||
+    (voiceDraft.avatar_url || "") !== (settings.interviewer_voice.avatar_url || "")
   );
 
   const saveVoice = async () => {
@@ -107,6 +166,9 @@ const AdminSettings = () => {
     setPreviewingVoice(true);
     try {
       const sample = `السلام عليكم، أنا ${voiceDraft.name}، المحاور الذكي. هذا اختبار سريع للصوت المختار.`;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token
+        ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
         {
@@ -114,7 +176,7 @@ const AdminSettings = () => {
           headers: {
             "Content-Type": "application/json",
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ text: sample, voiceId: voiceDraft.voice_id }),
         }
@@ -631,87 +693,72 @@ const AdminSettings = () => {
                   <CardDescription className="font-tajawal">عدّل الاسم والجنس والصوت ثم اضغط "حفظ وتفعيل" — لن تُطبّق التغييرات إلا بعد الحفظ.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-[160px_1fr]">
+                  <div className="grid gap-4 md:grid-cols-3">
                     <div className="space-y-2">
-                      <Label className="font-tajawal text-xs text-muted-foreground">معاينة الشكل</Label>
-                      <div className="aspect-square w-full rounded-xl overflow-hidden border">
-                        <AIAvatarScene
-                          avatarState="idle"
-                          name={voiceDraft?.name}
-                          gender={(voiceDraft?.gender as "male" | "female") ?? "female"}
-                          avatarUrl={voiceDraft?.avatar_url || undefined}
-                        />
-                      </div>
-                      <p className="text-[10px] text-muted-foreground font-tajawal text-center">
-                        يتغير الشكل حسب الجنس المختار
-                      </p>
+                      <Label className="font-tajawal">اسم المحاور/ة</Label>
+                      <Input
+                        value={voiceDraft?.name ?? ""}
+                        onChange={(e) => setVoiceDraft((d) => d ? { ...d, name: e.target.value } : d)}
+                        placeholder="مثال: نورة"
+                        className="font-tajawal"
+                      />
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label className="font-tajawal">اسم المحاور/ة</Label>
-                        <Input
-                          value={voiceDraft?.name ?? ""}
-                          onChange={(e) => setVoiceDraft((d) => d ? { ...d, name: e.target.value } : d)}
-                          placeholder="مثال: نورة"
-                          className="font-tajawal"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="font-tajawal">جنس الأفتار</Label>
-                        <Select
-                          value={voiceDraft?.gender ?? "female"}
-                          onValueChange={(v) => setVoiceDraft((d) => d ? { ...d, gender: v } : d)}
-                        >
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="female">أنثى (حجاب)</SelectItem>
-                            <SelectItem value="male">ذكر (ثوب وغترة)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label className="font-tajawal">رابط صورة مخصصة (اختياري)</Label>
-                        <Input
-                          value={voiceDraft?.avatar_url ?? ""}
-                          onChange={(e) => setVoiceDraft((d) => d ? { ...d, avatar_url: e.target.value } : d)}
-                          placeholder="https://... — اتركه فارغًا لاستخدام الشكل الافتراضي"
-                          className="font-tajawal"
-                          dir="ltr"
-                        />
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label className="font-tajawal">صوت ElevenLabs</Label>
-                        <Select
-                          value={voiceDraft?.voice_id ?? "QsV9PCczMIklRM6xLPAS"}
-                          onValueChange={(v) => setVoiceDraft((d) => d ? { ...d, voice_id: v } : d)}
-                        >
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="QsV9PCczMIklRM6xLPAS">هبة منصوري — أنثى سعودية (محادثة/خدمة عملاء) ⭐</SelectItem>
-                            <SelectItem value="IK7YYZcSpmlkjKrQxbSn">رائد — ذكر سعودي (رسمي/سرد)</SelectItem>
-                            <SelectItem value="yXEnnEln9armDCyhkXcA">جدّاوي — ذكر سعودي شاب (هادئ/عميق)</SelectItem>
-                            <SelectItem value="IES4nrmZdUBHByLBde0P">هيثم — عربي (لكنة مصرية)</SelectItem>
-                            <SelectItem value="mRdG9GYEjJmIzqbYTidv">سناء — عربي أصلي (أنثوي)</SelectItem>
-                            <SelectItem value="tavIIPLplRB883FzWU0V">منى — لهجة خليجية (أنثوي)</SelectItem>
-                            <SelectItem value="SAz9YHcvj6GT2YYXdXww">River (أنثوي)</SelectItem>
-                            <SelectItem value="EXAVITQu4vr4xnSDxMaL">Sarah (أنثوي)</SelectItem>
-                            <SelectItem value="FGY2WhTYpPnrIDTdsKH5">Laura (أنثوي)</SelectItem>
-                            <SelectItem value="Xb7hH8MSUJpSbSDYk0k2">Alice (أنثوي)</SelectItem>
-                            <SelectItem value="pFZP5JQG7iQjIQuC4Bku">Lily (أنثوي)</SelectItem>
-                            <SelectItem value="cgSgspJ2msm6clMCkdW9">Jessica (أنثوي)</SelectItem>
-                            <SelectItem value="XrExE9yKIg1WjnnlVkGX">Matilda (أنثوي)</SelectItem>
-                            <SelectItem value="CwhRBWXzGAHq8TQ4Fs17">Roger (ذكوري)</SelectItem>
-                            <SelectItem value="JBFqnCBsd6RMkjVDRZzb">George (ذكوري)</SelectItem>
-                            <SelectItem value="TX3LPaxmHKxFdv7VOQHJ">Liam (ذكوري)</SelectItem>
-                            <SelectItem value="onwK4e9ZLuTAKqWW03F9">Daniel (ذكوري)</SelectItem>
-                            <SelectItem value="nPczCjzI2devNBz1zQrb">Brian (ذكوري)</SelectItem>
-                            <SelectItem value="IKne3meq5aSn9XLyUdCD">Charlie (ذكوري)</SelectItem>
-                            <SelectItem value="cjVigY5qzO86Huf0OWal">Eric (ذكوري)</SelectItem>
-                            <SelectItem value="N2lVS1w4EtoT3dr4eOWO">Callum (ذكوري)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    <div className="space-y-2">
+                      <Label className="font-tajawal">الجنس</Label>
+                      <Select
+                        value={voiceDraft?.gender ?? "female"}
+                        onValueChange={(v) => setVoiceDraft((d) => d ? { ...d, gender: v } : d)}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="female">أنثى</SelectItem>
+                          <SelectItem value="male">ذكر</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+                    <div className="space-y-2">
+                      <Label className="font-tajawal">صوت ElevenLabs</Label>
+                      <Select
+                        value={voiceDraft?.voice_id ?? "QsV9PCczMIklRM6xLPAS"}
+                        onValueChange={(v) => setVoiceDraft((d) => d ? { ...d, voice_id: v } : d)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={voicesLoading ? "جارٍ التحميل..." : "اختر صوتاً"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(voiceOptions.length > 0 ? voiceOptions : FALLBACK_VOICES).map((v) => (
+                            <SelectItem key={v.voice_id} value={v.voice_id}>{v.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-tajawal">رابط الصورة الرمزية (Avatar URL)</Label>
+                    <Input
+                      type="url"
+                      placeholder="https://... (اتركه فارغًا للرسم الافتراضي)"
+                      value={voiceDraft?.avatar_url ?? ""}
+                      onChange={(e) =>
+                        setVoiceDraft((d) => (d ? { ...d, avatar_url: e.target.value } : d))
+                      }
+                      className="font-tajawal"
+                    />
+                    {voiceDraft?.avatar_url ? (
+                      <div className="flex items-center gap-3 pt-1">
+                        <img
+                          src={voiceDraft.avatar_url}
+                          alt="معاينة"
+                          className="w-14 h-14 rounded-xl object-cover border"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                        <p className="text-xs text-muted-foreground font-tajawal">
+                          ستظهر هذه الصورة بدلاً من الرسم الافتراضي للمحاور.
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <p className="text-xs text-muted-foreground font-tajawal">

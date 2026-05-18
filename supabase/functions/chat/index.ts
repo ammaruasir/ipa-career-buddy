@@ -11,7 +11,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, job_position, interview_type, context_summary, last_answer, vacancy_id, user_id, current_question, total_questions, interviewer_name, interviewer_gender, current_phase, core_question_count } = await req.json();
+    const { messages, job_position, interview_type, context_summary, last_answer, vacancy_id, user_id, current_question, total_questions, interviewer_name, interviewer_gender, current_phase, core_question_count, force_closing } = await req.json();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
@@ -183,7 +183,11 @@ ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية
     if (current_phase) {
       const coreCount = core_question_count || 0;
       phaseContext = `\n\n⚠️ المرحلة الحالية: ${current_phase}. عدد الأسئلة الجوهرية المطروحة حتى الآن: ${coreCount} من ${coreQCount}.`;
-      if (current_phase === "intro") {
+      if (force_closing) {
+        // Caller has decided we must close — block any CORE/FOLLOW_UP regardless
+        // of model judgement. Used when client detects core-loop overrun.
+        phaseContext += ` ⛔ تم تجاوز عدد الأسئلة الجوهرية. ممنوع طرح [CORE] أو [FOLLOW_UP] جديد. ابدأ الآن بـ [CLOSING] مباشرة، أو [END] إذا كانت الأسئلة الختامية انتهت.`;
+      } else if (current_phase === "intro") {
         phaseContext += ` أنت في مرحلة التعريف — اسأل عن السيرة الذاتية والملف الشخصي. ابدأ ردك بـ [INTRO].`;
       } else if (current_phase === "core") {
         phaseContext += ` أنت في المرحلة الجوهرية — اسأل أسئلة تقنية وسلوكية. ابدأ ردك بـ [CORE] أو [FOLLOW_UP].`;
@@ -195,23 +199,30 @@ ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية
       }
     }
 
-    // Latency optimization: use context_summary + last_answer if provided
-    let chatMessages: any[];
+    // Merge canonical system prompt + (optional) summary + (optional) recent
+    // message tail. This gives the model BOTH the long-range summary and the
+    // verbatim recent turns, without letting any caller-supplied system
+    // message override our prompt.
+    const chatMessages: any[] = [
+      { role: "system", content: systemPrompt + phaseContext },
+    ];
     if (context_summary !== undefined && last_answer !== undefined) {
-      chatMessages = [
-        { role: "system", content: systemPrompt + phaseContext },
-        { role: "user", content: `ملخص سياق المقابلة حتى الآن:\n${context_summary}\n\nآخر إجابة من المرشح:\n${last_answer}` },
-      ];
-    } else if (messages && messages.length > 0) {
-      const enrichedMessages = messages.map((m: any, i: number) => {
-        if (i === 0 && m.role === "system") {
-          return { ...m, content: systemPrompt + phaseContext };
-        }
-        return m;
+      chatMessages.push({
+        role: "user",
+        content: `ملخص سياق المقابلة حتى الآن (للمرجع فقط، لا تعتمد عليه بدلاً من الحوار الفعلي):\n${context_summary}`,
       });
-      chatMessages = enrichedMessages;
-    } else {
-      chatMessages = [{ role: "system", content: systemPrompt + phaseContext }];
+    }
+    if (Array.isArray(messages) && messages.length > 0) {
+      for (const m of messages) {
+        // Drop any caller-supplied system role — we already injected ours.
+        if (!m || m.role === "system") continue;
+        if (typeof m.content !== "string") continue;
+        chatMessages.push({ role: m.role, content: m.content });
+      }
+    }
+    if (last_answer !== undefined && (!messages || messages.length === 0)) {
+      // Summary-only path (used when caller didn't pass recent tail).
+      chatMessages.push({ role: "user", content: String(last_answer) });
     }
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {

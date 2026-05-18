@@ -197,6 +197,44 @@ const CandidateDetail = () => {
           </Card>
         )}
 
+        {/* Proctor flag banner */}
+        {(interview as any).flagged_at && (
+          <Card className="rounded-2xl border-amber-500/40 bg-amber-500/5 p-3 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5" />
+            <div className="text-sm">
+              <div className="font-medium text-amber-700 dark:text-amber-300">
+                تم وضع علامة على هذه الجلسة خلال المراقبة
+              </div>
+              {(interview as any).flagged_reason && (
+                <div className="text-muted-foreground">{(interview as any).flagged_reason}</div>
+              )}
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {new Date((interview as any).flagged_at).toLocaleString("ar-SA")}
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* End reason banner */}
+        {(interview as any).end_reason === "terminated_by_proctor" && (
+          <Card className="rounded-2xl border-destructive/40 bg-destructive/5 p-3 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-destructive mt-0.5" />
+            <div className="text-sm">
+              <div className="font-medium text-destructive">تم إنهاء هذه المقابلة من قبل المسؤول.</div>
+            </div>
+          </Card>
+        )}
+        {(interview as any).end_reason === "disconnected" && (
+          <Card className="rounded-2xl border-amber-500/40 bg-amber-500/5 p-3 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5" />
+            <div className="text-sm">
+              <div className="font-medium text-amber-700 dark:text-amber-300">
+                انتهت الجلسة بشكل غير متوقع — قد تكون البيانات ناقصة.
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Profile + Interview Info */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="rounded-2xl shadow-lg">
@@ -389,7 +427,16 @@ const CandidateDetail = () => {
 
         {/* Video/Audio Playback — for all interview types */}
         {interview.user_id && (
-          <VideoPlayback interviewId={interview.id} userId={interview.user_id} recordingUrl={(interview as any).recording_url} interviewType={interview.type} />
+          <VideoPlayback
+            interviewId={interview.id}
+            userId={interview.user_id}
+            recordingUrl={(interview as any).recording_url}
+            recordingChunksPath={(interview as any).recording_chunks_path}
+            recordingDurationMs={(interview as any).recording_duration_ms}
+            recordingChunkCount={(interview as any).recording_chunk_count}
+            recordingStatus={(interview as any).recording_status}
+            interviewType={interview.type}
+          />
         )}
 
         {/* Cheat Events Log */}

@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLiveInterview } from "@/hooks/useLiveInterview";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
-
+import { useCheatCamera } from "@/hooks/useCheatCamera";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
 import InterviewHeader from "@/components/interview/InterviewHeader";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import AIAvatarScene from "@/components/interview/AIAvatarScene";
+import ProctorBadge from "@/components/interview/ProctorBadge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,12 +34,16 @@ interface LiveInterviewProps {
 
 const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterviewProps) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [showExit, setShowExit] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
-  const { tabSwitchCount, showWarning } = useAntiCheat({ enableTabDetection: true });
   const { settings, loading: settingsLoading } = useSystemSettings();
 
   const iv = settings.interviewer_voice;
+  const isPractice = useMemo(
+    () => searchParams.get("practice") === "true",
+    [searchParams],
+  );
 
   const live = useLiveInterview({
     type,
@@ -49,6 +54,17 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
     interviewerVoiceId: iv.voice_id,
   });
 
+  const { tabSwitchCount, showWarning } = useAntiCheat({
+    enableTabDetection: true,
+    interviewId: live.interviewId,
+    mode: isPractice ? "practice" : "assessment",
+  });
+
+  // Cheat camera for voice mode (video mode already has camera via useLiveInterview)
+  const cheatCamera = useCheatCamera({
+    enabled: type === "voice" && live.isCallActive,
+    interviewId: live.interviewId,
+  });
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
@@ -164,6 +180,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
 
   return (
     <div className="min-h-screen bg-background flex flex-col" dir="rtl">
+      <ProctorBadge proctors={live.activeProctors} messages={live.proctorMessages} />
       <InterviewHeader
         timerFormatted="مباشر"
         isWarning={false}
@@ -197,6 +214,23 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
                 className="w-full h-full object-cover mirror"
                 style={{ transform: "scaleX(-1)" }}
               />
+            </div>
+          )}
+          {/* Candidate PiP Camera - voice mode (cheat detection) */}
+          {type === "voice" && cheatCamera.stream && (
+            <div className="absolute bottom-3 left-3 w-28 h-20 rounded-xl overflow-hidden border-2 border-background shadow-lg bg-black">
+              <video
+                ref={cheatCamera.videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+                style={{ transform: "scaleX(-1)" }}
+              />
+              <div className="absolute top-1 right-1 flex items-center gap-1 bg-black/60 rounded-full px-1.5 py-0.5">
+                <Camera className="w-3 h-3 text-red-400" />
+                <span className="text-[9px] text-red-400 font-medium">REC</span>
+              </div>
             </div>
           )}
         </div>

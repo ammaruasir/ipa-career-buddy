@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,19 +25,27 @@ import {
   Plus,
   Trash2,
   Download,
+  Palette,
+  Activity,
+  Target,
+  Mail,
+  Heart,
+  Trophy,
+  Lightbulb,
+  Globe,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { AIAssistBullets } from "@/components/cv-builder/AIAssistButton";
-import { ProofreadInput, ProofreadTextarea } from "@/components/cv-builder/ProofreadInput";
-import { useProfilePrefill } from "@/hooks/useProfilePrefill";
 import {
-  exportToDocx,
-  exportToPdf,
-  localizeDigits,
-  type CVDocumentData,
-  type CVLang,
-  type CVSection,
-} from "@/lib/cv-export";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { AIAssistBullets, AIAssistSummary, AIAssistSkills } from "@/components/cv-builder/AIAssistButton";
+import JobAlignmentDialog from "@/components/cv-builder/JobAlignmentDialog";
+import CVDateInput from "@/components/cv-builder/CVDateInput";
+import SectionOrderPanel, { resolveSectionOrder, type SectionKey } from "@/components/cv-builder/SectionOrderPanel";
 
 interface PersonalInfo {
   full_name?: string;
@@ -78,6 +86,38 @@ interface CertItem {
   link?: string;
 }
 
+interface VolunteerItem {
+  organization?: string;
+  role?: string;
+  start?: string;
+  end?: string;
+  description?: string;
+}
+interface AwardItem {
+  title?: string;
+  issuer?: string;
+  date?: string;
+  description?: string;
+}
+interface ProjectItem {
+  name?: string;
+  role?: string;
+  link?: string;
+  description?: string;
+  tech?: string[];
+}
+interface LanguageStructured {
+  name?: string;
+  cefr?: "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "native";
+  label?: string;
+}
+interface CustomSections {
+  volunteer?: VolunteerItem[];
+  awards?: AwardItem[];
+  projects?: ProjectItem[];
+  languages_structured?: LanguageStructured[];
+}
+
 interface Draft {
   id?: string;
   personal_info: PersonalInfo;
@@ -86,6 +126,8 @@ interface Draft {
   education: EducationItem[];
   skills: Skills;
   certifications: CertItem[];
+  custom_sections: CustomSections;
+  section_order: string[] | null;
   template: "conservative" | "modern" | "executive";
   language: "ar" | "en" | "bilingual";
 }
@@ -97,8 +139,44 @@ const STEPS = [
   { key: "education", label: "التعليم", icon: GraduationCap },
   { key: "skills", label: "المهارات", icon: Wrench },
   { key: "certs", label: "الشهادات", icon: Award },
+  { key: "extras", label: "أقسام إضافية", icon: Lightbulb },
   { key: "preview", label: "المعاينة", icon: Eye },
 ] as const;
+
+async function exportPdf(draft: Draft, _userId: string) {
+  if (!draft.id) {
+    toast.error("احفظ المسوّدة أوّلاً");
+    return;
+  }
+  const lang: "ar" | "en" = draft.language === "en" ? "en" : "ar";
+  try {
+    toast.loading("جارٍ توليد PDF...", { id: "pdf-gen" });
+    const { data, error } = await supabase.functions.invoke("render-cv-pdf", {
+      body: { draft_id: draft.id, language: lang },
+    });
+    toast.dismiss("pdf-gen");
+    if (error) throw error;
+    if (data.mode === "pdf" && data.url) {
+      window.open(data.url, "_blank");
+      toast.success("تمّ توليد PDF");
+    } else if (data.mode === "html" && data.html) {
+      // Fallback: open in new window and trigger print
+      const w = window.open("", "_blank");
+      if (w) {
+        w.document.write(data.html);
+        w.document.close();
+        setTimeout(() => w.print(), 500);
+        toast.info("افتح القائمة → طباعة → حفظ كـ PDF");
+      }
+    } else {
+      toast.error("فشل توليد PDF");
+    }
+  } catch (e) {
+    toast.dismiss("pdf-gen");
+    console.error(e);
+    toast.error("فشل توليد PDF");
+  }
+}
 
 const EMPTY_DRAFT: Draft = {
   personal_info: {},
@@ -107,104 +185,63 @@ const EMPTY_DRAFT: Draft = {
   education: [],
   skills: { technical: [], soft: [], languages: [] },
   certifications: [],
+  custom_sections: {},
+  section_order: null,
   template: "modern",
   language: "ar",
 };
 
-// Effective export language for the draft. Bilingual → Arabic numerals & RTL.
-const effectiveLang = (d: Draft): CVLang => (d.language === "en" ? "en" : "ar");
-
-// Build the export-ready CV structure from the in-progress draft.
-const draftToCV = (d: Draft): CVDocumentData => {
-  const lang = effectiveLang(d);
-  const isAr = lang === "ar";
-  const pi = d.personal_info || {};
-  const fullName = (pi.full_name || (isAr ? "السيرة الذاتية" : "Curriculum Vitae")).trim();
-  const contact = [pi.email, pi.phone, pi.city].filter(Boolean).join("  •  ");
-
-  const sections: CVSection[] = [];
-
-  const summaryText = (isAr ? d.summary?.ar : d.summary?.en) || d.summary?.ar || d.summary?.en;
-  if (summaryText && summaryText.trim()) {
-    sections.push({
-      title: isAr ? "الملخّص المهني" : "Professional Summary",
-      paragraphs: [summaryText.trim()],
-    });
-  }
-
-  if (d.experience.length > 0) {
-    sections.push({
-      title: isAr ? "الخبرة العملية" : "Work Experience",
-      paragraphs: d.experience.map((e) => {
-        const head = [e.position, e.company].filter(Boolean).join(" — ");
-        const period = [e.start, e.end].filter(Boolean).join(" – ");
-        const headLine = period ? `${head} (${period})` : head;
-        const bullets = (e.bullets ?? []).filter(Boolean);
-        return [headLine, ...bullets].filter(Boolean).join("\n");
-      }),
-    });
-  }
-
-  if (d.education.length > 0) {
-    sections.push({
-      title: isAr ? "التعليم" : "Education",
-      paragraphs: d.education.map((e) => {
-        const degree = [e.degree, e.major].filter(Boolean).join(isAr ? " في " : " in ");
-        const inst = e.institution || "";
-        const period = [e.start, e.end].filter(Boolean).join(" – ");
-        const tail = [inst, period, e.gpa ? (isAr ? `المعدل ${e.gpa}` : `GPA ${e.gpa}`) : ""]
-          .filter(Boolean)
-          .join(" — ");
-        return [degree, tail].filter(Boolean).join(" — ");
-      }),
-    });
-  }
-
-  const tech = d.skills.technical ?? [];
-  const soft = d.skills.soft ?? [];
-  const langs = d.skills.languages ?? [];
-  if (tech.length || soft.length || langs.length) {
-    const lines: string[] = [];
-    if (tech.length) lines.push(`${isAr ? "تقنية" : "Technical"}: ${tech.join("، ")}`);
-    if (soft.length) lines.push(`${isAr ? "شخصية" : "Soft"}: ${soft.join("، ")}`);
-    if (langs.length) lines.push(`${isAr ? "اللغات" : "Languages"}: ${langs.join("، ")}`);
-    sections.push({ title: isAr ? "المهارات" : "Skills", paragraphs: lines });
-  }
-
-  if (d.certifications.length > 0) {
-    sections.push({
-      title: isAr ? "الشهادات" : "Certifications",
-      paragraphs: d.certifications.map((c) =>
-        [c.name, c.issuer, c.date].filter(Boolean).join(" — "),
-      ),
-    });
-  }
-
-  return { fullName, contact, sections };
-};
-
 const CVBuilder = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const draftIdParam = searchParams.get("draft");
   const { user, loading: authLoading } = useAuth();
-  const prefill = useProfilePrefill();
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load existing draft (or seed a fresh one from the user profile)
+  // Load existing draft (by ?draft=id or latest); prefill from profile if new
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/login");
       return;
     }
     if (!user) return;
-    if (!prefill.loaded) return; // wait for profile so seeding is correct
 
     const load = async () => {
+      // 1. If ?draft=id, load that specific draft
+      if (draftIdParam) {
+        const { data } = await supabase
+          .from("cv_drafts")
+          .select("*")
+          .eq("id", draftIdParam)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (data) {
+          const d = data as any;
+          setDraft({
+            id: d.id,
+            personal_info: d.personal_info ?? {},
+            summary: d.summary ?? {},
+            experience: d.experience ?? [],
+            education: d.education ?? [],
+            skills: d.skills ?? { technical: [], soft: [], languages: [] },
+            certifications: d.certifications ?? [],
+            custom_sections: d.custom_sections ?? {},
+            section_order: d.section_order ?? null,
+            template: d.template ?? "modern",
+            language: d.language ?? "ar",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 2. Otherwise, load latest draft
       const { data } = await supabase
-        .from("cv_drafts" as any)
+        .from("cv_drafts")
         .select("*")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
@@ -225,19 +262,27 @@ const CVBuilder = () => {
           language: d.language ?? "ar",
         });
       } else {
-        // Fresh draft → seed personal info + first education row + certifications from profile
-        setDraft({
-          ...EMPTY_DRAFT,
-          personal_info: { ...prefill.personal_info },
-          education: prefill.education.length > 0 ? [...prefill.education] : [],
-          certifications: prefill.certifications.length > 0 ? [...prefill.certifications] : [],
-        });
-        toast.success("تم تعبئة بعض الحقول من ملفك الشخصي — يمكنك تعديلها");
+        // 3. No drafts at all — prefill personal_info from profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, email, phone")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (profile) {
+          setDraft((d) => ({
+            ...d,
+            personal_info: {
+              full_name: (profile as any).full_name ?? "",
+              email: (profile as any).email ?? "",
+              phone: (profile as any).phone ?? "",
+            },
+          }));
+        }
       }
       setLoading(false);
     };
     load();
-  }, [user, authLoading, navigate, prefill.loaded]);
+  }, [user, authLoading, navigate, draftIdParam]);
 
   // Debounced auto-save
   const saveDraft = useCallback(
@@ -247,7 +292,7 @@ const CVBuilder = () => {
       try {
         if (payload.id) {
           await supabase
-            .from("cv_drafts" as any)
+            .from("cv_drafts")
             .update({
               personal_info: payload.personal_info,
               summary: payload.summary,
@@ -255,13 +300,15 @@ const CVBuilder = () => {
               education: payload.education,
               skills: payload.skills,
               certifications: payload.certifications,
+              custom_sections: payload.custom_sections,
+              section_order: payload.section_order,
               template: payload.template,
               language: payload.language,
             })
             .eq("id", payload.id);
         } else {
           const { data } = await supabase
-            .from("cv_drafts" as any)
+            .from("cv_drafts")
             .insert({
               user_id: user.id,
               personal_info: payload.personal_info,
@@ -270,6 +317,8 @@ const CVBuilder = () => {
               education: payload.education,
               skills: payload.skills,
               certifications: payload.certifications,
+              custom_sections: payload.custom_sections,
+              section_order: payload.section_order,
               template: payload.template,
               language: payload.language,
             })
@@ -299,6 +348,20 @@ const CVBuilder = () => {
     setDraft((d) => ({ ...d, [key]: value }));
   };
 
+  // Replace a bullet across all experiences (used by Job Alignment dialog)
+  const applyBulletRewrite = (rw: { original: string; rewritten: string }) => {
+    setDraft((d) => ({
+      ...d,
+      experience: d.experience.map((exp) => ({
+        ...exp,
+        bullets: (exp.bullets ?? []).map((b) =>
+          b.trim() === rw.original.trim() ? rw.rewritten : b,
+        ),
+      })),
+    }));
+    toast.success("تمّ تطبيق إعادة الكتابة");
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -318,7 +381,7 @@ const CVBuilder = () => {
             <FileText className="w-6 h-6 text-primary" />
             <h1 className="text-lg font-bold text-foreground">منشئ السيرة الذاتية</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {saving ? (
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -330,7 +393,23 @@ const CVBuilder = () => {
                 محفوظ
               </span>
             )}
-            <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
+
+            <JobAlignmentDialog
+              draftId={draft.id}
+              language={draft.language}
+              onAcceptRewrite={applyBulletRewrite}
+            />
+
+            {draft.id && (
+              <Button variant="outline" size="sm" asChild className="rounded-xl gap-1.5">
+                <Link to={`/cv/cover-letter/${draft.id}`}>
+                  <Mail className="w-3.5 h-3.5" />
+                  رسالة تقديم
+                </Link>
+              </Button>
+            )}
+
+            <Button variant="ghost" size="sm" onClick={() => navigate("/cv")}>
               العودة
               <ArrowRight className="w-4 h-4 mr-2" />
             </Button>
@@ -338,27 +417,71 @@ const CVBuilder = () => {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 space-y-6 max-w-4xl">
-        {/* Step progress */}
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        <div className="grid lg:grid-cols-[1fr_460px] gap-6">
+          <div className="space-y-6 min-w-0">
+        {/* Step progress + Template + Language picker */}
         <Card className="rounded-2xl">
           <CardContent className="p-5 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
                   <StepIcon className="w-5 h-5 text-primary" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">
                     خطوة {step + 1} / {STEPS.length}
                   </p>
-                  <h2 className="font-semibold text-foreground">{STEPS[step].label}</h2>
+                  <h2 className="font-semibold text-foreground truncate">{STEPS[step].label}</h2>
                 </div>
               </div>
-              <Badge variant="outline" className="font-normal">
-                {Math.round(progress)}%
-              </Badge>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="font-normal">
+                  {Math.round(progress)}%
+                </Badge>
+                {/* ATS Score badge */}
+                <ATSScoreBadge draft={draft} />
+              </div>
             </div>
+
             <Progress value={progress} className="h-2" />
+
+            {/* Template + Language selector row */}
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1.5 text-muted-foreground">
+                  <Palette className="w-3 h-3" />
+                  القالب
+                </Label>
+                <Select value={draft.template} onValueChange={(v) => update("template", v as Draft["template"])}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="modern">حديث</SelectItem>
+                    <SelectItem value="conservative">محافظ</SelectItem>
+                    <SelectItem value="executive">تنفيذي</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1.5 text-muted-foreground">
+                  <FileText className="w-3 h-3" />
+                  لغة الإخراج
+                </Label>
+                <Select value={draft.language} onValueChange={(v) => update("language", v as Draft["language"])}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ar">عربية</SelectItem>
+                    <SelectItem value="en">إنجليزية</SelectItem>
+                    <SelectItem value="bilingual">ثنائية</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -375,6 +498,14 @@ const CVBuilder = () => {
               <SummaryStep
                 value={draft.summary}
                 onChange={(v) => update("summary", v)}
+                fullProfile={{
+                  personal_info: draft.personal_info,
+                  experience: draft.experience,
+                  education: draft.education,
+                  skills: draft.skills,
+                }}
+                targetRole={(draft.personal_info as any)?.target_role}
+                language={draft.language}
               />
             )}
             {step === 2 && (
@@ -397,6 +528,7 @@ const CVBuilder = () => {
                 onChange={(v) => update("skills", v)}
                 experience={draft.experience}
                 education={draft.education}
+                targetRole={(draft.personal_info as any)?.target_role}
                 language={draft.language}
               />
             )}
@@ -406,7 +538,36 @@ const CVBuilder = () => {
                 onChange={(v) => update("certifications", v)}
               />
             )}
-            {step === 6 && <PreviewStep draft={draft} />}
+            {step === 6 && (
+              <>
+                <CustomSectionsStep
+                  value={draft.custom_sections}
+                  onChange={(v) => update("custom_sections", v)}
+                />
+                <div className="pt-6 border-t border-border mt-6">
+                  <SectionOrderPanel
+                    order={draft.section_order}
+                    onChange={(o) => update("section_order", o)}
+                    hasContent={{
+                      summary: !!(draft.summary?.ar || draft.summary?.en),
+                      experience: draft.experience.length > 0,
+                      education: draft.education.length > 0,
+                      skills:
+                        (draft.skills.technical ?? []).length > 0 ||
+                        (draft.skills.soft ?? []).length > 0 ||
+                        (draft.skills.languages ?? []).length > 0,
+                      certifications: draft.certifications.length > 0,
+                      volunteer: (draft.custom_sections?.volunteer ?? []).length > 0,
+                      projects: (draft.custom_sections?.projects ?? []).length > 0,
+                      awards: (draft.custom_sections?.awards ?? []).length > 0,
+                      languages_structured:
+                        (draft.custom_sections?.languages_structured ?? []).length > 0,
+                    }}
+                  />
+                </div>
+              </>
+            )}
+            {step === 7 && <PreviewStep draft={draft} />}
           </CardContent>
         </Card>
 
@@ -431,44 +592,31 @@ const CVBuilder = () => {
               <ArrowLeft className="w-4 h-4 mr-2" />
             </Button>
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={async () => {
-                  try {
-                    const data = draftToCV(draft);
-                    await exportToDocx(data, `cv-${Date.now()}.docx`, {
-                      language: effectiveLang(draft),
-                    });
-                    toast.success("تم تصدير ملف Word");
-                  } catch (e: any) {
-                    toast.error(e?.message || "فشل تصدير Word");
-                  }
-                }}
-              >
-                <Download className="w-4 h-4 ml-2" />
-                تصدير Word (.docx)
-              </Button>
-              <Button
-                className="rounded-xl"
-                onClick={() => {
-                  try {
-                    const data = draftToCV(draft);
-                    exportToPdf(data, `cv-${Date.now()}.pdf`, {
-                      language: effectiveLang(draft),
-                    });
-                    toast.success("افتح نافذة الطباعة واختر 'حفظ كـ PDF'");
-                  } catch (e: any) {
-                    toast.error(e?.message || "فشل تصدير PDF");
-                  }
-                }}
-              >
-                <Download className="w-4 h-4 ml-2" />
-                تصدير PDF
-              </Button>
-            </div>
+            <Button onClick={() => exportPdf(draft, user?.id ?? "")} className="rounded-xl">
+              <Download className="w-4 h-4 ml-2" />
+              تصدير PDF
+            </Button>
           )}
+        </div>
+          </div>
+
+          {/* Sticky live preview on large screens */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-20">
+              <div className="rounded-2xl border border-border bg-card shadow-lg overflow-hidden">
+                <div className="p-3 border-b bg-muted/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Eye className="w-4 h-4 text-primary" />
+                    معاينة حيّة
+                  </div>
+                  <Badge variant="outline" className="text-[10px]">{draft.template}</Badge>
+                </div>
+                <div className="max-h-[80vh] overflow-y-auto p-4">
+                  <PreviewStep draft={draft} />
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </div>
@@ -488,24 +636,22 @@ const PersonalStep = ({
 }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
     {[
-      { key: "full_name", label: "الاسم الكامل", placeholder: "محمد عبدالله السعيد", ctx: "name" as const },
-      { key: "email", label: "البريد الإلكتروني", placeholder: "name@example.com", type: "email", ctx: null },
-      { key: "phone", label: "رقم الجوّال", placeholder: "+966 5XXXXXXXX", type: "tel", ctx: null },
-      { key: "city", label: "المدينة", placeholder: "الرياض", ctx: "name" as const },
-      { key: "nationality", label: "الجنسية", placeholder: "سعودي", ctx: "name" as const },
-      { key: "linkedin", label: "LinkedIn", placeholder: "linkedin.com/in/username", ctx: null },
+      { key: "full_name", label: "الاسم الكامل", placeholder: "محمد عبدالله السعيد" },
+      { key: "email", label: "البريد الإلكتروني", placeholder: "name@example.com", type: "email" },
+      { key: "phone", label: "رقم الجوّال", placeholder: "+966 5XXXXXXXX", type: "tel" },
+      { key: "city", label: "المدينة", placeholder: "الرياض" },
+      { key: "nationality", label: "الجنسية", placeholder: "سعودي" },
+      { key: "linkedin", label: "LinkedIn", placeholder: "linkedin.com/in/username" },
     ].map((f) => (
       <div key={f.key} className="space-y-1.5">
         <Label htmlFor={f.key}>{f.label}</Label>
-        <ProofreadInput
+        <Input
           id={f.key}
           type={f.type ?? "text"}
           value={(value as any)[f.key] ?? ""}
-          onChange={(v) => onChange({ ...value, [f.key]: v })}
+          onChange={(e) => onChange({ ...value, [f.key]: e.target.value })}
           placeholder={f.placeholder}
           dir={f.type === "email" || f.type === "tel" ? "ltr" : "rtl"}
-          proofreadContext={f.ctx ?? "general"}
-          enableProofread={!!f.ctx}
         />
       </div>
     ))}
@@ -515,24 +661,29 @@ const PersonalStep = ({
 const SummaryStep = ({
   value,
   onChange,
+  fullProfile,
+  targetRole,
+  language,
 }: {
   value: { ar?: string; en?: string };
   onChange: (v: { ar?: string; en?: string }) => void;
+  fullProfile: any;
+  targetRole?: string;
+  language: "ar" | "en" | "bilingual";
 }) => (
   <div className="space-y-4">
     <div className="space-y-1.5">
       <Label htmlFor="summary-ar">الملخّص (بالعربية)</Label>
-      <ProofreadTextarea
+      <Textarea
         id="summary-ar"
         value={value.ar ?? ""}
-        onChange={(v) => onChange({ ...value, ar: v })}
+        onChange={(e) => onChange({ ...value, ar: e.target.value })}
         placeholder="3–5 أسطر تلخّص خبراتك ومجال تخصّصك وأهدافك المهنية..."
         rows={5}
         dir="rtl"
-        proofreadContext="summary"
       />
       <p className="text-xs text-muted-foreground">
-        نصيحة: ركّز على الإنجازات الكمّية وتجنّب المبالغات. التدقيق الإملائي يحدث تلقائياً.
+        نصيحة: ركّز على الإنجازات الكمّية وتجنّب المبالغات.
       </p>
     </div>
     <div className="space-y-1.5">
@@ -545,6 +696,15 @@ const SummaryStep = ({
         dir="ltr"
       />
     </div>
+
+    {/* AI: improve or generate from profile */}
+    <AIAssistSummary
+      currentSummary={value.ar || value.en || ""}
+      fullProfile={fullProfile}
+      targetRole={targetRole}
+      language={language}
+      onAccept={(text, lang) => onChange({ ...value, [lang]: text })}
+    />
   </div>
 );
 
@@ -581,38 +741,35 @@ const ExperienceStep = ({
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <ProofreadInput
+              <Input
                 placeholder="الجهة"
                 value={exp.company ?? ""}
-                onChange={(v) => updateItem(idx, { company: v })}
-                proofreadContext="name"
+                onChange={(e) => updateItem(idx, { company: e.target.value })}
               />
-              <ProofreadInput
+              <Input
                 placeholder="المسمّى الوظيفي"
                 value={exp.position ?? ""}
-                onChange={(v) => updateItem(idx, { position: v })}
-                proofreadContext="general"
+                onChange={(e) => updateItem(idx, { position: e.target.value })}
               />
-              <Input
+              <CVDateInput
                 placeholder="تاريخ البداية"
                 value={exp.start ?? ""}
-                onChange={(e) => updateItem(idx, { start: e.target.value })}
+                onChange={(v) => updateItem(idx, { start: v })}
               />
-              <Input
+              <CVDateInput
                 placeholder="تاريخ النهاية (أو 'حتى الآن')"
                 value={exp.end ?? ""}
-                onChange={(e) => updateItem(idx, { end: e.target.value })}
+                onChange={(v) => updateItem(idx, { end: v })}
               />
             </div>
-            <ProofreadTextarea
+            <Textarea
               placeholder="اكتب إنجازاتك (سطر لكل إنجاز) — أو وصفاً حرّاً ثم اضغط زرّ AI بالأسفل"
               value={(exp.bullets ?? []).join("\n")}
-              onChange={(v) =>
-                updateItem(idx, { bullets: v.split("\n").filter(Boolean) })
+              onChange={(e) =>
+                updateItem(idx, { bullets: e.target.value.split("\n").filter(Boolean) })
               }
               rows={4}
               dir="rtl"
-              proofreadContext="bullet"
             />
 
             {/* AI Assist: convert raw description to STAR bullets */}
@@ -657,38 +814,35 @@ const EducationStep = ({
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <ProofreadInput
+              <Input
                 placeholder="المؤسّسة التعليمية"
                 value={ed.institution ?? ""}
-                onChange={(v) => updateItem(idx, { institution: v })}
-                proofreadContext="name"
+                onChange={(e) => updateItem(idx, { institution: e.target.value })}
               />
-              <ProofreadInput
+              <Input
                 placeholder="الدرجة (بكالوريوس / ماجستير...)"
                 value={ed.degree ?? ""}
-                onChange={(v) => updateItem(idx, { degree: v })}
-                proofreadContext="general"
+                onChange={(e) => updateItem(idx, { degree: e.target.value })}
               />
-              <ProofreadInput
+              <Input
                 placeholder="التخصّص"
                 value={ed.major ?? ""}
-                onChange={(v) => updateItem(idx, { major: v })}
-                proofreadContext="general"
+                onChange={(e) => updateItem(idx, { major: e.target.value })}
               />
               <Input
                 placeholder="المعدّل (اختياري)"
                 value={ed.gpa ?? ""}
                 onChange={(e) => updateItem(idx, { gpa: e.target.value })}
               />
-              <Input
+              <CVDateInput
                 placeholder="تاريخ البداية"
                 value={ed.start ?? ""}
-                onChange={(e) => updateItem(idx, { start: e.target.value })}
+                onChange={(v) => updateItem(idx, { start: v })}
               />
-              <Input
+              <CVDateInput
                 placeholder="تاريخ التخرّج"
                 value={ed.end ?? ""}
-                onChange={(e) => updateItem(idx, { end: e.target.value })}
+                onChange={(v) => updateItem(idx, { end: v })}
               />
             </div>
           </CardContent>
@@ -707,51 +861,16 @@ const SkillsStep = ({
   onChange,
   experience,
   education,
+  targetRole,
   language,
 }: {
   value: Skills;
   onChange: (v: Skills) => void;
   experience: ExperienceItem[];
   education: EducationItem[];
+  targetRole?: string;
   language: "ar" | "en" | "bilingual";
 }) => {
-  const [suggesting, setSuggesting] = useState(false);
-
-  const suggest = async () => {
-    setSuggesting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("suggest-cv-skills", {
-        body: {
-          experience,
-          education,
-          target_role: experience[0]?.position ?? "",
-          language: language === "bilingual" ? "ar" : language,
-        },
-      });
-      if (error) throw error;
-      const bucket = data?.ar ?? data?.en;
-      if (!bucket) {
-        toast.error("لم تُرجَع اقتراحات");
-        return;
-      }
-      const merge = (current: string[] = [], suggested: { name: string }[] = []) => {
-        const set = new Set(current.map((s) => s.trim()).filter(Boolean));
-        suggested.forEach((s) => s?.name && set.add(s.name.trim()));
-        return Array.from(set);
-      };
-      onChange({
-        technical: merge(value.technical, bucket.technical),
-        soft: merge(value.soft, bucket.soft),
-        languages: merge(value.languages, bucket.languages),
-      });
-      toast.success("تم اقتراح المهارات");
-    } catch (e: any) {
-      toast.error(e?.message ?? "تعذّر الاقتراح");
-    } finally {
-      setSuggesting(false);
-    }
-  };
-
   const tagInput = (
     label: string,
     key: keyof Skills,
@@ -778,28 +897,29 @@ const SkillsStep = ({
     </div>
   );
 
+  const mergeSkills = (suggested: { technical?: string[]; soft?: string[]; languages?: string[] }) => {
+    const dedupe = (arr: string[]) => Array.from(new Set(arr));
+    onChange({
+      technical: dedupe([...(value.technical ?? []), ...(suggested.technical ?? [])]),
+      soft: dedupe([...(value.soft ?? []), ...(suggested.soft ?? [])]),
+      languages: dedupe([...(value.languages ?? []), ...(suggested.languages ?? [])]),
+    });
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={suggest}
-          disabled={suggesting || (experience.length === 0 && education.length === 0)}
-          className="rounded-xl"
-        >
-          {suggesting ? (
-            <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-          ) : (
-            <Wrench className="w-4 h-4 ml-2" />
-          )}
-          اقترح المهارات بالذكاء الاصطناعي
-        </Button>
-      </div>
       {tagInput("المهارات التقنية", "technical", "Python، إدارة قواعد البيانات، Excel متقدّم")}
       {tagInput("المهارات الشخصية", "soft", "العمل الجماعي، إدارة الوقت، التواصل")}
       {tagInput("اللغات", "languages", "العربية (الأم)، الإنجليزية (طلاقة)")}
+
+      {/* AI: suggest skills based on profile */}
+      <AIAssistSkills
+        experience={experience}
+        education={education}
+        targetRole={targetRole}
+        language={language}
+        onAccept={mergeSkills}
+      />
     </div>
   );
 };
@@ -861,110 +981,419 @@ const CertsStep = ({
   );
 };
 
-const PreviewStep = ({ draft }: { draft: Draft }) => {
-  const lang = effectiveLang(draft);
-  const isAr = lang === "ar";
-  const dir = isAr ? "rtl" : "ltr";
-  const L = (s: string | undefined) => (s ? localizeDigits(s, lang) : "");
+// =============================================================================
+// CustomSectionsStep — volunteer, awards, projects, structured languages
+// =============================================================================
+const CEFR_LEVELS = [
+  { value: "native", label: "الأم / Native" },
+  { value: "C2", label: "C2 — متمكّن" },
+  { value: "C1", label: "C1 — متقدّم" },
+  { value: "B2", label: "B2 — متوسّط فوق" },
+  { value: "B1", label: "B1 — متوسّط" },
+  { value: "A2", label: "A2 — أساسي فوق" },
+  { value: "A1", label: "A1 — أساسي" },
+];
+
+const CustomSectionsStep = ({
+  value,
+  onChange,
+}: {
+  value: CustomSections;
+  onChange: (v: CustomSections) => void;
+}) => {
   return (
-  <div className="space-y-4">
-    <div className={cn("p-6 rounded-xl bg-white text-black dark:bg-white dark:text-black border-4 border-double border-primary/30 space-y-4", isAr && "font-arabic")} dir={dir}>
-      <div className="text-center pb-3 border-b-2 border-primary/30">
-        <h1 className="text-2xl font-bold">{L(draft.personal_info.full_name) || (isAr ? "اسم المتقدّم" : "Applicant Name")}</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          {[draft.personal_info.email, draft.personal_info.phone, draft.personal_info.city]
-            .filter(Boolean)
-            .map((s) => L(s as string))
-            .join(" • ")}
-        </p>
+    <div className="space-y-6">
+      <div className="text-sm text-muted-foreground">
+        أقسام اختيارية تبرز جوانب لا تظهر في الخبرة الرسمية. كل قسم يظهر في الـ PDF فقط إذا أضفت محتوى.
       </div>
 
-      {(isAr ? draft.summary?.ar : draft.summary?.en) && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">{isAr ? "الملخّص" : "Summary"}</h2>
-          <p className="text-sm leading-relaxed">{L(isAr ? draft.summary.ar : draft.summary.en)}</p>
-        </section>
-      )}
-
-      {draft.experience.length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">{isAr ? "الخبرة العمليّة" : "Work Experience"}</h2>
-          {draft.experience.map((e, i) => (
-            <div key={i} className="mb-3">
-              <div className="flex justify-between">
-                <strong className="text-sm">{L(e.position)}</strong>
-                <span className="text-xs text-gray-600">
-                  {L(e.start)} – {L(e.end)}
-                </span>
-              </div>
-              <p className="text-sm text-gray-700">{L(e.company)}</p>
-              {e.bullets && (
-                <ul className="text-sm mt-1 space-y-0.5">
-                  {e.bullets.map((b, bi) => (
-                    <li key={bi} className="flex gap-2">
-                      <span>•</span>
-                      <span>{L(b)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+      <SubSectionCard<VolunteerItem>
+        icon={Heart}
+        title="العمل التطوّعي"
+        addLabel="إضافة تطوّع"
+        items={value.volunteer ?? []}
+        setItems={(items) => onChange({ ...value, volunteer: items })}
+        renderItem={(item, updateItem) => (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <Input placeholder="الجهة" value={item.organization ?? ""} onChange={(e) => updateItem({ organization: e.target.value })} />
+              <Input placeholder="دورك" value={item.role ?? ""} onChange={(e) => updateItem({ role: e.target.value })} />
+              <CVDateInput placeholder="من" value={item.start ?? ""} onChange={(v) => updateItem({ start: v })} />
+              <CVDateInput placeholder="إلى (أو 'حتى الآن')" value={item.end ?? ""} onChange={(v) => updateItem({ end: v })} />
             </div>
-          ))}
-        </section>
-      )}
+            <Textarea placeholder="ماذا فعلت؟" value={item.description ?? ""} onChange={(e) => updateItem({ description: e.target.value })} rows={2} dir="rtl" />
+          </>
+        )}
+      />
 
-      {draft.education.length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">{isAr ? "التعليم" : "Education"}</h2>
-          {draft.education.map((e, i) => (
-            <div key={i} className="mb-2">
-              <div className="flex justify-between">
-                <strong className="text-sm">{L(e.degree)} {isAr ? "في" : "in"} {L(e.major)}</strong>
-                <span className="text-xs text-gray-600">
-                  {L(e.start)} – {L(e.end)}
-                </span>
-              </div>
-              <p className="text-sm text-gray-700">{L(e.institution)}</p>
+      <SubSectionCard<AwardItem>
+        icon={Trophy}
+        title="الجوائز والتقديرات"
+        addLabel="إضافة جائزة"
+        items={value.awards ?? []}
+        setItems={(items) => onChange({ ...value, awards: items })}
+        renderItem={(item, updateItem) => (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <Input placeholder="اسم الجائزة" value={item.title ?? ""} onChange={(e) => updateItem({ title: e.target.value })} />
+              <Input placeholder="الجهة المانحة" value={item.issuer ?? ""} onChange={(e) => updateItem({ issuer: e.target.value })} />
+              <Input placeholder="التاريخ" value={item.date ?? ""} onChange={(e) => updateItem({ date: e.target.value })} className="md:col-span-2" />
             </div>
+            <Textarea placeholder="ملاحظات (اختياري)" value={item.description ?? ""} onChange={(e) => updateItem({ description: e.target.value })} rows={2} dir="rtl" />
+          </>
+        )}
+      />
+
+      <SubSectionCard<ProjectItem>
+        icon={Lightbulb}
+        title="المشاريع"
+        addLabel="إضافة مشروع"
+        items={value.projects ?? []}
+        setItems={(items) => onChange({ ...value, projects: items })}
+        renderItem={(item, updateItem) => (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <Input placeholder="اسم المشروع" value={item.name ?? ""} onChange={(e) => updateItem({ name: e.target.value })} />
+              <Input placeholder="دورك" value={item.role ?? ""} onChange={(e) => updateItem({ role: e.target.value })} />
+              <Input placeholder="رابط (اختياري)" value={item.link ?? ""} onChange={(e) => updateItem({ link: e.target.value })} dir="ltr" className="md:col-span-2" />
+            </div>
+            <Textarea placeholder="وصف موجز" value={item.description ?? ""} onChange={(e) => updateItem({ description: e.target.value })} rows={2} dir="rtl" />
+            <Input
+              placeholder="التقنيات المستخدمة (مفصولة بفاصلة)"
+              value={(item.tech ?? []).join(", ")}
+              onChange={(e) =>
+                updateItem({ tech: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })
+              }
+            />
+          </>
+        )}
+      />
+
+      <SubSectionCard<LanguageStructured>
+        icon={Globe}
+        title="اللغات (مع مستوى CEFR)"
+        addLabel="إضافة لغة"
+        items={value.languages_structured ?? []}
+        setItems={(items) => onChange({ ...value, languages_structured: items })}
+        renderItem={(item, updateItem) => (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Input placeholder="اللغة (مثال: الإنجليزية)" value={item.name ?? ""} onChange={(e) => updateItem({ name: e.target.value })} />
+            <select
+              value={item.cefr ?? "B2"}
+              onChange={(e) => updateItem({ cefr: e.target.value as LanguageStructured["cefr"] })}
+              className="px-3 py-2 rounded-md border border-input bg-background text-sm"
+            >
+              {CEFR_LEVELS.map((l) => (
+                <option key={l.value} value={l.value}>{l.label}</option>
+              ))}
+            </select>
+            <Input placeholder="ملاحظة (اختياري)" value={item.label ?? ""} onChange={(e) => updateItem({ label: e.target.value })} />
+          </div>
+        )}
+      />
+    </div>
+  );
+};
+
+// Generic sub-section wrapper — items are controlled by parent via setItems
+const SubSectionCard = <T,>({
+  icon: Icon,
+  title,
+  addLabel,
+  items,
+  setItems,
+  renderItem,
+}: {
+  icon: typeof Heart;
+  title: string;
+  addLabel: string;
+  items: T[];
+  setItems: (items: T[]) => void;
+  renderItem: (item: T, updateItem: (patch: Partial<T>) => void) => React.ReactNode;
+}) => {
+  const updateAt = (i: number, patch: Partial<T>) =>
+    setItems(items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+  const removeAt = (i: number) => setItems(items.filter((_, idx) => idx !== i));
+  const add = () => setItems([...items, {} as T]);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon className="w-4 h-4 text-primary" />
+          <h3 className="font-semibold text-foreground text-sm">{title}</h3>
+          <Badge variant="outline" className="text-[10px] font-normal">
+            {items.length}
+          </Badge>
+        </div>
+        <Button size="sm" variant="ghost" onClick={add} className="text-xs">
+          <Plus className="w-3.5 h-3.5 ml-1" />
+          {addLabel}
+        </Button>
+      </div>
+      {items.length > 0 && (
+        <div className="space-y-3">
+          {items.map((item, i) => (
+            <Card key={i} className="rounded-xl border-border">
+              <CardContent className="p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="text-[10px]">#{i + 1}</Badge>
+                  <Button size="icon" variant="ghost" onClick={() => removeAt(i)}>
+                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {renderItem(item, (patch) => updateAt(i, patch))}
+                </div>
+              </CardContent>
+            </Card>
           ))}
-        </section>
-      )}
-
-      {(draft.skills.technical?.length || draft.skills.soft?.length || draft.skills.languages?.length) ? (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">{isAr ? "المهارات" : "Skills"}</h2>
-          {draft.skills.technical && draft.skills.technical.length > 0 && (
-            <p className="text-sm mb-1"><strong>{isAr ? "تقنية:" : "Technical:"}</strong> {L(draft.skills.technical.join("، "))}</p>
-          )}
-          {draft.skills.soft && draft.skills.soft.length > 0 && (
-            <p className="text-sm mb-1"><strong>{isAr ? "شخصية:" : "Soft:"}</strong> {L(draft.skills.soft.join("، "))}</p>
-          )}
-          {draft.skills.languages && draft.skills.languages.length > 0 && (
-            <p className="text-sm"><strong>{isAr ? "اللغات:" : "Languages:"}</strong> {L(draft.skills.languages.join("، "))}</p>
-          )}
-        </section>
-      ) : null}
-
-      {draft.certifications.length > 0 && (
-        <section>
-          <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">{isAr ? "الشهادات" : "Certifications"}</h2>
-          <ul className="text-sm space-y-1">
-            {draft.certifications.map((c, i) => (
-              <li key={i}>
-                <strong>{L(c.name)}</strong> — {L(c.issuer)} ({L(c.date)})
-              </li>
-            ))}
-          </ul>
-        </section>
+        </div>
       )}
     </div>
+  );
+};
 
-    <p className={cn("text-xs text-muted-foreground text-center")}>
-      {isAr
-        ? "هذه معاينة على الشاشة. استخدم زر التصدير لتنزيل PDF أو Word."
-        : "On-screen preview. Use the export buttons to download PDF or Word."}
-    </p>
-  </div>
+// =============================================================================
+// ATSScoreBadge — lightweight client-side score (0-100)
+// Components: completeness + STAR density (avg bullet length) + ATS-friendliness
+// =============================================================================
+const ATSScoreBadge = ({ draft }: { draft: Draft }) => {
+  const score = computeAtsScore(draft);
+  const color =
+    score >= 80
+      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+      : score >= 60
+      ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+      : "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30";
+  return (
+    <Badge
+      variant="outline"
+      className={cn("font-normal flex items-center gap-1", color)}
+      title="درجة جودة السيرة المقدّرة (مبنية على الاكتمال + الأرقام + ATS-friendliness)"
+    >
+      <Activity className="w-3 h-3" />
+      ATS: {score}/100
+    </Badge>
+  );
+};
+
+function computeAtsScore(d: Draft): number {
+  let s = 0;
+  // Completeness — 40 pts
+  if (d.personal_info?.full_name) s += 6;
+  if (d.personal_info?.email) s += 6;
+  if (d.personal_info?.phone) s += 6;
+  if (d.summary?.ar || d.summary?.en) s += 8;
+  if ((d.experience ?? []).length > 0) s += 8;
+  if ((d.education ?? []).length > 0) s += 6;
+
+  // STAR density: bullets that contain numbers → +1 each up to 20
+  const allBullets = (d.experience ?? []).flatMap((e: any) => e.bullets ?? []);
+  const quantifiedCount = allBullets.filter((b: string) => /\d/.test(b)).length;
+  s += Math.min(20, quantifiedCount * 2);
+
+  // Skills coverage — 20 pts
+  const techCount = (d.skills?.technical ?? []).length;
+  s += Math.min(10, techCount);
+  if ((d.skills?.languages ?? []).length > 0) s += 5;
+  if ((d.skills?.soft ?? []).length > 0) s += 5;
+
+  // Penalty for missing critical
+  if (allBullets.length === 0) s -= 5;
+  if (allBullets.some((b: string) => b.length > 250)) s -= 5; // bullets too long
+
+  return Math.max(0, Math.min(100, Math.round(s)));
+}
+
+// Section renderers indexed by SectionKey. Each returns the JSX for that
+// section, or null if the section has no content.
+const PREVIEW_SECTION_RENDERERS: Record<SectionKey, (draft: Draft) => React.ReactNode> = {
+  summary: (draft) =>
+    draft.summary?.ar || draft.summary?.en ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الملخّص</h2>
+        <p className="text-sm leading-relaxed">{draft.summary?.ar || draft.summary?.en}</p>
+      </section>
+    ) : null,
+
+  experience: (draft) =>
+    draft.experience.length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الخبرة العمليّة</h2>
+        {draft.experience.map((e, i) => (
+          <div key={i} className="mb-3">
+            <div className="flex justify-between">
+              <strong className="text-sm">{e.position}</strong>
+              <span className="text-xs text-gray-600">{e.start} – {e.end}</span>
+            </div>
+            <p className="text-sm text-gray-700">{e.company}</p>
+            {e.bullets && (
+              <ul className="text-sm mt-1 space-y-0.5">
+                {e.bullets.map((b, bi) => (
+                  <li key={bi} className="flex gap-2">
+                    <span>•</span>
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </section>
+    ) : null,
+
+  education: (draft) =>
+    draft.education.length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">التعليم</h2>
+        {draft.education.map((e, i) => (
+          <div key={i} className="mb-2">
+            <div className="flex justify-between">
+              <strong className="text-sm">{e.degree} في {e.major}</strong>
+              <span className="text-xs text-gray-600">{e.start} – {e.end}</span>
+            </div>
+            <p className="text-sm text-gray-700">{e.institution}</p>
+          </div>
+        ))}
+      </section>
+    ) : null,
+
+  skills: (draft) =>
+    draft.skills.technical?.length || draft.skills.soft?.length || draft.skills.languages?.length ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">المهارات</h2>
+        {draft.skills.technical && draft.skills.technical.length > 0 && (
+          <p className="text-sm mb-1"><strong>تقنية:</strong> {draft.skills.technical.join("، ")}</p>
+        )}
+        {draft.skills.soft && draft.skills.soft.length > 0 && (
+          <p className="text-sm mb-1"><strong>شخصية:</strong> {draft.skills.soft.join("، ")}</p>
+        )}
+        {draft.skills.languages && draft.skills.languages.length > 0 && (
+          <p className="text-sm"><strong>اللغات:</strong> {draft.skills.languages.join("، ")}</p>
+        )}
+      </section>
+    ) : null,
+
+  certifications: (draft) =>
+    draft.certifications.length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الشهادات</h2>
+        <ul className="text-sm space-y-1">
+          {draft.certifications.map((c, i) => (
+            <li key={i}>
+              <strong>{c.name}</strong> — {c.issuer} ({c.date})
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null,
+
+  volunteer: (draft) =>
+    (draft.custom_sections?.volunteer ?? []).length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">العمل التطوّعي</h2>
+        {(draft.custom_sections.volunteer ?? []).map((v, i) => (
+          <div key={i} className="mb-2">
+            <div className="flex justify-between">
+              <strong className="text-sm">{v.role}</strong>
+              <span className="text-xs text-gray-600">{v.start} – {v.end}</span>
+            </div>
+            <p className="text-sm text-gray-700">{v.organization}</p>
+            {v.description && <p className="text-sm mt-0.5">{v.description}</p>}
+          </div>
+        ))}
+      </section>
+    ) : null,
+
+  projects: (draft) =>
+    (draft.custom_sections?.projects ?? []).length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">المشاريع</h2>
+        {(draft.custom_sections.projects ?? []).map((p, i) => (
+          <div key={i} className="mb-2">
+            <div className="flex justify-between gap-2">
+              <strong className="text-sm">
+                {p.name}
+                {p.role && <span className="font-normal text-gray-600"> — {p.role}</span>}
+              </strong>
+              {p.link && (
+                <a href={p.link} className="text-xs text-blue-600 truncate max-w-[40%]" dir="ltr">
+                  {p.link.replace(/^https?:\/\//, "")}
+                </a>
+              )}
+            </div>
+            {p.description && <p className="text-sm mt-0.5">{p.description}</p>}
+            {p.tech && p.tech.length > 0 && (
+              <p className="text-xs text-gray-600 mt-0.5">
+                <strong>التقنيات:</strong> {p.tech.join("، ")}
+              </p>
+            )}
+          </div>
+        ))}
+      </section>
+    ) : null,
+
+  awards: (draft) =>
+    (draft.custom_sections?.awards ?? []).length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">الجوائز والتقديرات</h2>
+        <ul className="text-sm space-y-1">
+          {(draft.custom_sections.awards ?? []).map((a, i) => (
+            <li key={i}>
+              <strong>{a.title}</strong>
+              {a.issuer && <> — {a.issuer}</>}
+              {a.date && <span className="text-gray-600"> ({a.date})</span>}
+              {a.description && <div className="text-xs text-gray-600 mt-0.5">{a.description}</div>}
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null,
+
+  languages_structured: (draft) =>
+    (draft.custom_sections?.languages_structured ?? []).length > 0 ? (
+      <section>
+        <h2 className="text-lg font-bold border-b border-primary/30 pb-1 mb-2">اللغات</h2>
+        <ul className="text-sm space-y-0.5">
+          {(draft.custom_sections.languages_structured ?? []).map((l, i) => (
+            <li key={i}>
+              <strong>{l.name}</strong>
+              {l.cefr && <span className="text-gray-600"> — {l.cefr === "native" ? "الأم" : l.cefr}</span>}
+              {l.label && <span className="text-gray-500"> · {l.label}</span>}
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null,
+};
+
+const PreviewStep = ({ draft }: { draft: Draft }) => {
+  const orderedSections = resolveSectionOrder(draft.section_order);
+  return (
+    <div className="space-y-4">
+      <div
+        className="p-6 rounded-xl bg-white text-black dark:bg-white dark:text-black border-4 border-double border-primary/30 space-y-4 font-arabic"
+        dir="rtl"
+      >
+        <div className="text-center pb-3 border-b-2 border-primary/30">
+          <h1 className="text-2xl font-bold">{draft.personal_info.full_name || "اسم المتقدّم"}</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            {[draft.personal_info.email, draft.personal_info.phone, draft.personal_info.city]
+              .filter(Boolean)
+              .join(" • ")}
+          </p>
+        </div>
+
+        {orderedSections.map((key) => (
+          <div key={key}>{PREVIEW_SECTION_RENDERERS[key]?.(draft) ?? null}</div>
+        ))}
+      </div>
+
+      <p className={cn("text-xs text-muted-foreground text-center")}>
+        هذه معاينة على الشاشة. اسحب الأقسام في الخطوة السابقة لتغيير ترتيبها.
+      </p>
+    </div>
   );
 };
 

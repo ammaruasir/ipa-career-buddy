@@ -73,17 +73,17 @@ const CohortDetail = () => {
     const load = async () => {
       const [cohortRes, enrollRes, assignRes] = await Promise.all([
         supabase
-          .from("cohorts" as any)
+          .from("cohorts")
           .select("*")
           .eq("id", id)
           .single(),
         supabase
-          .from("enrollments" as any)
+          .from("enrollments")
           .select("id, student_id, status, enrolled_at")
           .eq("cohort_id", id)
           .eq("status", "active"),
         supabase
-          .from("assignments" as any)
+          .from("assignments")
           .select("*")
           .eq("cohort_id", id)
           .order("due_at", { ascending: true }),

@@ -19,7 +19,12 @@ export interface SystemSettings {
   brand_color: string;
   evaluation_thresholds: { highly_recommended: number; recommended: number };
   filler_words: string[];
-  interview_engine: "built_in" | "vapi";
+  /**
+   * Historical engine toggle. The only engine implemented is the built-in
+   * one (chat + elevenlabs-tts). The DB column is retained for backward
+   * compatibility but no code path branches on it anymore.
+   */
+  interview_engine: "built_in";
   interviewer_voice: InterviewerVoice;
 }
 
@@ -60,7 +65,7 @@ export const useSystemSettings = () => {
         brand_color: data.brand_color,
         evaluation_thresholds: data.evaluation_thresholds as any,
         filler_words: data.filler_words as any,
-        interview_engine: (data as any).interview_engine || "built_in",
+        interview_engine: "built_in",
         interviewer_voice: (data as any).interviewer_voice || DEFAULT_SETTINGS.interviewer_voice,
       });
     }

@@ -39,13 +39,23 @@ const TextInterview = () => {
   const timer = useInterviewTimer({
     durationSeconds: session.timerDuration || 300,
     onExpire: () => {
-      if (input.trim()) session.sendAnswer(input);
+      // If the candidate has anything typed, submit it.
+      // Otherwise submit a placeholder so the interview advances rather than
+      // leaving them stuck on 00:00 with an unresponsive UI.
+      const answer = input.trim()
+        ? input
+        : "(لم يقدم المرشح إجابة خلال الوقت المحدد)";
+      session.sendAnswer(answer);
+      setInput("");
     },
   });
 
+  const isPracticeMode = new URLSearchParams(window.location.search).get("practice") === "true";
   const { tabSwitchCount, showWarning, handlePaste } = useAntiCheat({
     enableTabDetection: true,
     enablePasteDetection: true,
+    interviewId: session.interviewId,
+    mode: isPracticeMode ? "practice" : "assessment",
   });
 
   const cheatCamera = useCheatCamera({
@@ -145,11 +155,10 @@ const TextInterview = () => {
     }
   };
 
-  const isPractice = new URLSearchParams(window.location.search).get("practice") === "true";
   const preSelectedJob = new URLSearchParams(window.location.search).get("job") || undefined;
 
   if (!session.selectedJob) {
-    return <JobSelector title="المقابلة النصية" onSelect={(job, count) => { setCustomQuestionCount(count); session.startInterview(job); }} onBack={() => navigate("/dashboard")} isPractice={isPractice} preSelectedJob={preSelectedJob} />;
+    return <JobSelector title="المقابلة النصية" onSelect={(job, count) => { setCustomQuestionCount(count); session.startInterview(job); }} onBack={() => navigate("/dashboard")} isPractice={isPracticeMode} preSelectedJob={preSelectedJob} />;
   }
 
   return (

@@ -167,6 +167,7 @@ export type Database = {
         Row: {
           certifications: Json | null
           created_at: string | null
+          custom_sections: Json | null
           education: Json | null
           experience: Json | null
           export_count: number | null
@@ -175,6 +176,7 @@ export type Database = {
           last_exported_at: string | null
           personal_info: Json | null
           primary_color: string | null
+          section_order: string[] | null
           skills: Json | null
           summary: Json | null
           template: string | null
@@ -184,6 +186,7 @@ export type Database = {
         Insert: {
           certifications?: Json | null
           created_at?: string | null
+          custom_sections?: Json | null
           education?: Json | null
           experience?: Json | null
           export_count?: number | null
@@ -192,6 +195,7 @@ export type Database = {
           last_exported_at?: string | null
           personal_info?: Json | null
           primary_color?: string | null
+          section_order?: string[] | null
           skills?: Json | null
           summary?: Json | null
           template?: string | null
@@ -201,6 +205,7 @@ export type Database = {
         Update: {
           certifications?: Json | null
           created_at?: string | null
+          custom_sections?: Json | null
           education?: Json | null
           experience?: Json | null
           export_count?: number | null
@@ -209,6 +214,7 @@ export type Database = {
           last_exported_at?: string | null
           personal_info?: Json | null
           primary_color?: string | null
+          section_order?: string[] | null
           skills?: Json | null
           summary?: Json | null
           template?: string | null

@@ -4,6 +4,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import fixWebmDuration from "fix-webm-duration";
+import { useProctorChannel, type ChunkReadyEvent } from "@/hooks/useProctorChannel";
+
+const CHUNK_DURATION_MS = 30_000;
+const CHUNK_MIME_TYPE = "video/webm;codecs=vp8,opus";
+const AUDIO_CHUNK_MIME_TYPE = "audio/webm;codecs=opus";
+
+interface ChunkMeta {
+  index: number;
+  path: string;
+  duration_ms: number;
+  size_bytes: number;
+}
 
 interface TranscriptEntry {
   role: "assistant" | "user";
@@ -67,21 +79,29 @@ export const useLiveInterview = ({
   const activeRef = useRef(false);
   const stoppedManuallyRef = useRef(false);
   const isEndingRef = useRef(false);
-  const lastQuestionRef = useRef(false);
   const endInterviewRef = useRef<(() => Promise<void>) | null>(null);
   
-  // Session recording refs
-  const sessionRecorderRef = useRef<MediaRecorder | null>(null);
-  const sessionChunksRef = useRef<Blob[]>([]);
-  const partialUploadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastUploadedChunkIndexRef = useRef(0);
-  const partialUploadFnRef = useRef<(() => Promise<void>) | null>(null);
+  // Chunked session recording refs.
+  // The session is recorded as a sequence of ~30s WebM files. Each chunk is
+  // self-contained (has its own Cues + Duration via fix-webm-duration), is
+  // uploaded as {user_id}/{interview_id}/chunk_NNN.webm, and broadcast on
+  // the proctor channel so the admin live-viewer can pick it up.
+  const currentChunkRecorderRef = useRef<MediaRecorder | null>(null);
+  const currentChunkDataRef = useRef<Blob[]>([]);
+  const currentChunkStartRef = useRef<number>(0);
+  const chunkRotationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chunkIndexRef = useRef(0);
+  const chunksMetaRef = useRef<ChunkMeta[]>([]);
+  const combinedStreamRef = useRef<MediaStream | null>(null);
+  const recordingActiveRef = useRef(false);
+  const chunkRotationInFlightRef = useRef<Promise<void> | null>(null);
+  const forceEndedRef = useRef<{ reason: string; by_name: string } | null>(null);
 
   // Audio mixing refs — to merge candidate mic + TTS into one recording stream
   const mixingCtxRef = useRef<AudioContext | null>(null);
   const mixedDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
 
-  // Track recording start time for WebM duration fix
+  // Track session start time (used to derive end-of-stream wall clock).
   const sessionRecordingStartRef = useRef<number>(0);
 
   const userRef = useRef(user);
@@ -96,6 +116,38 @@ export const useLiveInterview = ({
   const coreQuestionCountRef = useRef(0);
   useEffect(() => { currentPhaseRef.current = currentPhase; }, [currentPhase]);
   useEffect(() => { coreQuestionCountRef.current = coreQuestionCount; }, [coreQuestionCount]);
+
+  // Live proctor state visible to the candidate.
+  const [activeProctors, setActiveProctors] = useState<{ role: string; name?: string }[]>([]);
+  const [proctorMessages, setProctorMessages] = useState<{ text: string; from: string; at: string }[]>([]);
+
+  const { broadcastChunkReady } = useProctorChannel({
+    interviewId,
+    userId: user?.id ?? null,
+    enabled: !!interviewId && !!user?.id,
+    role: "trainee",
+    onPresenceChange: (proctors) => setActiveProctors(proctors),
+    onAdminMessage: (event) => {
+      setProctorMessages((prev) => [...prev, { text: event.text, from: event.from_name, at: event.at }]);
+      toast.info(`${event.from_name}: ${event.text}`, { duration: 8000 });
+    },
+    onForceEnd: (event) => {
+      // Idempotent: ignore repeat force-end broadcasts while the first drain
+      // is still in flight (e.g. admin double-clicks "End").
+      if (isEndingRef.current || forceEndedRef.current) return;
+      forceEndedRef.current = { reason: event.reason, by_name: event.by_name };
+      toast.warning(`تم إنهاء المقابلة من قبل ${event.by_name}: ${event.reason}`);
+      // Fire-and-forget intentionally: endInterview awaits chunk drain + final
+      // broadcast internally before navigating, so the proctor view receives
+      // the last chunk-ready event over the still-open realtime channel.
+      void endInterviewRef.current?.();
+    },
+  });
+
+  // Keep the broadcast function reachable from rotateChunk (which runs in a closure that predates this hook call).
+  useEffect(() => {
+    broadcastChunkReadyRef.current = broadcastChunkReady;
+  }, [broadcastChunkReady]);
 
   // Speak text using ElevenLabs TTS and resolve when done
   // Fallback: use browser SpeechSynthesis
@@ -128,6 +180,9 @@ export const useLiveInterview = ({
     return new Promise(async (resolve) => {
       setIsSpeaking(true);
       try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token
+          ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
           {
@@ -135,7 +190,7 @@ export const useLiveInterview = ({
             headers: {
               "Content-Type": "application/json",
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              Authorization: `Bearer ${accessToken}`,
             },
             body: JSON.stringify({ text: cleanedText, voiceId: interviewerVoiceIdRef.current }),
           }
@@ -211,9 +266,11 @@ export const useLiveInterview = ({
   // Start recording microphone with silence detection
   const startListening = useCallback(async () => {
     if (!activeRef.current || stoppedManuallyRef.current) return;
-    
+
     try {
-      // For video interviews, reuse existing video stream's audio track
+      // For video interviews, reuse existing video stream's audio track. For
+      // voice interviews, reuse the cached mic stream across turns — calling
+      // getUserMedia every turn re-prompts the OS indicator and wastes 50-200ms.
       let stream: MediaStream;
       if (type === "video" && videoStreamRef.current) {
         const audioTrack = videoStreamRef.current.getAudioTracks()[0];
@@ -223,7 +280,12 @@ export const useLiveInterview = ({
           stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
       } else {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const cached = streamRef.current;
+        const stillLive =
+          cached && cached.getAudioTracks().some((t) => t.readyState === "live");
+        stream = stillLive
+          ? cached!
+          : await navigator.mediaDevices.getUserMedia({ audio: true });
       }
       streamRef.current = stream;
 
@@ -242,10 +304,9 @@ export const useLiveInterview = ({
       };
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        // Don't stop video tracks, only stop audio-only streams
-        if (type !== "video") {
-          stream.getTracks().forEach(t => t.stop());
-        }
+        // Keep the mic stream alive across turns so the next startListening
+        // doesn't re-acquire. The stream is released in endInterview /
+        // unmount cleanup.
         ctx.close().catch(() => {});
         setIsListening(false);
         cancelAnimationFrame(rafRef.current);
@@ -419,6 +480,13 @@ export const useLiveInterview = ({
     
     setIsProcessing(true);
     try {
+      // Hard-cap CORE: once we've overshot the configured count, hint the AI
+      // to wrap up. Prevents infinite [CORE] loops if the model never emits
+      // [CLOSING] on its own.
+      const overrunCore =
+        currentPhaseRef.current === "core" &&
+        coreQuestionCountRef.current >= totalQuestions;
+
       const body: any = {
         job_position: jobPosition,
         interview_type: type,
@@ -428,15 +496,20 @@ export const useLiveInterview = ({
         total_questions: totalQuestions,
         interviewer_name: interviewerName,
         interviewer_gender: interviewerGender,
-        current_phase: currentPhaseRef.current,
+        // Force closing if core has overrun; otherwise pass the tracked phase.
+        current_phase: overrunCore ? "closing" : currentPhaseRef.current,
         core_question_count: coreQuestionCountRef.current,
+        force_closing: overrunCore || undefined,
       };
 
+      // Always send the trailing message slice so the AI sees recent verbatim
+      // history, not just the truncated summary. The chat function will merge
+      // it with the system prompt + phase context.
+      const recentTail = conversationRef.current.slice(-12);
+      body.messages = recentTail;
       if (lastAnswer && contextSummaryRef.current) {
         body.context_summary = contextSummaryRef.current;
         body.last_answer = lastAnswer;
-      } else {
-        body.messages = conversationRef.current;
       }
 
       const { data, error } = await supabase.functions.invoke("chat", { body });
@@ -446,13 +519,12 @@ export const useLiveInterview = ({
       let aiText = data?.choices?.[0]?.message?.content || data?.content || "";
       if (!aiText) throw new Error("Empty AI response");
 
-      // Parse phase tag from response (case-insensitive, flexible format)
+      // Parse phase tag from response (case-insensitive, flexible format).
+      // Only strip the LEADING tag — the global strip on plain words would
+      // erase legitimate Arabic-mixed-English content (e.g. "CORE banking").
       const phaseMatch = aiText.match(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i);
       const phaseTag = phaseMatch ? phaseMatch[1].toUpperCase() : null;
-      
-      // Remove phase tag and any remaining phase keywords from display text
-      aiText = aiText.replace(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i, "");
-      aiText = aiText.replace(/\b(INTRO|CORE|FOLLOW_UP|CLOSING|END)\b\s*:?\s*/gi, "").trim();
+      aiText = aiText.replace(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i, "").trim();
 
       // Handle [END] — interview complete
       if (phaseTag === "END") {
@@ -469,18 +541,25 @@ export const useLiveInterview = ({
       // Update phase tracking
       if (phaseTag === "INTRO") {
         setCurrentPhase("intro");
+        currentPhaseRef.current = "intro";
       } else if (phaseTag === "CORE") {
         setCurrentPhase("core");
+        currentPhaseRef.current = "core";
         const newCoreCount = coreQuestionCountRef.current + 1;
         setCoreQuestionCount(newCoreCount);
         coreQuestionCountRef.current = newCoreCount;
-        
-        // If all core questions done, next response should be closing
-        if (newCoreCount >= totalQuestions) {
-          lastQuestionRef.current = true;
+
+        // Hard ceiling: if we've already passed totalQuestions + 1 cores,
+        // promote the local phase to "closing" so the next user answer
+        // triggers a [CLOSING] prompt. Without this the interview can loop
+        // forever if the AI never switches phase.
+        if (newCoreCount > totalQuestions) {
+          currentPhaseRef.current = "closing";
+          setCurrentPhase("closing");
         }
       } else if (phaseTag === "CLOSING") {
         setCurrentPhase("closing");
+        currentPhaseRef.current = "closing";
       }
 
       // Increment general question count for non-follow-ups
@@ -493,36 +572,15 @@ export const useLiveInterview = ({
 
       setIsProcessing(false);
 
-      // Stream text character by character while speaking
-      const streamTextToTranscript = (): Promise<void> => {
-        return new Promise((resolve) => {
-          const entryIndex = transcriptRef.current.length;
-          const emptyEntry: TranscriptEntry = { role: "assistant", text: "" };
-          transcriptRef.current = [...transcriptRef.current, emptyEntry];
-          setTranscript([...transcriptRef.current]);
-
-          let charIndex = 0;
-          const interval = setInterval(() => {
-            charIndex++;
-            if (charIndex <= aiText.length) {
-              const updated = [...transcriptRef.current];
-              updated[entryIndex] = { role: "assistant", text: aiText.slice(0, charIndex) };
-              transcriptRef.current = updated;
-              setTranscript([...updated]);
-            } else {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 30);
-        });
-      };
-
       conversationRef.current.push({ role: "assistant", content: aiText });
 
-      // Speak first, then show text after audio finishes
-      await speakText(aiText);
+      // Show the transcript entry IMMEDIATELY so the candidate can read along
+      // while TTS plays. Previously the text only appeared after audio ended,
+      // which left the screen blank for 5-15s every turn.
       transcriptRef.current = [...transcriptRef.current, { role: "assistant", text: aiText }];
       setTranscript([...transcriptRef.current]);
+
+      await speakText(aiText);
       if (activeRef.current && !stoppedManuallyRef.current) {
         await startListening();
       }
@@ -533,11 +591,169 @@ export const useLiveInterview = ({
     }
   }, [jobPosition, type, speakText, startListening, totalQuestions]);
 
+  // ============================================================
+  // Chunked recording helpers
+  //
+  // The session is recorded as a sequence of ~30-second WebM chunks. Each
+  // chunk is uploaded to storage and broadcast on the proctor channel as
+  // soon as it's ready. This fixes the long-recording playback bug (WebM
+  // metadata gets fixed per chunk so HTML5 video can seek), keeps every
+  // upload safely under the bucket size limit, and powers the live proctor
+  // view as a natural side effect.
+  // ============================================================
+
+  const broadcastChunkReadyRef = useRef<((event: ChunkReadyEvent) => Promise<void>) | null>(null);
+
+  const uploadChunk = useCallback(async (blob: Blob, index: number, durationMs: number): Promise<ChunkMeta | null> => {
+    const u = userRef.current;
+    const interviewId = interviewIdRef.current;
+    if (!u || !interviewId || blob.size === 0) return null;
+
+    let fixedBlob = blob;
+    try {
+      fixedBlob = await fixWebmDuration(blob, durationMs);
+    } catch (e) {
+      console.warn(`[Recording] fixWebmDuration failed on chunk ${index}, uploading raw:`, e);
+    }
+
+    const padded = String(index).padStart(3, "0");
+    const path = `${u.id}/${interviewId}/chunk_${padded}.webm`;
+
+    try {
+      const { error } = await supabase.storage
+        .from("interview-recordings")
+        .upload(path, fixedBlob, {
+          contentType: type === "video" ? "video/webm" : "audio/webm",
+          upsert: true,
+        });
+      if (error) {
+        console.error(`[Recording] Chunk ${index} upload failed:`, error);
+        return null;
+      }
+    } catch (err) {
+      console.error(`[Recording] Chunk ${index} upload threw:`, err);
+      return null;
+    }
+
+    const meta: ChunkMeta = {
+      index,
+      path,
+      duration_ms: durationMs,
+      size_bytes: fixedBlob.size,
+    };
+    chunksMetaRef.current.push(meta);
+    console.log(`[Recording] Chunk ${index} uploaded (${(fixedBlob.size / 1024).toFixed(1)} KB, ${durationMs} ms)`);
+
+    // Broadcast to any live proctors watching this session.
+    try {
+      await broadcastChunkReadyRef.current?.(meta);
+    } catch (e) {
+      console.warn("[Recording] chunk-ready broadcast failed:", e);
+    }
+
+    return meta;
+  }, [type]);
+
+  // Forward declaration via ref so rotateChunk can call startNextChunk.
+  const startNextChunkRef = useRef<(() => void) | null>(null);
+
+  const rotateChunk = useCallback(async (): Promise<void> => {
+    const recorder = currentChunkRecorderRef.current;
+    if (!recorder) return;
+
+    const indexAtStop = chunkIndexRef.current;
+    const startedAt = currentChunkStartRef.current;
+
+    // Capture the chunk's data via the recorder's onstop event.
+    const chunkBlob = await new Promise<Blob>((resolve) => {
+      recorder.onstop = () => {
+        const mime = type === "video" ? "video/webm" : "audio/webm";
+        const data = currentChunkDataRef.current;
+        currentChunkDataRef.current = [];
+        resolve(new Blob(data, { type: mime }));
+      };
+      if (recorder.state === "recording") {
+        try { recorder.stop(); } catch { /* ignore */ }
+      } else {
+        // Not recording — flush whatever's buffered.
+        const mime = type === "video" ? "video/webm" : "audio/webm";
+        const data = currentChunkDataRef.current;
+        currentChunkDataRef.current = [];
+        resolve(new Blob(data, { type: mime }));
+      }
+    });
+
+    const duration = Math.max(1, Date.now() - (startedAt || Date.now()));
+    currentChunkRecorderRef.current = null;
+
+    await uploadChunk(chunkBlob, indexAtStop, duration);
+
+    chunkIndexRef.current = indexAtStop + 1;
+
+    // If we're still meant to be recording, immediately start the next chunk.
+    if (recordingActiveRef.current) {
+      startNextChunkRef.current?.();
+    }
+  }, [type, uploadChunk]);
+
+  const startNextChunk = useCallback(() => {
+    const stream = combinedStreamRef.current;
+    if (!stream || !recordingActiveRef.current) return;
+
+    const hasVideo = stream.getVideoTracks().length > 0;
+    const mimeType = hasVideo ? CHUNK_MIME_TYPE : AUDIO_CHUNK_MIME_TYPE;
+
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(stream, { mimeType });
+    } catch (e) {
+      // Fall back to default codec selection if the pinned mime type is unsupported.
+      console.warn(`[Recording] Pinned mime type ${mimeType} rejected, falling back:`, e);
+      try {
+        recorder = new MediaRecorder(stream, { mimeType: hasVideo ? "video/webm" : "audio/webm" });
+      } catch (err) {
+        console.error("[Recording] MediaRecorder construction failed:", err);
+        return;
+      }
+    }
+
+    currentChunkDataRef.current = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) currentChunkDataRef.current.push(e.data);
+    };
+
+    try {
+      recorder.start(1000); // 1s timeslice — many small data events, smoother chunk
+    } catch (e) {
+      console.error("[Recording] recorder.start failed:", e);
+      return;
+    }
+
+    currentChunkRecorderRef.current = recorder;
+    currentChunkStartRef.current = Date.now();
+
+    // Schedule rotation. We don't await this — onstop handler in rotateChunk
+    // is the source of truth for chunk completion.
+    chunkRotationTimerRef.current = setTimeout(() => {
+      chunkRotationInFlightRef.current = rotateChunk();
+    }, CHUNK_DURATION_MS);
+  }, [rotateChunk]);
+
+  // Register startNextChunk with the forward-declared ref.
+  useEffect(() => {
+    startNextChunkRef.current = startNextChunk;
+  }, [startNextChunk]);
+
   // End interview and evaluate
   const endInterview = useCallback(async () => {
+    // Idempotency guard: endInterview can be called from (a) user "End" button,
+    // (b) admin force-end broadcast, (c) [END] phase tag, (d) closing flow.
+    // Without this guard, two paths can each post a "completed" update and
+    // double-invoke evaluate-interview.
+    if (isEndingRef.current) return;
+    isEndingRef.current = true;
     activeRef.current = false;
     stoppedManuallyRef.current = true;
-    isEndingRef.current = true;
     setIsActive(false);
     setIsCompleted(true);
     setIsListening(false);
@@ -546,33 +762,52 @@ export const useLiveInterview = ({
       mediaRecorderRef.current.stop();
     }
     cancelAnimationFrame(rafRef.current);
-    // Stop partial upload interval
-    if (partialUploadIntervalRef.current) {
-      clearInterval(partialUploadIntervalRef.current);
-      partialUploadIntervalRef.current = null;
+
+    // Stop chunk rotation: cancel any pending timer and let the current
+    // chunk drain (its onstop handler still fires and uploads).
+    recordingActiveRef.current = false;
+    if (chunkRotationTimerRef.current) {
+      clearTimeout(chunkRotationTimerRef.current);
+      chunkRotationTimerRef.current = null;
     }
 
     const currentId = interviewIdRef.current;
     if (!currentId) return;
 
-    // Safety: upload partial immediately before stopping recorder
-    if (partialUploadFnRef.current) {
-      try { await partialUploadFnRef.current(); } catch (e) { console.error("[Recording] Safety partial upload error:", e); }
+    // Wait for any in-flight chunk rotation, then drain the current chunk
+    // so the final piece of the interview gets uploaded.
+    try {
+      if (chunkRotationInFlightRef.current) await chunkRotationInFlightRef.current;
+    } catch (e) {
+      console.warn("[Recording] In-flight chunk rotation error:", e);
+    }
+    if (currentChunkRecorderRef.current) {
+      try { await rotateChunk(); } catch (e) { console.warn("[Recording] Final chunk drain error:", e); }
     }
 
-    // Stop session recorder and wait for onstop event to ensure all chunks are collected
-    if (sessionRecorderRef.current?.state === "recording") {
-      await new Promise<void>((resolve) => {
-        const recorder = sessionRecorderRef.current!;
-        recorder.onstop = () => resolve();
-        recorder.stop();
-      });
-    }
+    // Determine final recording status.
+    const chunkCount = chunksMetaRef.current.length;
+    const totalDuration = chunksMetaRef.current.reduce((sum, c) => sum + c.duration_ms, 0);
+    const finalStatus: "complete" | "incomplete" | "failed" =
+      chunkCount === 0 ? "failed" : "complete";
 
-    // Mark interview as completed immediately
+    // Mark interview as completed, with end_reason and recording metadata.
+    const endReason = forceEndedRef.current ? "terminated_by_proctor" : "completed";
+    const bgUser = userRef.current;
+    const chunksPath = bgUser ? `${bgUser.id}/${currentId}/` : null;
+    const manifestPath = bgUser ? `${bgUser.id}/${currentId}/manifest.json` : null;
+
     await supabase
       .from("interviews")
-      .update({ status: "completed" as any })
+      .update({
+        status: "completed",
+        recording_chunks_path: chunksPath,
+        recording_url: manifestPath,
+        recording_duration_ms: totalDuration,
+        recording_chunk_count: chunkCount,
+        recording_status: finalStatus,
+        end_reason: endReason,
+      } as any)
       .eq("id", currentId);
 
     // P0.1: practice mode does not update the hiring pipeline
@@ -588,76 +823,46 @@ export const useLiveInterview = ({
     // Stop streams immediately
     streamRef.current?.getTracks().forEach(t => t.stop());
     videoStreamRef.current?.getTracks().forEach(t => t.stop());
+    combinedStreamRef.current?.getTracks().forEach(t => t.stop());
+    combinedStreamRef.current = null;
     audioContextRef.current?.close().catch(() => {});
     mixingCtxRef.current?.close().catch(() => {});
     mixingCtxRef.current = null;
     mixedDestRef.current = null;
 
-    // Fix WebM duration BEFORE navigating (~1s operation)
-    const bgUser = user;
-    const bgChunks = [...sessionChunksRef.current];
-    const bgDuration = Date.now() - (sessionRecordingStartRef.current || Date.now());
-    const mimeType = type === "video" ? "video/webm" : "audio/webm";
-    const rawSessionBlob = new Blob(bgChunks, { type: mimeType });
-    
-    let fixedBlob = rawSessionBlob;
-    if (rawSessionBlob.size > 0) {
-      try {
-        fixedBlob = await fixWebmDuration(rawSessionBlob, bgDuration);
-        console.log("[Recording] Duration fixed before navigation");
-      } catch (e) {
-        console.warn("[Recording] fixWebmDuration failed, will upload raw blob:", e);
-      }
-    }
-
     toast.success("تمت المقابلة بنجاح! يتم إعداد التقييم في الخلفية...");
 
-    // Navigate immediately — don't wait for upload/evaluation
+    // Snapshot data for background work, then navigate.
+    const manifestChunks = [...chunksMetaRef.current];
+    chunksMetaRef.current = [];
     navigate("/dashboard");
 
-    // Run upload + evaluation in background (fire-and-forget)
+    // Run manifest write + evaluation in background (fire-and-forget).
     (async () => {
       try {
-        if (fixedBlob.size > 0 && bgUser) {
-
-          const fileName = `${bgUser.id}/${currentId}_full.webm`;
-          let uploaded = false;
-          
-          for (let attempt = 0; attempt < 2 && !uploaded; attempt++) {
-            try {
-              const { error: uploadErr } = await supabase.storage
-                .from("interview-recordings")
-                .upload(fileName, fixedBlob, { contentType: mimeType, upsert: true });
-              
-              if (uploadErr) {
-                console.error(`[Recording] Upload attempt ${attempt + 1} failed:`, uploadErr);
-              } else {
-                console.log("[Recording] Upload successful:", fileName);
-                await supabase
-                  .from("interviews")
-                  .update({ recording_url: fileName } as any)
-                  .eq("id", currentId);
-                uploaded = true;
-                await supabase.storage
-                  .from("interview-recordings")
-                  .remove([`${bgUser.id}/${currentId}_partial.webm`]);
-              }
-            } catch (err) {
-              console.error(`[Recording] Upload attempt ${attempt + 1} error:`, err);
-            }
-          }
-          
-          if (!uploaded) {
+        if (bgUser && manifestChunks.length > 0 && manifestPath) {
+          const manifest = {
+            version: 1,
+            interview_id: currentId,
+            total_duration_ms: totalDuration,
+            chunk_count: manifestChunks.length,
+            mime_type: type === "video" ? "video/webm" : "audio/webm",
+            chunks: manifestChunks,
+            completed_at: new Date().toISOString(),
+          };
+          const manifestBlob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
+          const { error: manifestErr } = await supabase.storage
+            .from("interview-recordings")
+            .upload(manifestPath, manifestBlob, { contentType: "application/json", upsert: true });
+          if (manifestErr) {
+            console.error("[Recording] Manifest upload failed:", manifestErr);
             await supabase
               .from("interviews")
-              .update({ recording_url: `${bgUser.id}/${currentId}_partial.webm` } as any)
+              .update({ recording_status: "incomplete" } as any)
               .eq("id", currentId);
+          } else {
+            console.log("[Recording] Manifest uploaded:", manifestPath);
           }
-        } else if (bgUser) {
-          await supabase
-            .from("interviews")
-            .update({ recording_url: `${bgUser.id}/${currentId}_partial.webm` } as any)
-            .eq("id", currentId);
         }
 
         // Evaluate
@@ -666,10 +871,10 @@ export const useLiveInterview = ({
         });
         console.log("[Interview] Background evaluation completed");
       } catch (err) {
-        console.error("[Interview] Background upload/evaluation error:", err);
+        console.error("[Interview] Background manifest/evaluation error:", err);
       }
     })();
-  }, [navigate, user]);
+  }, [navigate, user, rotateChunk, type, searchParams]);
 
   // Keep ref in sync so getNextAIResponse can call endInterview
   useEffect(() => { endInterviewRef.current = endInterview; }, [endInterview]);
@@ -786,51 +991,33 @@ export const useLiveInterview = ({
           console.warn("[AudioMix] Could not connect mic to mixing context:", e);
         }
 
-        // Build the combined stream: mixed audio tracks + video tracks (if any)
+        // Build the combined stream: mixed audio tracks + video tracks (if any).
+        // This stream persists across chunk recorder restarts.
         const combinedStream = new MediaStream();
-        // Add mixed audio tracks
         mixedDest.stream.getAudioTracks().forEach(t => combinedStream.addTrack(t));
-        // Add video tracks from original stream (for video interviews)
         if (type === "video") {
           rawRecordingStream.getVideoTracks().forEach(t => combinedStream.addTrack(t));
         }
+        combinedStreamRef.current = combinedStream;
 
-        try {
-          const sessionRecorder = new MediaRecorder(combinedStream, { 
-            mimeType: type === "video" ? "video/webm" : "audio/webm" 
-          });
-          sessionChunksRef.current = [];
-          sessionRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) sessionChunksRef.current.push(e.data);
-          };
-          sessionRecorder.start(5000);
-          sessionRecorderRef.current = sessionRecorder;
-          sessionRecordingStartRef.current = Date.now();
-          console.log("[AudioMix] Session recorder started with mixed stream");
-        } catch (err) {
-          console.error("Failed to start session recorder:", err);
-        }
+        // Initialize chunked recording state and kick off the first chunk.
+        chunksMetaRef.current = [];
+        chunkIndexRef.current = 0;
+        currentChunkDataRef.current = [];
+        recordingActiveRef.current = true;
+        sessionRecordingStartRef.current = Date.now();
+        forceEndedRef.current = null;
+
+        // Mark interview as recording in DB so admins can see it's live.
+        supabase
+          .from("interviews")
+          .update({ recording_status: "recording" } as any)
+          .eq("id", interview.id)
+          .then(() => undefined, () => undefined);
+
+        startNextChunk();
+        console.log("[Recording] Chunked session recorder started (30s chunks)");
       }
-
-      // Start periodic partial upload every 60 seconds
-      lastUploadedChunkIndexRef.current = 0;
-      const partialUploadFn = async () => {
-        const chunks = sessionChunksRef.current;
-        if (chunks.length === 0 || !interviewIdRef.current || !user) return;
-        try {
-          const blob = new Blob(chunks, { type: type === "video" ? "video/webm" : "audio/webm" });
-          if (blob.size < 1000) return; // skip tiny blobs
-          const partialPath = `${user.id}/${interviewIdRef.current}_partial.webm`;
-          await supabase.storage
-            .from("interview-recordings")
-            .upload(partialPath, blob, { contentType: blob.type, upsert: true });
-          console.log("[Recording] Partial upload OK:", partialPath, blob.size, "bytes");
-        } catch (err) {
-          console.error("[Recording] Partial upload error:", err);
-        }
-      };
-      partialUploadFnRef.current = partialUploadFn;
-      partialUploadIntervalRef.current = setInterval(partialUploadFn, 20000);
 
       // Link to job application if vacancy_id present
       if (vacancyId) {
@@ -921,37 +1108,45 @@ export const useLiveInterview = ({
     return () => window.removeEventListener("beforeunload", handler);
   }, [isActive, isCompleted]);
 
-  // Cleanup on unmount — use sendBeacon to mark interview as completed
+  // Cleanup on unmount — abandoned session is recoverable from already-uploaded chunks.
   useEffect(() => {
     return () => {
       if (isEndingRef.current) return;
 
       activeRef.current = false;
       stoppedManuallyRef.current = true;
-      if (partialUploadIntervalRef.current) {
-        clearInterval(partialUploadIntervalRef.current);
-        partialUploadIntervalRef.current = null;
+      recordingActiveRef.current = false;
+
+      if (chunkRotationTimerRef.current) {
+        clearTimeout(chunkRotationTimerRef.current);
+        chunkRotationTimerRef.current = null;
       }
+
+      // Stop current chunk recorder if still running. Its onstop handler may
+      // still fire after unmount but we don't await — already-uploaded chunks
+      // are enough for admin playback of the partial session.
+      if (currentChunkRecorderRef.current?.state === "recording") {
+        try { currentChunkRecorderRef.current.stop(); } catch { /* ignore */ }
+      }
+
       mediaRecorderRef.current?.state === "recording" && mediaRecorderRef.current.stop();
       streamRef.current?.getTracks().forEach(t => t.stop());
       videoStreamRef.current?.getTracks().forEach(t => t.stop());
+      combinedStreamRef.current?.getTracks().forEach(t => t.stop());
       audioContextRef.current?.close().catch(() => {});
       mixingCtxRef.current?.close().catch(() => {});
       cancelAnimationFrame(rafRef.current);
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
 
-      // Last-chance partial upload before abandoning
-      if (partialUploadFnRef.current) {
-        try { partialUploadFnRef.current(); } catch (e) { console.error("[Recording] Cleanup partial upload error:", e); }
-      }
-
+      // Tell the backend the session ended unexpectedly so the admin gets a
+      // clear "incomplete" banner instead of an interview stuck in_progress.
       const id = interviewIdRef.current;
       if (id && !isCompleted) {
-        // Set recording_url to partial before abandoning
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/complete-interview`;
-        const body = JSON.stringify({ 
+        const body = JSON.stringify({
           interview_id: id,
-          recording_url: userRef.current ? `${userRef.current.id}/${id}_partial.webm` : undefined,
+          recording_status: "incomplete",
+          end_reason: "disconnected",
         });
         navigator.sendBeacon(url, body);
       }
@@ -983,5 +1178,7 @@ export const useLiveInterview = ({
     submitAnswer,
     videoStream: videoStreamRef.current,
     videoElementRef,
+    activeProctors,
+    proctorMessages,
   };
 };

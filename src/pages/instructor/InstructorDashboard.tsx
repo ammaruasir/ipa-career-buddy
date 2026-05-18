@@ -56,7 +56,7 @@ const InstructorDashboard = () => {
 
     const load = async () => {
       const { data: cohortRows } = await supabase
-        .from("cohorts" as any)
+        .from("cohorts")
         .select("id, name, track, status, start_date, end_date, capacity")
         .order("start_date", { ascending: false });
 
@@ -68,12 +68,12 @@ const InstructorDashboard = () => {
         list.map(async (c) => {
           const [enrollments, assignments] = await Promise.all([
             supabase
-              .from("enrollments" as any)
+              .from("enrollments")
               .select("student_id", { count: "exact", head: true })
               .eq("cohort_id", c.id)
               .eq("status", "active"),
             supabase
-              .from("assignments" as any)
+              .from("assignments")
               .select("id", { count: "exact", head: true })
               .eq("cohort_id", c.id)
               .gt("due_at", new Date().toISOString()),
