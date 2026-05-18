@@ -8,6 +8,7 @@ import { MessagesSquare, Send, Loader2, Lightbulb, Sparkles, User2 } from "lucid
 import { supabase } from "@/integrations/supabase/client";
 import JustificationCard, { type Justification } from "./JustificationCard";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type Lang = "ar" | "en";
 
