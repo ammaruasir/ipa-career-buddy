@@ -349,46 +349,146 @@ const CVReview = () => {
           </Card>
         )}
 
-        {/* Rewrites */}
+        {/* Rewrites — accept / edit / reject */}
         {rewrites.length > 0 && (
           <Card className="rounded-2xl shadow-lg">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-emerald-600" />
-                اقتراحات إعادة الكتابة
+                تحسينات الذكاء الاصطناعي — اعتمد ما يناسبك
               </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                يمكنك تعديل النسخة المحسّنة قبل اعتمادها. التحسينات المعتمدة ستظهر في النسخة النهائية القابلة للتصدير.
+              </p>
             </CardHeader>
             <CardContent>
               <Accordion type="multiple" className="space-y-2">
-                {rewrites.map((r, idx) => (
-                  <AccordionItem
-                    key={idx}
-                    value={`rw-${idx}`}
-                    className="border rounded-xl px-3"
-                  >
-                    <AccordionTrigger className="hover:no-underline py-2 text-sm text-right">
-                      {r.reason}
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-2 pt-1">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div className="rounded-lg bg-muted/40 p-3">
-                          <p className="text-xs text-muted-foreground mb-1">الأصلي</p>
-                          <p className="text-sm text-foreground">{r.original}</p>
+                {rewrites.map((r, idx) => {
+                  const accepted = revision?.accepted_rewrites?.find((a) => a.original === r.original);
+                  const currentValue = editedImproved[idx] ?? accepted?.improved ?? r.improved;
+                  return (
+                    <AccordionItem key={idx} value={`rw-${idx}`} className="border rounded-xl px-3">
+                      <AccordionTrigger className="hover:no-underline py-2 text-sm text-right">
+                        <div className="flex items-center gap-2 flex-1 text-right">
+                          <span className="flex-1">{r.reason}</span>
+                          {accepted && (
+                            <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px]">
+                              معتمد
+                            </Badge>
+                          )}
                         </div>
-                        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3">
-                          <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-1">
-                            النسخة المحسّنة
-                          </p>
-                          <p className="text-sm text-foreground">{r.improved}</p>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-3 pt-1">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground mb-1">الأصلي</p>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{r.original}</p>
+                          </div>
+                          <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 space-y-2">
+                            <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                              النسخة المحسّنة (قابلة للتعديل)
+                            </p>
+                            <Textarea
+                              dir="rtl"
+                              value={currentValue}
+                              onChange={(e) =>
+                                setEditedImproved((prev) => ({ ...prev, [idx]: e.target.value }))
+                              }
+                              rows={4}
+                              className="text-sm bg-background/60"
+                            />
+                          </div>
                         </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
+                        <div className="flex flex-wrap gap-2 justify-end">
+                          {accepted && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={saving}
+                              onClick={async () => {
+                                await rejectRewrite(r.original);
+                                toast.success("تم إلغاء اعتماد التحسين");
+                              }}
+                            >
+                              <X className="w-3.5 h-3.5 ml-1" />
+                              إلغاء الاعتماد
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            disabled={saving}
+                            onClick={async () => {
+                              await acceptRewrite(r.original, currentValue);
+                              toast.success("تم اعتماد التحسين");
+                            }}
+                          >
+                            <Check className="w-3.5 h-3.5 ml-1" />
+                            {accepted ? "حفظ التعديلات" : "اعتماد التحسين"}
+                          </Button>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
               </Accordion>
             </CardContent>
           </Card>
         )}
+
+        {/* Export improved CV */}
+        <Card className="rounded-2xl shadow-lg border-primary/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Download className="w-5 h-5 text-primary" />
+              تصدير سيرتك المحسّنة
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              يتم دمج جميع التحسينات التي اعتمدتها في النص الأصلي للسيرة، ثم تصديرها بصيغة Word أو PDF.
+              {revision?.accepted_rewrites?.length
+                ? ` (${revision.accepted_rewrites.length} تحسين معتمد)`
+                : " (لم يتم اعتماد أي تحسين بعد — سيتم تصدير النص الأصلي)"}
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button
+              onClick={async () => {
+                try {
+                  const data = buildImprovedCV(
+                    doc.extraction,
+                    revision?.accepted_rewrites ?? [],
+                    doc.file_name ?? "السيرة الذاتية",
+                  );
+                  await exportToDocx(data, `cv-${Date.now()}.docx`);
+                  toast.success("تم تصدير ملف Word");
+                } catch (e: any) {
+                  toast.error(e?.message || "فشل تصدير Word");
+                }
+              }}
+            >
+              <FileDown className="w-4 h-4 ml-1.5" />
+              تصدير Word (.docx)
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                try {
+                  const data = buildImprovedCV(
+                    doc.extraction,
+                    revision?.accepted_rewrites ?? [],
+                    doc.file_name ?? "السيرة الذاتية",
+                  );
+                  exportToPdf(data, `cv-${Date.now()}.pdf`);
+                  toast.success("افتح نافذة الطباعة واختر 'حفظ كـ PDF'");
+                } catch (e: any) {
+                  toast.error(e?.message || "فشل تصدير PDF");
+                }
+              }}
+            >
+              <FileDown className="w-4 h-4 ml-1.5" />
+              تصدير PDF
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* P0.4: AI chat about this CV */}
         <CVChatPanel cvDocumentId={doc.id} language="ar" />
