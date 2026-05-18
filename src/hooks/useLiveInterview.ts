@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import fixWebmDuration from "fix-webm-duration";
 import { useProctorChannel, type ChunkReadyEvent } from "@/hooks/useProctorChannel";
+import { stripPhaseTags } from "@/lib/arabic-utils";
 
 const CHUNK_DURATION_MS = 30_000;
 const CHUNK_MIME_TYPE = "video/webm;codecs=vp8,opus";
