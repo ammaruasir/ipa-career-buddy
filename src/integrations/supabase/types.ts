@@ -404,35 +404,41 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          job_position: string
+          job_position: string | null
+          mode: Database["public"]["Enums"]["interview_mode"]
           questions: Json | null
           recording_url: string | null
           status: Database["public"]["Enums"]["interview_status"]
           type: Database["public"]["Enums"]["interview_type"]
           updated_at: string
           user_id: string
+          visibility: Database["public"]["Enums"]["interview_visibility"]
         }
         Insert: {
           created_at?: string
           id?: string
-          job_position: string
+          job_position?: string | null
+          mode?: Database["public"]["Enums"]["interview_mode"]
           questions?: Json | null
           recording_url?: string | null
           status?: Database["public"]["Enums"]["interview_status"]
           type: Database["public"]["Enums"]["interview_type"]
           updated_at?: string
           user_id: string
+          visibility?: Database["public"]["Enums"]["interview_visibility"]
         }
         Update: {
           created_at?: string
           id?: string
-          job_position?: string
+          job_position?: string | null
+          mode?: Database["public"]["Enums"]["interview_mode"]
           questions?: Json | null
           recording_url?: string | null
           status?: Database["public"]["Enums"]["interview_status"]
           type?: Database["public"]["Enums"]["interview_type"]
           updated_at?: string
           user_id?: string
+          visibility?: Database["public"]["Enums"]["interview_visibility"]
         }
         Relationships: []
       }
@@ -855,8 +861,10 @@ export type Database = {
     }
     Enums: {
       app_role: "student" | "admin" | "hr" | "candidate" | "instructor"
+      interview_mode: "practice" | "assessment" | "mock_final"
       interview_status: "pending" | "in_progress" | "completed" | "cancelled"
       interview_type: "text" | "voice" | "video"
+      interview_visibility: "private" | "instructor" | "hr"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -985,8 +993,10 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["student", "admin", "hr", "candidate", "instructor"],
+      interview_mode: ["practice", "assessment", "mock_final"],
       interview_status: ["pending", "in_progress", "completed", "cancelled"],
       interview_type: ["text", "voice", "video"],
+      interview_visibility: ["private", "instructor", "hr"],
     },
   },
 } as const
