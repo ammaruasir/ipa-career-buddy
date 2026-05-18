@@ -21,6 +21,7 @@ import {
   Pencil,
   Globe,
 } from "lucide-react";
+import TemplateGallery from "@/components/cv-hub/TemplateGallery";
 
 interface DraftRow {
   id: string;
@@ -230,6 +231,9 @@ const CVHub = () => {
             </Link>
           </Card>
         </div>
+
+        {/* Template Gallery */}
+        <TemplateGallery />
 
         {/* Drafts list */}
         <Card className="rounded-2xl shadow-lg">
