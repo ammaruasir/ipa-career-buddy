@@ -11,7 +11,19 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-const PATHS = [
+type CVPath = {
+  icon: typeof MessagesSquare;
+  title: string;
+  description: string;
+  bullets: string[];
+  cta: string;
+  href: string;
+  color: string;
+  badge?: string;
+  gradient: string;
+};
+
+const PATHS: CVPath[] = [
   {
     icon: MessagesSquare,
     title: "ابدأ من الصفر بالمحادثة",
