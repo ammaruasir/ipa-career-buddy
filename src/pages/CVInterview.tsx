@@ -250,7 +250,26 @@ const CVInterview = () => {
     }
   };
 
-  const askSuggestion = async () => {
+  const goBack = async () => {
+    if (!sessionId || currentStep <= 0 || loading) return;
+    setLoading(true);
+    setSuggestion(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("cv-interview-step", {
+        body: { action: "back", session_id: sessionId, language },
+      });
+      if (error) throw error;
+      setCurrentStep(data.current_step);
+      setQuestion(data.question);
+      setAnswer(data.previous_answer ?? "");
+    } catch (e) {
+      console.error(e);
+      toast.error(uiLang === "en" ? "Failed to go back" : "تعذّر الرجوع");
+    } finally {
+      setLoading(false);
+    }
+  };
+
     if (!sessionId || !question) return;
     setSuggesting(true);
     try {
