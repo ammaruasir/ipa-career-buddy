@@ -198,20 +198,10 @@ const CVInterview = () => {
     switch (q.field) {
       case "personal_info.full_name":
         return pi.full_name ?? "";
-      case "personal_info.contact": {
-        const parts = [pi.email, pi.phone].filter(Boolean);
-        return parts.join(" — ");
-      }
       case "target_role":
         return prefill.major ?? "";
       case "target_industry":
         return prefill.major ?? "";
-      case "education": {
-        const ed = prefill.education[0];
-        if (!ed) return "";
-        const head = [ed.degree, ed.major].filter(Boolean).join(" في ");
-        return ed.gpa ? `${head} — المعدل ${ed.gpa}` : head;
-      }
       case "experience_level": {
         const yrs = prefill.experience_years ?? -1;
         if (yrs < 0 || !q.choices) return "";
@@ -238,6 +228,30 @@ const CVInterview = () => {
     }
   };
 
+  // Structured prefill from profile (returns null if not applicable)
+  const prefillStructuredFor = (q: Question | null): any | null => {
+    if (!q || !prefill.loaded) return null;
+    const pi = prefill.personal_info;
+    if (q.id === "contact") {
+      return {
+        email: pi.email ?? "",
+        phone: pi.phone ?? "",
+        city: (prefill as any).city ?? "",
+        linkedin: "",
+      };
+    }
+    if (q.id === "education" && prefill.education?.length) {
+      return prefill.education.map((ed: any) => ({
+        degree: ed.degree ?? "",
+        major: ed.major ?? "",
+        university: ed.institution ?? ed.university ?? "",
+        year: ed.end ?? ed.year ?? "",
+        gpa: ed.gpa ?? "",
+      }));
+    }
+    return null;
+  };
+
   // When a new question loads, pre-fill the answer from the profile when possible.
   useEffect(() => {
     if (!question) {
@@ -250,11 +264,27 @@ const CVInterview = () => {
       setPrefilled(false);
       return;
     }
+    // Structured types
+    if (STRUCTURED_TYPES.includes(question.type)) {
+      const seed = prefillStructuredFor(question);
+      if (seed && (Array.isArray(seed) ? seed.length > 0 : Object.values(seed).some((v) => v))) {
+        setStructuredAnswer(seed);
+        setPrefilled(true);
+      } else {
+        setStructuredAnswer(emptyStructuredFor(question));
+        setPrefilled(false);
+      }
+      setAnswer("");
+      return;
+    }
+    // Free text / choice
+    setStructuredAnswer(null);
     const seed = prefillFor(question);
     if (seed) {
       setAnswer(seed);
       setPrefilled(true);
     } else {
+      setAnswer("");
       setPrefilled(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
