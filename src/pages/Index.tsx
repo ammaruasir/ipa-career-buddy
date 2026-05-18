@@ -122,7 +122,7 @@ const Index = () => {
                 <Button size="sm" className="rounded-xl" asChild>
                   <Link to="/login?tab=signup" className="gap-1.5">
                     <UserPlus className="w-4 h-4" />
-                    ابدأ مجاناً
+                    ابدأ الآن
                   </Link>
                 </Button>
               </div>
@@ -153,7 +153,7 @@ const Index = () => {
                         <Link to="/login" onClick={() => setMobileOpen(false)}>تسجيل الدخول</Link>
                       </Button>
                       <Button className="w-full rounded-xl mt-2" asChild>
-                        <Link to="/login?tab=signup" onClick={() => setMobileOpen(false)}>ابدأ مجاناً</Link>
+                        <Link to="/login?tab=signup" onClick={() => setMobileOpen(false)}>ابدأ الآن</Link>
                       </Button>
                     </>
                   )}
@@ -208,7 +208,7 @@ const Index = () => {
                 asChild
               >
                 <Link to={user ? "/dashboard" : "/login?tab=signup"}>
-                  ابدأ التدريب المجاني
+                  ابدأ التدريب
                   <ChevronLeft className="w-5 h-5 mr-1" />
                 </Link>
               </Button>
@@ -227,7 +227,7 @@ const Index = () => {
           <div className="mt-20 max-w-3xl mx-auto">
             <div className="grid grid-cols-3 gap-4 bg-card/80 backdrop-blur-sm rounded-2xl border border-border p-6 shadow-lg">
               {[
-                { value: "آمن للفشل", label: "وضع تدريب خاص بك", icon: GraduationCap },
+                { value: "خاصة", label: "وضع تدريب خاص بك", icon: GraduationCap },
                 { value: "STAR + DISC", label: "تحليل لكل إجابة", icon: Brain },
                 { value: "٣ طرق للسيرة", label: "محادثة · يدوي · تقييم", icon: FileText },
               ].map((stat, i) => (
@@ -260,7 +260,7 @@ const Index = () => {
             {[
               {
                 icon: GraduationCap,
-                title: "وضع التدريب (آمن للفشل)",
+                title: "وضع التدريب (خاص)",
                 desc: "كل جلسة تدريب خاصّة بك. لا يراها HR. تخطئ، تتعلّم، تكرّر بدون قلق.",
                 badges: ["practice mode", "STAR coaching"],
                 href: "/login?tab=signup",
@@ -555,7 +555,7 @@ const Index = () => {
                 asChild
               >
                 <Link to="/login?tab=signup">
-                  أنشئ حسابك المجاني
+                  أنشئ حسابك
                   <ChevronLeft className="w-5 h-5 mr-1" />
                 </Link>
               </Button>

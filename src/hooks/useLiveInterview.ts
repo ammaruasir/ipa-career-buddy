@@ -376,12 +376,17 @@ export const useLiveInterview = ({
       const formData = new FormData();
       formData.append("audio", blob, "recording.webm");
 
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userToken = sessionData.session?.access_token;
+      if (!userToken) throw new Error("Not authenticated");
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${userToken}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
           body: formData,
         }
