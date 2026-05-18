@@ -379,6 +379,91 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
           </div>
         </div>
       </CardContent>
+
+      {/* Manual accept dialog (used when AI didn't return structured replacements) */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent dir={dir} className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {language === "en" ? "Accept improvement" : "اعتماد التحسين"}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {language === "en"
+                ? "Optionally paste the original text from your CV to replace. Leave it empty to add this as a new bullet in the chosen section — it will still be merged on export."
+                : "اختياري: الصق النص الأصلي من سيرتك ليُستبدل. اتركه فارغاً لإضافته كبند جديد في القسم المحدد — وسيُدمج تلقائياً عند التصدير."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
+                {language === "en" ? "Improved (from AI)" : "النص المُحسَّن (من الذكاء)"}
+              </div>
+              <Textarea
+                value={pickerImproved}
+                onChange={(e) => setPickerImproved(e.target.value)}
+                rows={4}
+                dir={dir}
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground mb-1">
+                {language === "en" ? "Original text from CV (optional)" : "النص الأصلي من السيرة (اختياري)"}
+              </div>
+              <Textarea
+                value={pickerOriginal}
+                onChange={(e) => setPickerOriginal(e.target.value)}
+                rows={3}
+                dir={dir}
+                placeholder={
+                  language === "en"
+                    ? "Leave empty to add as a new bullet"
+                    : "اتركه فارغاً لإضافته كبند جديد"
+                }
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground mb-1">
+                {language === "en" ? "Section" : "القسم"}
+              </div>
+              <select
+                value={pickerSection}
+                onChange={(e) => setPickerSection(e.target.value)}
+                className="w-full text-sm border border-input bg-background rounded-md h-9 px-2"
+                dir={dir}
+              >
+                <option value="summary">{language === "en" ? "Summary" : "الملخّص"}</option>
+                <option value="experience">{language === "en" ? "Experience" : "الخبرة"}</option>
+                <option value="education">{language === "en" ? "Education" : "التعليم"}</option>
+                <option value="skills">{language === "en" ? "Skills" : "المهارات"}</option>
+                <option value="achievements">{language === "en" ? "Achievements" : "الإنجازات"}</option>
+                <option value="certifications">{language === "en" ? "Certifications" : "الشهادات"}</option>
+                <option value="other">{language === "en" ? "Other" : "أخرى"}</option>
+              </select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPickerOpen(false)} disabled={accepting}>
+              {language === "en" ? "Cancel" : "إلغاء"}
+            </Button>
+            <Button
+              disabled={!pickerImproved.trim() || accepting}
+              onClick={async () => {
+                setAccepting(true);
+                await acceptOne(pickerImproved.trim(), pickerOriginal.trim(), pickerSection);
+                setAccepting(false);
+                setPickerOpen(false);
+              }}
+            >
+              {accepting && <Loader2 className="w-3.5 h-3.5 ml-1.5 animate-spin" />}
+              {language === "en" ? "Accept & merge on export" : "اعتمد ودمج عند التصدير"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
