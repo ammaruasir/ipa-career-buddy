@@ -75,8 +75,22 @@ const TOOL_SCHEMA = {
           items: { type: "string" },
           description: "Concrete next steps the user can take",
         },
+        replacements: {
+          type: "array",
+          description: "Concrete rewrite suggestions. Each item targets one piece of the CV; if no original exists (new addition), set original to empty string.",
+          items: {
+            type: "object",
+            properties: {
+              original: { type: "string", description: "Verbatim original text from the CV (or empty string for new additions)" },
+              improved: { type: "string", description: "The rewritten/improved version" },
+              section: { type: "string", description: "Section name: summary | experience | education | skills | achievements | certifications | other" },
+            },
+            required: ["original", "improved", "section"],
+            additionalProperties: false,
+          },
+        },
       },
-      required: ["message", "justifications", "suggested_actions"],
+      required: ["message", "justifications", "suggested_actions", "replacements"],
       additionalProperties: false,
     },
   },
