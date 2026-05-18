@@ -67,12 +67,8 @@ const AppNav = () => {
   };
 
   const dashHref =
-    role === "hr"
-      ? "/dashboard/hr"
-      : role === "instructor"
+    role === "instructor"
       ? "/dashboard/instructor"
-      : role === "admin"
-      ? "/dashboard/admin"
       : "/dashboard/candidate";
 
   return (
