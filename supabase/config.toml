@@ -60,3 +60,12 @@ verify_jwt = false
 
 [functions.admin-interview]
 verify_jwt = false
+
+[functions.render-cv-pdf]
+verify_jwt = false
+
+[functions.generate-cover-letter]
+verify_jwt = false
+
+[functions.cv-job-alignment]
+verify_jwt = false

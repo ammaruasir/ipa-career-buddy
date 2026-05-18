@@ -45,6 +45,8 @@ const ProfileSettings = lazyRetry(() => import("./pages/ProfileSettings"));
 const InterviewSettings = lazyRetry(() => import("./pages/InterviewSettings"));
 const AdminSettings = lazyRetry(() => import("./pages/AdminSettings"));
 const AdminInterviews = lazyRetry(() => import("./pages/AdminInterviews"));
+const LiveProctor = lazyRetry(() => import("./pages/admin/LiveProctor"));
+const LiveProctorSession = lazyRetry(() => import("./pages/admin/LiveProctorSession"));
 const CompleteProfile = lazyRetry(() => import("./pages/CompleteProfile"));
 const HiringPipeline = lazyRetry(() => import("./pages/HiringPipeline"));
 const CandidateCompare = lazyRetry(() => import("./pages/CandidateCompare"));
@@ -55,6 +57,8 @@ const CVReview = lazyRetry(() => import("./pages/CVReview"));
 const CVBuilder = lazyRetry(() => import("./pages/CVBuilder"));
 const CVInterview = lazyRetry(() => import("./pages/CVInterview"));
 const Features = lazyRetry(() => import("./pages/Features"));
+const CVHub = lazyRetry(() => import("./pages/CVHub"));
+const CoverLetter = lazyRetry(() => import("./pages/CoverLetter"));
 
 const queryClient = new QueryClient();
 
@@ -84,9 +88,11 @@ const App = () => (
               <Route path="/dashboard/hr/pipeline" element={<HiringPipeline />} />
               <Route path="/dashboard/instructor" element={<InstructorDashboard />} />
               <Route path="/dashboard/instructor/cohort/:id" element={<CohortDetail />} />
+              <Route path="/cv" element={<CVHub />} />
               <Route path="/cv/review" element={<CVReview />} />
               <Route path="/cv/builder" element={<CVBuilder />} />
               <Route path="/cv/interview" element={<CVInterview />} />
+              <Route path="/cv/cover-letter/:draftId" element={<CoverLetter />} />
               <Route path="/features" element={<Features />} />
               <Route path="/dashboard/hr/compare" element={<CandidateCompare />} />
               <Route path="/dashboard/admin/candidate/:id" element={<CandidateDetail />} />
@@ -101,6 +107,8 @@ const App = () => (
               <Route path="/settings/interview" element={<InterviewSettings />} />
               <Route path="/admin/settings" element={<AdminSettings />} />
               <Route path="/admin/interviews" element={<AdminInterviews />} />
+              <Route path="/admin/proctor" element={<LiveProctor />} />
+              <Route path="/admin/proctor/:interviewId" element={<LiveProctorSession />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

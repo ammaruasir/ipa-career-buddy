@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,9 +25,19 @@ import {
   Plus,
   Trash2,
   Download,
+  Palette,
+  Activity,
+  Target,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { AIAssistBullets } from "@/components/cv-builder/AIAssistButton";
+import { AIAssistBullets, AIAssistSummary, AIAssistSkills } from "@/components/cv-builder/AIAssistButton";
 
 interface PersonalInfo {
   full_name?: string;
@@ -90,6 +100,41 @@ const STEPS = [
   { key: "preview", label: "المعاينة", icon: Eye },
 ] as const;
 
+async function exportPdf(draft: Draft, _userId: string) {
+  if (!draft.id) {
+    toast.error("احفظ المسوّدة أوّلاً");
+    return;
+  }
+  const lang: "ar" | "en" = draft.language === "en" ? "en" : "ar";
+  try {
+    toast.loading("جارٍ توليد PDF...", { id: "pdf-gen" });
+    const { data, error } = await supabase.functions.invoke("render-cv-pdf", {
+      body: { draft_id: draft.id, language: lang },
+    });
+    toast.dismiss("pdf-gen");
+    if (error) throw error;
+    if (data.mode === "pdf" && data.url) {
+      window.open(data.url, "_blank");
+      toast.success("تمّ توليد PDF");
+    } else if (data.mode === "html" && data.html) {
+      // Fallback: open in new window and trigger print
+      const w = window.open("", "_blank");
+      if (w) {
+        w.document.write(data.html);
+        w.document.close();
+        setTimeout(() => w.print(), 500);
+        toast.info("افتح القائمة → طباعة → حفظ كـ PDF");
+      }
+    } else {
+      toast.error("فشل توليد PDF");
+    }
+  } catch (e) {
+    toast.dismiss("pdf-gen");
+    console.error(e);
+    toast.error("فشل توليد PDF");
+  }
+}
+
 const EMPTY_DRAFT: Draft = {
   personal_info: {},
   summary: {},
@@ -103,6 +148,8 @@ const EMPTY_DRAFT: Draft = {
 
 const CVBuilder = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const draftIdParam = searchParams.get("draft");
   const { user, loading: authLoading } = useAuth();
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [step, setStep] = useState(0);
@@ -110,7 +157,7 @@ const CVBuilder = () => {
   const [loading, setLoading] = useState(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load existing draft
+  // Load existing draft (by ?draft=id or latest); prefill from profile if new
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/login");
@@ -119,6 +166,33 @@ const CVBuilder = () => {
     if (!user) return;
 
     const load = async () => {
+      // 1. If ?draft=id, load that specific draft
+      if (draftIdParam) {
+        const { data } = await supabase
+          .from("cv_drafts")
+          .select("*")
+          .eq("id", draftIdParam)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (data) {
+          const d = data as any;
+          setDraft({
+            id: d.id,
+            personal_info: d.personal_info ?? {},
+            summary: d.summary ?? {},
+            experience: d.experience ?? [],
+            education: d.education ?? [],
+            skills: d.skills ?? { technical: [], soft: [], languages: [] },
+            certifications: d.certifications ?? [],
+            template: d.template ?? "modern",
+            language: d.language ?? "ar",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 2. Otherwise, load latest draft
       const { data } = await supabase
         .from("cv_drafts")
         .select("*")
@@ -140,11 +214,28 @@ const CVBuilder = () => {
           template: d.template ?? "modern",
           language: d.language ?? "ar",
         });
+      } else {
+        // 3. No drafts at all — prefill personal_info from profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, email, phone")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (profile) {
+          setDraft((d) => ({
+            ...d,
+            personal_info: {
+              full_name: (profile as any).full_name ?? "",
+              email: (profile as any).email ?? "",
+              phone: (profile as any).phone ?? "",
+            },
+          }));
+        }
       }
       setLoading(false);
     };
     load();
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, draftIdParam]);
 
   // Debounced auto-save
   const saveDraft = useCallback(
@@ -245,27 +336,71 @@ const CVBuilder = () => {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 space-y-6 max-w-4xl">
-        {/* Step progress */}
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        <div className="grid lg:grid-cols-[1fr_460px] gap-6">
+          <div className="space-y-6 min-w-0">
+        {/* Step progress + Template + Language picker */}
         <Card className="rounded-2xl">
           <CardContent className="p-5 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
                   <StepIcon className="w-5 h-5 text-primary" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">
                     خطوة {step + 1} / {STEPS.length}
                   </p>
-                  <h2 className="font-semibold text-foreground">{STEPS[step].label}</h2>
+                  <h2 className="font-semibold text-foreground truncate">{STEPS[step].label}</h2>
                 </div>
               </div>
-              <Badge variant="outline" className="font-normal">
-                {Math.round(progress)}%
-              </Badge>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="font-normal">
+                  {Math.round(progress)}%
+                </Badge>
+                {/* ATS Score badge */}
+                <ATSScoreBadge draft={draft} />
+              </div>
             </div>
+
             <Progress value={progress} className="h-2" />
+
+            {/* Template + Language selector row */}
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1.5 text-muted-foreground">
+                  <Palette className="w-3 h-3" />
+                  القالب
+                </Label>
+                <Select value={draft.template} onValueChange={(v) => update("template", v as Draft["template"])}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="modern">حديث</SelectItem>
+                    <SelectItem value="conservative">محافظ</SelectItem>
+                    <SelectItem value="executive">تنفيذي</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1.5 text-muted-foreground">
+                  <FileText className="w-3 h-3" />
+                  لغة الإخراج
+                </Label>
+                <Select value={draft.language} onValueChange={(v) => update("language", v as Draft["language"])}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ar">عربية</SelectItem>
+                    <SelectItem value="en">إنجليزية</SelectItem>
+                    <SelectItem value="bilingual">ثنائية</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -282,6 +417,14 @@ const CVBuilder = () => {
               <SummaryStep
                 value={draft.summary}
                 onChange={(v) => update("summary", v)}
+                fullProfile={{
+                  personal_info: draft.personal_info,
+                  experience: draft.experience,
+                  education: draft.education,
+                  skills: draft.skills,
+                }}
+                targetRole={(draft.personal_info as any)?.target_role}
+                language={draft.language}
               />
             )}
             {step === 2 && (
@@ -302,6 +445,10 @@ const CVBuilder = () => {
               <SkillsStep
                 value={draft.skills}
                 onChange={(v) => update("skills", v)}
+                experience={draft.experience}
+                education={draft.education}
+                targetRole={(draft.personal_info as any)?.target_role}
+                language={draft.language}
               />
             )}
             {step === 5 && (
@@ -335,16 +482,31 @@ const CVBuilder = () => {
               <ArrowLeft className="w-4 h-4 mr-2" />
             </Button>
           ) : (
-            <Button
-              onClick={() =>
-                toast.info("تصدير PDF عربي قيد التطوير — يتطلّب اختبار جودة RTL.")
-              }
-              className="rounded-xl"
-            >
+            <Button onClick={() => exportPdf(draft, user?.id ?? "")} className="rounded-xl">
               <Download className="w-4 h-4 ml-2" />
-              تصدير PDF (قريباً)
+              تصدير PDF
             </Button>
           )}
+        </div>
+          </div>
+
+          {/* Sticky live preview on large screens */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-20">
+              <div className="rounded-2xl border border-border bg-card shadow-lg overflow-hidden">
+                <div className="p-3 border-b bg-muted/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Eye className="w-4 h-4 text-primary" />
+                    معاينة حيّة
+                  </div>
+                  <Badge variant="outline" className="text-[10px]">{draft.template}</Badge>
+                </div>
+                <div className="max-h-[80vh] overflow-y-auto p-4">
+                  <PreviewStep draft={draft} />
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </div>
@@ -389,9 +551,15 @@ const PersonalStep = ({
 const SummaryStep = ({
   value,
   onChange,
+  fullProfile,
+  targetRole,
+  language,
 }: {
   value: { ar?: string; en?: string };
   onChange: (v: { ar?: string; en?: string }) => void;
+  fullProfile: any;
+  targetRole?: string;
+  language: "ar" | "en" | "bilingual";
 }) => (
   <div className="space-y-4">
     <div className="space-y-1.5">
@@ -418,6 +586,15 @@ const SummaryStep = ({
         dir="ltr"
       />
     </div>
+
+    {/* AI: improve or generate from profile */}
+    <AIAssistSummary
+      currentSummary={value.ar || value.en || ""}
+      fullProfile={fullProfile}
+      targetRole={targetRole}
+      language={language}
+      onAccept={(text, lang) => onChange({ ...value, [lang]: text })}
+    />
   </div>
 );
 
@@ -572,9 +749,17 @@ const EducationStep = ({
 const SkillsStep = ({
   value,
   onChange,
+  experience,
+  education,
+  targetRole,
+  language,
 }: {
   value: Skills;
   onChange: (v: Skills) => void;
+  experience: ExperienceItem[];
+  education: EducationItem[];
+  targetRole?: string;
+  language: "ar" | "en" | "bilingual";
 }) => {
   const tagInput = (
     label: string,
@@ -602,11 +787,29 @@ const SkillsStep = ({
     </div>
   );
 
+  const mergeSkills = (suggested: { technical?: string[]; soft?: string[]; languages?: string[] }) => {
+    const dedupe = (arr: string[]) => Array.from(new Set(arr));
+    onChange({
+      technical: dedupe([...(value.technical ?? []), ...(suggested.technical ?? [])]),
+      soft: dedupe([...(value.soft ?? []), ...(suggested.soft ?? [])]),
+      languages: dedupe([...(value.languages ?? []), ...(suggested.languages ?? [])]),
+    });
+  };
+
   return (
     <div className="space-y-4">
       {tagInput("المهارات التقنية", "technical", "Python، إدارة قواعد البيانات، Excel متقدّم")}
       {tagInput("المهارات الشخصية", "soft", "العمل الجماعي، إدارة الوقت، التواصل")}
       {tagInput("اللغات", "languages", "العربية (الأم)، الإنجليزية (طلاقة)")}
+
+      {/* AI: suggest skills based on profile */}
+      <AIAssistSkills
+        experience={experience}
+        education={education}
+        targetRole={targetRole}
+        language={language}
+        onAccept={mergeSkills}
+      />
     </div>
   );
 };
@@ -667,6 +870,58 @@ const CertsStep = ({
     </div>
   );
 };
+
+// =============================================================================
+// ATSScoreBadge — lightweight client-side score (0-100)
+// Components: completeness + STAR density (avg bullet length) + ATS-friendliness
+// =============================================================================
+const ATSScoreBadge = ({ draft }: { draft: Draft }) => {
+  const score = computeAtsScore(draft);
+  const color =
+    score >= 80
+      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+      : score >= 60
+      ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+      : "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30";
+  return (
+    <Badge
+      variant="outline"
+      className={cn("font-normal flex items-center gap-1", color)}
+      title="درجة جودة السيرة المقدّرة (مبنية على الاكتمال + الأرقام + ATS-friendliness)"
+    >
+      <Activity className="w-3 h-3" />
+      ATS: {score}/100
+    </Badge>
+  );
+};
+
+function computeAtsScore(d: Draft): number {
+  let s = 0;
+  // Completeness — 40 pts
+  if (d.personal_info?.full_name) s += 6;
+  if (d.personal_info?.email) s += 6;
+  if (d.personal_info?.phone) s += 6;
+  if (d.summary?.ar || d.summary?.en) s += 8;
+  if ((d.experience ?? []).length > 0) s += 8;
+  if ((d.education ?? []).length > 0) s += 6;
+
+  // STAR density: bullets that contain numbers → +1 each up to 20
+  const allBullets = (d.experience ?? []).flatMap((e: any) => e.bullets ?? []);
+  const quantifiedCount = allBullets.filter((b: string) => /\d/.test(b)).length;
+  s += Math.min(20, quantifiedCount * 2);
+
+  // Skills coverage — 20 pts
+  const techCount = (d.skills?.technical ?? []).length;
+  s += Math.min(10, techCount);
+  if ((d.skills?.languages ?? []).length > 0) s += 5;
+  if ((d.skills?.soft ?? []).length > 0) s += 5;
+
+  // Penalty for missing critical
+  if (allBullets.length === 0) s -= 5;
+  if (allBullets.some((b: string) => b.length > 250)) s -= 5; // bullets too long
+
+  return Math.max(0, Math.min(100, Math.round(s)));
+}
 
 const PreviewStep = ({ draft }: { draft: Draft }) => (
   <div className="space-y-4">
