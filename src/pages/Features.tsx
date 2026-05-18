@@ -27,7 +27,7 @@ const sections = [
     id: "training-mode",
     icon: GraduationCap,
     title: "وضع التدريب مقابل وضع التقييم",
-    subtitle: "آمن للفشل — هذا هو الفرق",
+    subtitle: "تدريب خاص بك — هذا هو الفرق",
     color: "emerald",
     body: [
       "كل جلسة تبدأها هي إمّا 'تدريب' (الافتراضي) أو 'تقييم رسمي'. الفرق ليس تجميلياً.",
@@ -252,11 +252,11 @@ const Features = () => {
               جاهز للبدء؟
             </h2>
             <p className="text-primary-foreground/80 max-w-md mx-auto">
-              أنشئ حسابك المجاني وادخل وضع التدريب في أقلّ من دقيقتين.
+              أنشئ حسابك وادخل وضع التدريب في أقلّ من دقيقتين.
             </p>
             <Button size="lg" variant="secondary" className="rounded-2xl px-10 py-7" asChild>
               <Link to="/login?tab=signup">
-                ابدأ مجاناً
+                ابدأ الآن
                 <ChevronLeft className="w-5 h-5 mr-1" />
               </Link>
             </Button>

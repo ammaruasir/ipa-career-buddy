@@ -1,20 +1,30 @@
-## Problem
+## التعديلات المطلوبة
 
-During the demo (Act 2), the narration about password reset navigates to `/reset-password`. That page is only valid when arrived at from a real recovery email link (it checks for `type=recovery` in the URL hash). Without it, it correctly shows "رابط غير صالح. يرجى طلب رابط إعادة تعيين جديد" — which breaks the demo storytelling.
+**أولاً: إزالة كلمة "مجاني/مجاناً/المجاني"** من نصوص الواجهة:
 
-The right page to showcase is the **"forgot password" request form** (email input → "send reset link"), which currently only renders when the user clicks the link on `/login` (toggled by local state `isForgotPassword`).
+| الملف | السطر | قبل | بعد |
+|---|---|---|---|
+| `src/pages/Index.tsx` | 125 | "ابدأ مجاناً" | "ابدأ الآن" |
+| `src/pages/Index.tsx` | 156 | "ابدأ مجاناً" | "ابدأ الآن" |
+| `src/pages/Index.tsx` | 211 | "ابدأ التدريب المجاني" | "ابدأ التدريب" |
+| `src/pages/Index.tsx` | 558 | "أنشئ حسابك المجاني" | "أنشئ حسابك" |
+| `src/pages/Features.tsx` | 255 | "أنشئ حسابك المجاني وادخل وضع التدريب…" | "أنشئ حسابك وادخل وضع التدريب…" |
+| `src/pages/Features.tsx` | 259 | "ابدأ مجاناً" | "ابدأ الآن" |
+| `src/demo/tour-script.ts` | 135 | label "ابدأ مجاناً" | label "ابدأ الآن" |
 
-## Plan
+**ثانياً: استبدال "آمن للفشل" بكلمة واحدة تعبّر عن المعنى (جلسات خاصة/تدريبية لا تُعرض):**
+الكلمة المقترحة: **"خاصة"** (أي جلسات خاصة بالمستخدم لا تظهر لأحد).
 
-1. **`src/pages/Login.tsx`** — Support a URL query param to open the forgot-password view directly:
-   - Read `searchParams.get("forgot")` on mount and initialize `isForgotPassword` to `true` when it's set (e.g. `?forgot=1`).
-   - No other behavior change.
+| الملف | السطر | قبل | بعد |
+|---|---|---|---|
+| `src/pages/Index.tsx` | 230 | value: "آمن للفشل" | value: "خاصة" |
+| `src/pages/Index.tsx` | 263 | title: "وضع التدريب (آمن للفشل)" | title: "وضع التدريب (خاص)" |
+| `src/pages/Features.tsx` | 30 | subtitle: "آمن للفشل — هذا هو الفرق" | subtitle: "تدريب خاص بك — هذا هو الفرق" |
+| `src/components/training/TrainingSection.tsx` | 74 | "وضع التدريب — آمن للفشل" | "وضع التدريب — خاص بك" |
+| `src/demo/feature-spec.ts` | 16 | "وضع آمن للفشل" | "وضع تدريب خاص" |
 
-2. **`src/demo/tour-script.ts`** — Update the `act2-reset-password` step:
-   - Change `route` from `/reset-password` to `/login?forgot=1`.
-   - Keep the same narration and spotlight selector (`input[type='email']` still matches the email field on the forgot form).
+**ملاحظات:**
+- لم أمسّ رسائل الأخطاء التي تستخدم كلمة "فشل" (مثل "فشل الحفظ") لأنها سياق مختلف تماماً.
+- لم أمسّ كلمة "أمن سيبراني" في `location-data.ts`.
 
-## Out of scope
-
-- No change to `ResetPassword.tsx` (it stays as-is for real recovery flows).
-- No backend, voice, or other tour steps changed.
+هل أوافق على الكلمة البديلة "**خاص/خاصة**"؟ أو تفضّل كلمة أخرى مثل "آمن" أو "تجريبي" أو "تدريبي"؟
