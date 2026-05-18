@@ -237,6 +237,19 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
     return () => observer.disconnect();
   }, [status]);
 
+  // Preload the first step's TTS in the background once the provider mounts
+  // so the very first click doesn't sit silent for 2–4s while the TTS POST
+  // round-trips. Fire-and-forget; speak() handles a missing/failed preload.
+  useEffect(() => {
+    const first = tourScript[0];
+    if (!first) return;
+    if (preloadedAudioRef.current.has(first.id)) return;
+    const p = voice.fetchTtsBlob(first.narration).catch(() => null);
+    preloadedAudioRef.current.set(first.id, p);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   const setMicConsent = useCallback((on: boolean) => {
     setMicConsentState(on);
     if (typeof window !== "undefined") {
