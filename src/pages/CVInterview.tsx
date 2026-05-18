@@ -379,6 +379,10 @@ const CVInterview = () => {
   return (
     <div className="min-h-screen bg-background" dir={dir}>
       <div className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="rounded-xl -mb-2">
+          {dir === "rtl" ? <ArrowRight className="w-4 h-4 ml-1.5" /> : <ArrowLeft className="w-4 h-4 mr-1.5" />}
+          {uiLang === "en" ? "Back to home" : "العودة للرئيسية"}
+        </Button>
         {/* Progress */}
         <Card className="rounded-2xl">
           <CardContent className="p-4 space-y-2">
