@@ -82,12 +82,14 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
   }, [messages]);
 
   const send = async (text?: string) => {
-    const msg = (text ?? input).trim();
-    if (!msg || loading) return;
+    const raw = (text ?? input).trim();
+    if (!raw || loading) return;
 
     setInput("");
-    setMessages((m) => [...m, { role: "user", content: msg }]);
     setLoading(true);
+    // Silent Arabic proofread before sending (only auto-applies single-option fixes)
+    const msg = language === "ar" ? await proofreadText(raw, "general") : raw;
+    setMessages((m) => [...m, { role: "user", content: msg }]);
 
     try {
       const { data, error } = await supabase.functions.invoke("chat-with-cv", {
