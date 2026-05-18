@@ -5,9 +5,10 @@ import {
   rateLimitResponse,
 } from "../_shared/guards.ts";
 
-// Admin-only endpoint that proxies ElevenLabs's GET /v1/voices so the
-// AdminSettings dropdown can show a live, curated list of voices instead
-// of a hardcoded one. We never leak the ElevenLabs API key to the client.
+// Admin-only endpoint that proxies the Wakeb AI Engine voice catalogue so the
+// AdminSettings dropdown can show a live, curated list of voices instead of
+// a hardcoded one. Upstream provider credentials are never returned to the
+// client.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,7 +16,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-interface ElevenLabsVoice {
+interface UpstreamVoice {
   voice_id: string;
   name: string;
   labels?: Record<string, string>;
@@ -83,7 +84,7 @@ serve(async (req) => {
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     // Defensive rate limit — even an admin shouldn't be able to spam the
     // upstream API.
-    const rl = await checkRateLimit(supabaseAdmin, callerId, "elevenlabs_voices", 30, 60);
+    const rl = await checkRateLimit(supabaseAdmin, callerId, "wakeb_voices", 30, 60);
     if (!rl.allowed) return rateLimitResponse(rl.retryAfter, corsHeaders);
 
     const resp = await fetch("https://api.elevenlabs.io/v1/voices", {
@@ -92,15 +93,15 @@ serve(async (req) => {
 
     if (!resp.ok) {
       const text = await resp.text().catch(() => "");
-      console.error("ElevenLabs /v1/voices error:", resp.status, text);
-      return new Response(JSON.stringify({ error: "Failed to fetch voices" }), {
+      console.error("[wakeb-voices] upstream error:", resp.status, text);
+      return new Response(JSON.stringify({ error: "Failed to fetch voice catalogue" }), {
         status: resp.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const data = await resp.json();
-    const voices: ElevenLabsVoice[] = Array.isArray(data?.voices) ? data.voices : [];
+    const voices: UpstreamVoice[] = Array.isArray(data?.voices) ? data.voices : [];
 
     const curated: CuratedVoice[] = voices.map((v) => ({
       voice_id: v.voice_id,
@@ -120,7 +121,7 @@ serve(async (req) => {
       },
     });
   } catch (err) {
-    console.error("elevenlabs-voices error:", err);
+    console.error("[wakeb-voices] handler error:", err);
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

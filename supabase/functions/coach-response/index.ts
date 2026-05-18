@@ -266,7 +266,8 @@ serve(async (req) => {
       if (!rl.allowed) return rateLimitResponse(rl.retryAfter, corsHeaders);
     }
 
-    // Prefer Lovable AI gateway (cheaper Gemini for practice); fall back to OpenAI.
+    // Wakeb AI Engine — prefer the cheaper multimodal upstream for practice;
+    // fall back to the text upstream when unavailable.
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 

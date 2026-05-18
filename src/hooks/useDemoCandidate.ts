@@ -55,7 +55,7 @@ export function useDemoCandidate() {
       setIsAnswering(true);
       try {
         const ttsResp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-elevenlabs-tts`,
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-wakeb-tts`,
           {
             method: "POST",
             headers: {

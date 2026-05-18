@@ -1,5 +1,10 @@
 // Voice IDs used by Demo Mode (عبدالله + سعد) and the platform interviewer.
-// All three speak Hijazi (Jeddawi) Arabic via the supplied ElevenLabs voice.
+// All three currently resolve to a single male Hijazi (Jeddawi) Arabic voice
+// as a fallback. Phase B.5 (voice procurement) is external work — once
+// cloned voices land, the presenter and candidate will get distinct voices
+// via Wakeb AI Engine voice cloning. Procurement checklist: audit
+// AdminSettings voices → record 1F + 1M Khaleeji/Hijazi samples → clone
+// → blind-listen test with native speakers.
 
 const JEDDAWI_MALE_VOICE = "yXEnnEln9armDCyhkXcA";
 

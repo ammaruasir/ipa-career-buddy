@@ -29,7 +29,7 @@ if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
 const cleanText = (t: string) => t.replace(/(.)\1{2,}/g, "$1");
 
 async function tts(text: string): Promise<ArrayBuffer> {
-  const resp = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/wakeb-tts`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

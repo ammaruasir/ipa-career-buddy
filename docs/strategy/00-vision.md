@@ -24,7 +24,7 @@
 
 - **واجهة عربية كاملة RTL** + برومبت ذكاء اصطناعي عربي.
 - **شخصية مقابِل مخصّصة ثقافياً** (Avatar بزي سعودي — ثوب/عباءة) في `src/components/interview/AIAvatarScene.tsx`.
-- **أصوات عربية أصلية** عبر ElevenLabs (هيثم/سناء) — `supabase/functions/elevenlabs-tts/index.ts`.
+- **أصوات عربية أصلية** عبر محرك واكب للذكاء الاصطناعي — `supabase/functions/wakeb-tts/index.ts`.
 - **محرّك تقييم متطوّر**: DISC + 5 أبعاد + توصية نهائية في `supabase/functions/evaluate-interview/index.ts`.
 - **بنية مقابلة حيّة مرحلية** (INTRO → CORE → CLOSING → END) مع كشف صمت ومزامنة TTS — `src/hooks/useLiveInterview.ts` + `src/components/interview/LiveInterview.tsx`.
 - **تسجيل مرن** مع checkpoint كل 20 ثانية، ومقاومة لانقطاع الاتصال.

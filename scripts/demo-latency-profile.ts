@@ -48,12 +48,12 @@ async function profileLlm(question: string): Promise<number> {
 
 async function profileTtsFirstByte(): Promise<number> {
   const t0 = performance.now();
-  const resp = await fetch(`${SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/wakeb-tts`, {
     method: "POST",
     headers: { ...headers, Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}` },
     body: JSON.stringify({ text: "مرحباً، هذا اختبار زمن استجابة." }),
   });
-  if (!resp.ok) throw new Error(`elevenlabs-tts ${resp.status}`);
+  if (!resp.ok) throw new Error(`wakeb-tts ${resp.status}`);
   const reader = resp.body!.getReader();
   await reader.read();
   await reader.cancel();

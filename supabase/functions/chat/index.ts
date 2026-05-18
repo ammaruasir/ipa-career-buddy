@@ -241,7 +241,7 @@ ${isFemale ? "تتكلمين" : "تتكلم"} بلهجة سعودية مهنية
 
     if (!response.ok) {
       const t = await response.text();
-      console.error("OpenAI API error:", response.status, t);
+      console.error("[chat] Wakeb upstream error:", response.status, t);
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "تم تجاوز الحد المسموح، يرجى المحاولة لاحقاً" }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },

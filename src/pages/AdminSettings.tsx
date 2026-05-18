@@ -22,8 +22,8 @@ import {
   MapPin, Building2, ToggleLeft, ToggleRight, Mic
 } from "lucide-react";
 
-// Fallback when the live ElevenLabs voice list can't be fetched (e.g. function
-// not deployed yet or upstream 5xx). Mirrors the previous hard-coded list.
+// Fallback when the live Wakeb voice catalogue can't be fetched (e.g. function
+// not deployed yet or upstream 5xx). Mirrors the previously hard-coded list.
 const FALLBACK_VOICES: Array<{ voice_id: string; label: string }> = [
   { voice_id: "QsV9PCczMIklRM6xLPAS", label: "هبة منصوري — أنثى سعودية (محادثة/خدمة عملاء) ⭐" },
   { voice_id: "IK7YYZcSpmlkjKrQxbSn", label: "رائد — ذكر سعودي (رسمي/سرد)" },
@@ -98,7 +98,7 @@ const AdminSettings = () => {
   const [savingVoice, setSavingVoice] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState(false);
 
-  // ElevenLabs voices: try to fetch live list; fall back to hard-coded curated set
+  // Wakeb voice catalogue: try to fetch live list; fall back to hard-coded curated set
   const [voiceOptions, setVoiceOptions] = useState<Array<{ voice_id: string; label: string }>>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
 
@@ -108,7 +108,7 @@ const AdminSettings = () => {
     (async () => {
       setVoicesLoading(true);
       try {
-        const { data, error } = await supabase.functions.invoke("elevenlabs-voices", { body: {} });
+        const { data, error } = await supabase.functions.invoke("wakeb-voices", { body: {} });
         if (cancelled) return;
         if (error || !data?.voices?.length) throw error || new Error("empty");
         const opts = (data.voices as Array<any>)
@@ -170,7 +170,7 @@ const AdminSettings = () => {
       const accessToken = sessionData.session?.access_token
         ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/wakeb-tts`,
         {
           method: "POST",
           headers: {
@@ -717,7 +717,7 @@ const AdminSettings = () => {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label className="font-tajawal">صوت ElevenLabs</Label>
+                      <Label className="font-tajawal">صوت محرك واكب للذكاء الاصطناعي</Label>
                       <Select
                         value={voiceDraft?.voice_id ?? "QsV9PCczMIklRM6xLPAS"}
                         onValueChange={(v) => setVoiceDraft((d) => d ? { ...d, voice_id: v } : d)}

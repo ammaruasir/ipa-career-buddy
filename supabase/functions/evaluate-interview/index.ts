@@ -247,7 +247,7 @@ ${videoAnalysisSummary}`;
 
     if (!response.ok) {
       const t = await response.text();
-      console.error("OpenAI API error:", response.status, t);
+      console.error("[evaluate-interview] Wakeb upstream error:", response.status, t);
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "تم تجاوز الحد المسموح" }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -12,11 +12,13 @@ const corsHeaders = {
 };
 
 // Voice IDs are validated by shape, not whitelist. The admin can now pick any
-// voice in the org's ElevenLabs account via elevenlabs-voices; locking this
+// voice via the Wakeb AI Engine catalogue (wakeb-voices); locking this
 // function to a hard-coded list would defeat that. Auth gate + rate limit
 // are the real abuse defense.
 const VOICE_ID_RE = /^[A-Za-z0-9_-]{16,32}$/;
 
+// Underlying upstream TTS model identifiers. These are not exposed to the
+// platform; they're the internal IDs the upstream provider expects.
 const ALLOWED_MODELS = new Set([
   "eleven_flash_v2_5",
   "eleven_multilingual_v2",
@@ -98,9 +100,11 @@ serve(async (req) => {
       if (!rl.allowed) return rateLimitResponse(rl.retryAfter, corsHeaders);
     }
 
-    console.log(`[TTS] user=${userId ?? "server"} voice=${selectedVoiceId} model=${primaryModel} chars=${text.length}`);
+    console.log(`[wakeb-tts] user=${userId ?? "server"} voice=${selectedVoiceId} model=${primaryModel} chars=${text.length}`);
 
-    const callElevenLabs = async (modelId: string) =>
+    // Internal upstream call. The upstream provider is an implementation
+    // detail; the platform only exposes "wakeb-tts" to clients.
+    const callUpstreamTts = async (modelId: string) =>
       fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}/stream?output_format=mp3_44100_128`,
         {
@@ -123,19 +127,20 @@ serve(async (req) => {
         }
       );
 
-    let response = await callElevenLabs(primaryModel);
+    let response = await callUpstreamTts(primaryModel);
 
-    // Fallback to multilingual_v2 if flash fails (e.g. voice not supported on flash)
+    // Fallback to the multilingual model if the flash variant fails (e.g.
+    // voice not supported on the faster model).
     if (!response.ok && primaryModel !== "eleven_multilingual_v2") {
       const errText = await response.text();
-      console.warn(`[TTS] ${primaryModel} failed (${response.status}): ${errText}. Retrying with multilingual_v2`);
-      response = await callElevenLabs("eleven_multilingual_v2");
+      console.warn(`[wakeb-tts] ${primaryModel} failed (${response.status}): ${errText}. Retrying with fallback model`);
+      response = await callUpstreamTts("eleven_multilingual_v2");
     }
 
     if (!response.ok || !response.body) {
       const errorText = await response.text().catch(() => "");
-      console.error("ElevenLabs TTS API error:", response.status, errorText);
-      return new Response(JSON.stringify({ error: "TTS generation failed" }), {
+      console.error("[wakeb-tts] upstream error:", response.status, errorText);
+      return new Response(JSON.stringify({ error: "Wakeb TTS generation failed" }), {
         status: response.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -150,7 +155,7 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error("Error in TTS function:", error);
+    console.error("[wakeb-tts] handler error:", error);
     return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

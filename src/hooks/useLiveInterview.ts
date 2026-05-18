@@ -149,8 +149,8 @@ export const useLiveInterview = ({
     broadcastChunkReadyRef.current = broadcastChunkReady;
   }, [broadcastChunkReady]);
 
-  // Speak text using ElevenLabs TTS and resolve when done
-  // Fallback: use browser SpeechSynthesis
+  // Speak text using the Wakeb AI Engine TTS and resolve when done.
+  // Fallback: use the browser's SpeechSynthesis API.
   const speakWithBrowserTTS = useCallback((text: string): Promise<void> => {
     return new Promise((resolve) => {
       if (!window.speechSynthesis) { resolve(); return; }
@@ -174,7 +174,7 @@ export const useLiveInterview = ({
     return text.replace(/(.)\1{2,}/g, '$1');
   };
 
-  // Speak text using ElevenLabs TTS with browser fallback
+  // Speak text using the Wakeb AI Engine TTS with browser fallback
   const speakText = useCallback((text: string): Promise<void> => {
     const cleanedText = cleanTextForTTS(text);
     return new Promise(async (resolve) => {
@@ -184,7 +184,7 @@ export const useLiveInterview = ({
         const accessToken = sessionData.session?.access_token
           ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/wakeb-tts`,
           {
             method: "POST",
             headers: {
@@ -253,7 +253,7 @@ export const useLiveInterview = ({
         }
         await audio.play();
       } catch (error) {
-        console.error("ElevenLabs TTS failed, falling back to browser TTS:", error);
+        console.error("Wakeb AI Engine TTS failed, falling back to browser TTS:", error);
         currentAudioRef.current = null;
         setIsSpeaking(false);
         // Fallback to browser TTS

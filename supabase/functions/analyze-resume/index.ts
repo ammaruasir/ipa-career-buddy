@@ -54,7 +54,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Use Gemini with the PDF as inline data
+    // Wakeb AI Engine multimodal upstream — PDF as inline data
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -263,7 +263,7 @@ serve(async (req) => {
         weaknesses,
         rewrites,
         saudi_compliance,
-        model_used: "google/gemini-3-flash-preview",
+        model_used: "wakeb-ai-engine",
         tokens_used: aiData.usage?.total_tokens ?? null,
       })
       .select()

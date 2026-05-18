@@ -1,5 +1,5 @@
-// Public, IP-rate-limited TTS for /demo (Lina + Sara voices).
-// Mirrors elevenlabs-tts but drops the auth gate and locks voiceId to the
+// Public, IP-rate-limited TTS for /demo (presenter + candidate voices).
+// Mirrors wakeb-tts but drops the auth gate and locks voiceId to the
 // known demo voices so this can't be used as a free TTS proxy.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -27,12 +27,12 @@ serve(async (req) => {
 
   try {
     // ~120 TTS calls / hr / IP. A full 39-step tour + Sara answers fits comfortably.
-    const limited = await enforceIpRateLimit(req, "demo-elevenlabs-tts", 120, 3600, corsHeaders);
+    const limited = await enforceIpRateLimit(req, "demo-wakeb-tts", 120, 3600, corsHeaders);
     if (limited) return limited;
 
-    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
-    if (!ELEVENLABS_API_KEY) {
-      return new Response(JSON.stringify({ error: "ELEVENLABS_API_KEY not set" }), {
+    const WAKEB_TTS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+    if (!WAKEB_TTS_API_KEY) {
+      return new Response(JSON.stringify({ error: "Wakeb TTS API key not set" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -57,13 +57,13 @@ serve(async (req) => {
         ? voiceId
         : "yXEnnEln9armDCyhkXcA";
 
-    const callElevenLabs = (modelId: string) =>
+    const callUpstreamTts = (modelId: string) =>
       fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}/stream?output_format=mp3_44100_128`,
         {
           method: "POST",
           headers: {
-            "xi-api-key": ELEVENLABS_API_KEY,
+            "xi-api-key": WAKEB_TTS_API_KEY,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -80,17 +80,17 @@ serve(async (req) => {
         },
       );
 
-    let response = await callElevenLabs("eleven_multilingual_v2");
+    let response = await callUpstreamTts("eleven_multilingual_v2");
     if (!response.ok) {
       const errText = await response.text();
-      console.warn(`[demo-tts] multilingual_v2 failed (${response.status}): ${errText}. Retrying flash_v2_5`);
-      response = await callElevenLabs("eleven_flash_v2_5");
+      console.warn(`[demo-wakeb-tts] multilingual_v2 failed (${response.status}): ${errText}. Retrying flash_v2_5`);
+      response = await callUpstreamTts("eleven_flash_v2_5");
     }
 
     if (!response.ok || !response.body) {
       const errorText = await response.text().catch(() => "");
-      console.error("ElevenLabs error:", response.status, errorText);
-      return new Response(JSON.stringify({ error: "TTS generation failed" }), {
+      console.error("[demo-wakeb-tts] upstream error:", response.status, errorText);
+      return new Response(JSON.stringify({ error: "Wakeb TTS generation failed" }), {
         status: response.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -104,7 +104,7 @@ serve(async (req) => {
       },
     });
   } catch (e) {
-    console.error("demo-elevenlabs-tts error:", e);
+    console.error("demo-wakeb-tts error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "unknown" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },

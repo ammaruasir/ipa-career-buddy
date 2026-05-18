@@ -52,6 +52,25 @@ export function useDemoVoice() {
     setIsSpeaking(false);
   }, []);
 
+  /** Pause without releasing the audio element. Used during AI-vs-AI live
+   *  interview cameos so the demo narrator yields the audio bus to the real
+   *  interview pipeline, then resumes from the same script position. */
+  const pause = useCallback(() => {
+    if (currentAudioRef.current && !currentAudioRef.current.paused) {
+      currentAudioRef.current.pause();
+    }
+  }, []);
+
+  const resume = useCallback(async () => {
+    if (currentAudioRef.current && currentAudioRef.current.paused) {
+      try {
+        await currentAudioRef.current.play();
+      } catch (e) {
+        console.warn("voice.resume failed:", e);
+      }
+    }
+  }, []);
+
   const playAudioFromUrl = useCallback((audio: HTMLAudioElement, urlsToRevoke: string[]) => {
     currentAudioRef.current = audio;
     return new Promise<void>((resolve) => {
@@ -108,7 +127,7 @@ export function useDemoVoice() {
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-elevenlabs-tts`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-wakeb-tts`,
         {
           method: "POST",
           headers: {
@@ -186,6 +205,8 @@ export function useDemoVoice() {
   return {
     speak,
     stop,
+    pause,
+    resume,
     isSpeaking,
     startRecording,
     stopRecording,

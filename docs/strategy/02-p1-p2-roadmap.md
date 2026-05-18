@@ -56,7 +56,7 @@ SET interviewer_personas = '[
     "name_ar": "نورة الفهد",
     "name_en": "Noura Al-Fahd",
     "gender": "female",
-    "voice_id": "elevenlabs_voice_id_1",
+    "voice_id": "wakeb_voice_id_1",
     "avatar_url": "/personas/noura.png",
     "outfit": "abaya_modern",
     "tone_ar": "ودودة، مشجّعة",
@@ -67,7 +67,7 @@ SET interviewer_personas = '[
     "name_ar": "أحمد القحطاني",
     "name_en": "Ahmed Al-Qahtani",
     "gender": "male",
-    "voice_id": "elevenlabs_voice_id_2",
+    "voice_id": "wakeb_voice_id_2",
     "avatar_url": "/personas/ahmed.png",
     "outfit": "thobe_formal",
     "tone_ar": "تقني، دقيق، يطلب أدلّة",
@@ -78,7 +78,7 @@ SET interviewer_personas = '[
     "name_ar": "د. خالد العنزي",
     "name_en": "Dr. Khaled Al-Anazi",
     "gender": "male",
-    "voice_id": "elevenlabs_voice_id_3",
+    "voice_id": "wakeb_voice_id_3",
     "avatar_url": "/personas/khaled.png",
     "outfit": "thobe_executive",
     "tone_ar": "تنفيذي، رسمي، حكومي",
@@ -168,7 +168,7 @@ src/i18n/
     └── cv.json
 ```
 
-**أيضاً:** قوالب برومبت إنجليزية + أصوات ElevenLabs إنجليزية + قوالب CV إنجليزية.
+**أيضاً:** قوالب برومبت إنجليزية + أصوات إنجليزية من محرك واكب للذكاء الاصطناعي + قوالب CV إنجليزية.
 
 **الجهد:** 14–21 يوم (مراجعة 200+ نص)
 
