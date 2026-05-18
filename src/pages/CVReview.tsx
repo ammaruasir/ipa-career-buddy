@@ -29,7 +29,15 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import CVChatPanel from "@/components/cv-builder/CVChatPanel";
+
+// Extract storage path "<user_id>/<file>" from a full Supabase public/signed URL
+const extractResumePath = (resumeUrl: string | null, userId: string): string => {
+  if (!resumeUrl) return `${userId}/resume.pdf`;
+  const m = resumeUrl.match(/\/resumes\/(.+?)(?:\?|$)/);
+  return m?.[1] ?? `${userId}/resume.pdf`;
+};
 
 interface Weakness {
   section: string;
