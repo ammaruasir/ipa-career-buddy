@@ -302,6 +302,9 @@ const CVBuilder = () => {
               <SkillsStep
                 value={draft.skills}
                 onChange={(v) => update("skills", v)}
+                experience={draft.experience}
+                education={draft.education}
+                language={draft.language}
               />
             )}
             {step === 5 && (
