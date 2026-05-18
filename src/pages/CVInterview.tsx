@@ -21,6 +21,7 @@ import {
   SkipForward,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useProfilePrefill } from "@/hooks/useProfilePrefill";
 
 interface QuestionChoice {
   value: string;
@@ -93,6 +94,8 @@ const TEXT = {
 const CVInterview = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const prefill = useProfilePrefill();
+  const [prefilled, setPrefilled] = useState(false);
 
   // Pre-interview language picker
   const [language, setLanguage] = useState<Lang>("ar");
@@ -119,6 +122,69 @@ const CVInterview = () => {
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
   }, [authLoading, user, navigate]);
+
+  // Map a question field to a sensible default from the user's profile.
+  const prefillFor = (q: Question | null): string => {
+    if (!q || !prefill.loaded) return "";
+    const pi = prefill.personal_info;
+    switch (q.field) {
+      case "personal_info.full_name":
+        return pi.full_name ?? "";
+      case "personal_info.contact": {
+        const parts = [pi.email, pi.phone].filter(Boolean);
+        return parts.join(" — ");
+      }
+      case "target_role":
+        return prefill.major ?? "";
+      case "target_industry":
+        return prefill.major ?? "";
+      case "education": {
+        const ed = prefill.education[0];
+        if (!ed) return "";
+        const head = [ed.degree, ed.major].filter(Boolean).join(" في ");
+        return ed.gpa ? `${head} — المعدل ${ed.gpa}` : head;
+      }
+      case "experience_level": {
+        const yrs = prefill.experience_years ?? -1;
+        if (yrs < 0 || !q.choices) return "";
+        const wantedLabels =
+          yrs === 0
+            ? ["entry", "fresh", "graduate", "خريج", "مبتدئ"]
+            : yrs <= 3
+              ? ["junior", "1-3", "مبتدئ", "حديث"]
+              : yrs <= 7
+                ? ["mid", "intermediate", "4-7", "متوسط"]
+                : ["senior", "lead", "expert", "خبير", "قيادي"];
+        const match = q.choices.find((c) =>
+          wantedLabels.some(
+            (w) =>
+              c.value?.toLowerCase().includes(w) ||
+              c.label_ar?.includes(w) ||
+              c.label_en?.toLowerCase().includes(w),
+          ),
+        );
+        return match?.value ?? "";
+      }
+      default:
+        return "";
+    }
+  };
+
+  // When a new question loads, pre-fill the answer from the profile when possible.
+  useEffect(() => {
+    if (!question) {
+      setPrefilled(false);
+      return;
+    }
+    const seed = prefillFor(question);
+    if (seed) {
+      setAnswer(seed);
+      setPrefilled(true);
+    } else {
+      setPrefilled(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question, prefill.loaded]);
 
   const startInterview = async () => {
     if (!user) return;
@@ -370,6 +436,15 @@ const CVInterview = () => {
                   placeholder={t.yourAnswer}
                   dir={dir}
                 />
+              )}
+
+              {prefilled && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  {uiLang === "en"
+                    ? "Filled from your profile — you can edit it"
+                    : "تم تعبئتها من ملفك — يمكنك التعديل"}
+                </p>
               )}
 
               {/* AI suggestion (when present) */}

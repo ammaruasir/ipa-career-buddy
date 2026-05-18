@@ -145,11 +145,12 @@ const CVBuilder = () => {
           language: d.language ?? "ar",
         });
       } else {
-        // Fresh draft → seed personal info + first education row from profile
+        // Fresh draft → seed personal info + first education row + certifications from profile
         setDraft({
           ...EMPTY_DRAFT,
           personal_info: { ...prefill.personal_info },
           education: prefill.education.length > 0 ? [...prefill.education] : [],
+          certifications: prefill.certifications.length > 0 ? [...prefill.certifications] : [],
         });
         toast.success("تم تعبئة بعض الحقول من ملفك الشخصي — يمكنك تعديلها");
       }
