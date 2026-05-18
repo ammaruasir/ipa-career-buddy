@@ -174,10 +174,23 @@ const CVReview = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 px-4" dir="rtl">
         <FileText className="w-12 h-12 text-muted-foreground" />
-        <p className="text-muted-foreground text-lg text-center">
-          لم يتمّ تحليل سيرة ذاتية بعد. ارفع سيرتك من إعدادات الملف الشخصي لتبدأ.
-        </p>
-        <Button onClick={() => navigate("/settings/profile")}>الذهاب لرفع السيرة</Button>
+        {hasResume ? (
+          <>
+            <p className="text-muted-foreground text-lg text-center">
+              سيرتك الذاتية مرفوعة. اضغط لتحليلها بالذكاء الاصطناعي.
+            </p>
+            <Button onClick={triggerAnalysis} disabled={analyzing}>
+              {analyzing ? "جارٍ التحليل..." : "حلّل سيرتي الآن"}
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="text-muted-foreground text-lg text-center">
+              لم يتمّ تحليل سيرة ذاتية بعد. ارفع سيرتك من إعدادات الملف الشخصي لتبدأ.
+            </p>
+            <Button onClick={() => navigate("/settings/profile")}>الذهاب لرفع السيرة</Button>
+          </>
+        )}
       </div>
     );
   }
