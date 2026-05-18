@@ -16,13 +16,37 @@ const corsHeaders = {
 // ============================================================
 // Question bank — order matters. Bilingual labels.
 // ============================================================
+interface SubFieldDef {
+  key: string;
+  label_ar: string;
+  label_en: string;
+  type: "text" | "email" | "tel" | "url" | "date" | "textarea" | "choice";
+  required?: boolean;
+  placeholder_ar?: string;
+  placeholder_en?: string;
+  choices?: { value: string; label_ar: string; label_en: string }[];
+  span?: 1 | 2; // grid columns
+}
+
 interface QuestionDef {
   id: string;
   step: number;
   field: string;
   required: boolean;
-  type: "text" | "textarea" | "list_text" | "structured_list" | "choice";
+  type:
+    | "text"
+    | "textarea"
+    | "list_text"
+    | "structured_list"
+    | "choice"
+    | "form"
+    | "repeater"
+    | "repeater_simple"
+    | "chips";
   choices?: { value: string; label_ar: string; label_en: string }[];
+  fields?: SubFieldDef[]; // for form & repeater
+  item_label_ar?: string; // for repeaters
+  item_label_en?: string;
   label_ar: string;
   label_en: string;
   hint_ar: string;
