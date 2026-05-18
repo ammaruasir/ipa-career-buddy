@@ -548,20 +548,23 @@ const EducationStep = ({
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input
+              <ProofreadInput
                 placeholder="المؤسّسة التعليمية"
                 value={ed.institution ?? ""}
-                onChange={(e) => updateItem(idx, { institution: e.target.value })}
+                onChange={(v) => updateItem(idx, { institution: v })}
+                proofreadContext="name"
               />
-              <Input
+              <ProofreadInput
                 placeholder="الدرجة (بكالوريوس / ماجستير...)"
                 value={ed.degree ?? ""}
-                onChange={(e) => updateItem(idx, { degree: e.target.value })}
+                onChange={(v) => updateItem(idx, { degree: v })}
+                proofreadContext="general"
               />
-              <Input
+              <ProofreadInput
                 placeholder="التخصّص"
                 value={ed.major ?? ""}
-                onChange={(e) => updateItem(idx, { major: e.target.value })}
+                onChange={(v) => updateItem(idx, { major: v })}
+                proofreadContext="general"
               />
               <Input
                 placeholder="المعدّل (اختياري)"
