@@ -132,5 +132,5 @@ export const tourScript: TourStep[] = [
     spotlight: { selector: "h1", label: "الختام" }, durationEstimateMs: 13_000 },
   { id: "act8-cta", act: "Act 8 — Close", route: "/login?tab=signup",
     narration: "إذا حابب تجرّب بنفسك، عبّي هذا النموذج بإيميلك الحقيقي. راح تبدأ من نفس المكان اللي بدأ منه سعد. شكراً وأهلًا بك في معهد الإدارة العامة.",
-    spotlight: { selector: "form", label: "ابدأ مجاناً" }, durationEstimateMs: 14_000 },
+    spotlight: { selector: "form", label: "ابدأ الآن" }, durationEstimateMs: 14_000 },
 ];
