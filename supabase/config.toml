@@ -69,5 +69,5 @@ verify_jwt = false
 
 [functions.cv-job-alignment]
 verify_jwt = false
-[functions._seed-demo]
+[functions.seed-demo]
 verify_jwt = false
