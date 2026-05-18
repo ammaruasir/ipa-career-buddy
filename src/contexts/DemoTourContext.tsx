@@ -441,7 +441,16 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       if (cancelRef.current) return;
 
       appendTranscript({ role: "presenter", text: step.narration });
-      const speaking = voice.speak(step.narration, undefined, step.id);
+      const preloaded = preloadedAudioRef.current.get(step.id);
+      // Consume the preload so re-runs (resume/next) refetch instead of reusing stale.
+      if (preloaded) preloadedAudioRef.current.delete(step.id);
+      const preloadedBlob = preloaded ? await preloaded.catch(() => null) : null;
+      const speaking = voice
+        .speak(step.narration, undefined, step.id, preloadedBlob)
+        .catch((e) => {
+          console.warn("voice.speak threw unexpectedly:", e);
+          appendTranscript({ role: "presenter", text: "(تعذّر النطق لهذه الخطوة)" });
+        });
 
       if (step.action && !isSessionSwap && !takeOverMode) {
         runAction(step.action).catch((e) =>
