@@ -413,16 +413,17 @@ const SummaryStep = ({
   <div className="space-y-4">
     <div className="space-y-1.5">
       <Label htmlFor="summary-ar">الملخّص (بالعربية)</Label>
-      <Textarea
+      <ProofreadTextarea
         id="summary-ar"
         value={value.ar ?? ""}
-        onChange={(e) => onChange({ ...value, ar: e.target.value })}
+        onChange={(v) => onChange({ ...value, ar: v })}
         placeholder="3–5 أسطر تلخّص خبراتك ومجال تخصّصك وأهدافك المهنية..."
         rows={5}
         dir="rtl"
+        proofreadContext="summary"
       />
       <p className="text-xs text-muted-foreground">
-        نصيحة: ركّز على الإنجازات الكمّية وتجنّب المبالغات.
+        نصيحة: ركّز على الإنجازات الكمّية وتجنّب المبالغات. التدقيق الإملائي يحدث تلقائياً.
       </p>
     </div>
     <div className="space-y-1.5">
