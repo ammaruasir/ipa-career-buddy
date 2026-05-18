@@ -106,19 +106,21 @@ const EMPTY_DRAFT: Draft = {
 const CVBuilder = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const prefill = useProfilePrefill();
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load existing draft
+  // Load existing draft (or seed a fresh one from the user profile)
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/login");
       return;
     }
     if (!user) return;
+    if (!prefill.loaded) return; // wait for profile so seeding is correct
 
     const load = async () => {
       const { data } = await supabase
@@ -142,11 +144,19 @@ const CVBuilder = () => {
           template: d.template ?? "modern",
           language: d.language ?? "ar",
         });
+      } else {
+        // Fresh draft → seed personal info + first education row from profile
+        setDraft({
+          ...EMPTY_DRAFT,
+          personal_info: { ...prefill.personal_info },
+          education: prefill.education.length > 0 ? [...prefill.education] : [],
+        });
+        toast.success("تم تعبئة بعض الحقول من ملفك الشخصي — يمكنك تعديلها");
       }
       setLoading(false);
     };
     load();
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, prefill.loaded]);
 
   // Debounced auto-save
   const saveDraft = useCallback(
