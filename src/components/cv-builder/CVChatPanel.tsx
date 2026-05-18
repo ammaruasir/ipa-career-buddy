@@ -96,19 +96,24 @@ const CVChatPanel = ({ cvDocumentId, language = "ar" }: CVChatPanelProps) => {
         },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.message) throw new Error(language === "en" ? "Empty response" : "استجابة فارغة");
       if (data.conversation_id) setConversationId(data.conversation_id);
       setMessages((m) => [...m, data.message]);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error("chat-with-cv failed:", e);
+      const fallback =
+        e?.message?.includes("Failed to fetch") || e?.name === "FunctionsFetchError"
+          ? language === "en"
+            ? "Connection issue. Please check your internet and try again."
+            : "تعذّر الاتصال. تحقّق من الإنترنت وحاول مجدداً."
+          : e?.message ||
+            (language === "en" ? "Something went wrong. Please try again." : "حدث خطأ. حاول مرّة أخرى.");
+      toast.error(fallback);
+      setInput(msg);
       setMessages((m) => [
         ...m,
-        {
-          role: "assistant",
-          content:
-            language === "en"
-              ? "Sorry, something went wrong. Please try again."
-              : "عذراً، حدث خطأ. حاول مرّة أخرى.",
-        },
+        { role: "assistant", content: `⚠️ ${fallback}` },
       ]);
     } finally {
       setLoading(false);
