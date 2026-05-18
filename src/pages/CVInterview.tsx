@@ -385,9 +385,30 @@ const CVInterview = () => {
       if (error) throw error;
       // Mark that the next prefill effect should NOT overwrite the restored answer
       skipPrefillOnceRef.current = true;
-      setAnswer(data.previous_answer ?? "");
+      const prevQ: Question | null = data.question;
+      const raw = data.previous_answer ?? "";
+      if (prevQ && STRUCTURED_TYPES.includes(prevQ.type)) {
+        // Try to parse structured JSON
+        let parsed: any = null;
+        if (typeof raw === "string" && raw.trim().startsWith(prevQ.type === "form" ? "{" : "[")) {
+          try { parsed = JSON.parse(raw); } catch { parsed = null; }
+        }
+        if (parsed == null) parsed = emptyStructuredFor(prevQ);
+        // Ensure repeater has at least one row for editing
+        if (prevQ.type === "repeater" && (!Array.isArray(parsed) || parsed.length === 0)) {
+          parsed = emptyStructuredFor(prevQ);
+        }
+        if (prevQ.type === "repeater_simple" && (!Array.isArray(parsed) || parsed.length === 0)) {
+          parsed = [""];
+        }
+        setStructuredAnswer(parsed);
+        setAnswer("");
+      } else {
+        setStructuredAnswer(null);
+        setAnswer(typeof raw === "string" ? raw : "");
+      }
       setCurrentStep(data.current_step);
-      setQuestion(data.question);
+      setQuestion(prevQ);
     } catch (e) {
       console.error(e);
       toast.error(uiLang === "en" ? "Failed to go back" : "تعذّر الرجوع");
