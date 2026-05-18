@@ -271,6 +271,7 @@ ${JSON.stringify(cvDoc, null, 2).slice(0, 5000)}
       content: parsed.message,
       justifications: parsed.justifications ?? [],
       suggested_actions: parsed.suggested_actions ?? [],
+      replacements: parsed.replacements ?? [],
       created_at: new Date().toISOString(),
     };
     history.push(assistantMessage);
