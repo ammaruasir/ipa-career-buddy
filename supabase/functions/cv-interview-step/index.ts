@@ -318,7 +318,7 @@ async function suggestForQuestion(
   language: string,
 ) {
   // Only suggest for free-text and textarea questions
-  if (q.type === "choice" || q.type === "text") return null;
+  if (q.type !== "textarea" && q.type !== "list_text" && q.type !== "structured_list") return null;
 
   try {
     const { apiKey, apiUrl, model } = pickProvider();
