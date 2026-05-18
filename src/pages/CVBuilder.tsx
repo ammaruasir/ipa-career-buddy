@@ -431,15 +431,43 @@ const CVBuilder = () => {
               <ArrowLeft className="w-4 h-4 mr-2" />
             </Button>
           ) : (
-            <Button
-              onClick={() =>
-                toast.info("تصدير PDF عربي قيد التطوير — يتطلّب اختبار جودة RTL.")
-              }
-              className="rounded-xl"
-            >
-              <Download className="w-4 h-4 ml-2" />
-              تصدير PDF (قريباً)
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={async () => {
+                  try {
+                    const data = draftToCV(draft);
+                    await exportToDocx(data, `cv-${Date.now()}.docx`, {
+                      language: effectiveLang(draft),
+                    });
+                    toast.success("تم تصدير ملف Word");
+                  } catch (e: any) {
+                    toast.error(e?.message || "فشل تصدير Word");
+                  }
+                }}
+              >
+                <Download className="w-4 h-4 ml-2" />
+                تصدير Word (.docx)
+              </Button>
+              <Button
+                className="rounded-xl"
+                onClick={() => {
+                  try {
+                    const data = draftToCV(draft);
+                    exportToPdf(data, `cv-${Date.now()}.pdf`, {
+                      language: effectiveLang(draft),
+                    });
+                    toast.success("افتح نافذة الطباعة واختر 'حفظ كـ PDF'");
+                  } catch (e: any) {
+                    toast.error(e?.message || "فشل تصدير PDF");
+                  }
+                }}
+              >
+                <Download className="w-4 h-4 ml-2" />
+                تصدير PDF
+              </Button>
+            </div>
           )}
         </div>
       </div>
