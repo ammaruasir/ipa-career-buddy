@@ -27,6 +27,7 @@ import {
   Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AIAssistBullets } from "@/components/cv-builder/AIAssistButton";
 
 interface PersonalInfo {
   full_name?: string;
@@ -287,6 +288,8 @@ const CVBuilder = () => {
               <ExperienceStep
                 value={draft.experience}
                 onChange={(v) => update("experience", v)}
+                targetRole={(draft.personal_info as any)?.target_role}
+                language={draft.language}
               />
             )}
             {step === 3 && (
@@ -421,14 +424,23 @@ const SummaryStep = ({
 const ExperienceStep = ({
   value,
   onChange,
+  targetRole,
+  language,
 }: {
   value: ExperienceItem[];
   onChange: (v: ExperienceItem[]) => void;
+  targetRole?: string;
+  language: "ar" | "en" | "bilingual";
 }) => {
   const add = () => onChange([...value, {}]);
   const remove = (idx: number) => onChange(value.filter((_, i) => i !== idx));
   const updateItem = (idx: number, patch: Partial<ExperienceItem>) =>
     onChange(value.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+
+  const acceptBullets = (idx: number, bullets: string[]) => {
+    const existing = value[idx]?.bullets ?? [];
+    updateItem(idx, { bullets: [...existing, ...bullets] });
+  };
 
   return (
     <div className="space-y-4">
@@ -464,13 +476,21 @@ const ExperienceStep = ({
               />
             </div>
             <Textarea
-              placeholder="اكتب إنجازاتك (سطر لكل إنجاز)"
+              placeholder="اكتب إنجازاتك (سطر لكل إنجاز) — أو وصفاً حرّاً ثم اضغط زرّ AI بالأسفل"
               value={(exp.bullets ?? []).join("\n")}
               onChange={(e) =>
                 updateItem(idx, { bullets: e.target.value.split("\n").filter(Boolean) })
               }
               rows={4}
               dir="rtl"
+            />
+
+            {/* AI Assist: convert raw description to STAR bullets */}
+            <AIAssistBullets
+              role={exp.position || targetRole || ""}
+              rawDescription={(exp.bullets ?? []).join("\n")}
+              language={language}
+              onAccept={(bullets) => acceptBullets(idx, bullets)}
             />
           </CardContent>
         </Card>

@@ -12,95 +12,67 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  MessageSquare,
-  Mic,
-  Video,
+  GraduationCap,
+  PenLine,
+  MessagesSquare,
+  ScanSearch,
   Briefcase,
-  BarChart3,
+  Users,
   Shield,
   Brain,
   FileText,
   LogIn,
   UserPlus,
   Menu,
-  X,
   Star,
   ChevronLeft,
   Award,
-  Users,
   TrendingUp,
   CheckCircle2,
   LogOut,
   LayoutDashboard,
-  MapPin,
-  Building2,
-  Clock,
-  Loader2,
-  Send,
+  Sparkles,
+  Mic,
+  ShieldCheck,
+  Target,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 
 const navLinks = [
   { label: "الرئيسية", href: "#" },
-  { label: "المقابلات", href: "#features" },
-  { label: "الوظائف", href: "#vacancies" },
-  { label: "كيف تعمل", href: "#how-it-works" },
-  { label: "الدعم", href: "#footer" },
+  { label: "ماذا نقدّم", href: "#features" },
+  { label: "كيف نعمل", href: "#how-it-works" },
+  { label: "ما يميّزنا", href: "#differentiators" },
+  { label: "تواصل", href: "#footer" },
 ];
-
-const employmentTypeMap: Record<string, string> = {
-  full_time: "دوام كامل",
-  part_time: "دوام جزئي",
-  contract: "عقد مؤقت",
-};
-
-interface LandingVacancy {
-  id: string;
-  title: string;
-  description: string | null;
-  department: string | null;
-  location: string | null;
-  employment_type: string;
-  created_at: string;
-}
 
 const Index = () => {
   const { user, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [vacancies, setVacancies] = useState<LandingVacancy[]>([]);
-  const [vacanciesLoading, setVacanciesLoading] = useState(true);
-
-  useEffect(() => {
-    supabase
-      .from("job_vacancies")
-      .select("id, title, description, department, location, employment_type, created_at")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(6)
-      .then(({ data }) => {
-        setVacancies((data as LandingVacancy[]) || []);
-        setVacanciesLoading(false);
-      });
-  }, []);
 
   const userInitial = user?.user_metadata?.full_name?.[0] || user?.email?.[0] || "م";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" dir="rtl">
       {/* ── Sticky Navigation ── */}
       <header className="border-b border-border bg-card/90 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto flex items-center justify-between py-3 px-4">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
-            <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="w-11 h-11 rounded-xl object-contain shadow-md group-hover:shadow-lg transition-shadow" />
+            <img
+              src="/ipa-logo.png"
+              alt="معهد الإدارة العامة"
+              className="w-11 h-11 rounded-xl object-contain shadow-md group-hover:shadow-lg transition-shadow"
+            />
             <div className="hidden sm:block">
-              <h2 className="text-base font-bold text-foreground leading-tight">منصة المقابلات الذكية - معهد الإدارة العامة</h2>
-              <p className="text-[11px] text-muted-foreground">مدعومة بمحرك واكب للذكاء الاصطناعي</p>
+              <h2 className="text-base font-bold text-foreground leading-tight">
+                منصّة تدريب IPA الذكية
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                تدرّب · ابنِ سيرتك · انطلق للوظيفة الحكومية
+              </p>
             </div>
           </Link>
 
-          {/* Desktop nav links */}
           <nav className="hidden md:flex items-center gap-1">
             {navLinks.map((l) => (
               <a
@@ -113,7 +85,6 @@ const Index = () => {
             ))}
           </nav>
 
-          {/* Auth area */}
           <div className="flex items-center gap-2">
             {user ? (
               <DropdownMenu>
@@ -150,13 +121,12 @@ const Index = () => {
                 <Button size="sm" className="rounded-xl" asChild>
                   <Link to="/login?tab=signup" className="gap-1.5">
                     <UserPlus className="w-4 h-4" />
-                    إنشاء حساب
+                    ابدأ مجاناً
                   </Link>
                 </Button>
               </div>
             )}
 
-            {/* Mobile menu */}
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="md:hidden">
@@ -182,7 +152,7 @@ const Index = () => {
                         <Link to="/login" onClick={() => setMobileOpen(false)}>تسجيل الدخول</Link>
                       </Button>
                       <Button className="w-full rounded-xl mt-2" asChild>
-                        <Link to="/login?tab=signup" onClick={() => setMobileOpen(false)}>إنشاء حساب</Link>
+                        <Link to="/login?tab=signup" onClick={() => setMobileOpen(false)}>ابدأ مجاناً</Link>
                       </Button>
                     </>
                   )}
@@ -193,40 +163,39 @@ const Index = () => {
         </div>
       </header>
 
-      {/* ── Hero Section ── */}
-      <section className="relative overflow-hidden py-24 md:py-36">
-        {/* Animated gradient bg */}
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden py-20 md:py-32">
         <div className="absolute inset-0 hero-gradient opacity-90" />
-        {/* Decorative floating shapes */}
         <div className="absolute top-20 right-[10%] w-72 h-72 rounded-full bg-secondary/10 blur-3xl animate-float" />
         <div className="absolute bottom-10 left-[15%] w-56 h-56 rounded-full bg-primary/10 blur-3xl animate-float-delayed" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-accent/5 blur-3xl" />
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl mx-auto text-center space-y-8">
+          <div className="max-w-4xl mx-auto text-center space-y-7">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-5 py-2.5 rounded-full text-sm font-semibold border border-primary/20">
               <Shield className="w-4 h-4" />
-              مدعوم بمحرك واكب للذكاء الاصطناعي
+              معهد الإدارة العامة (IPA) · متوافقة مع رؤية ٢٠٣٠
             </div>
 
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold text-foreground leading-[1.15] tracking-tight">
-              المقابلات الذكية
+              تدرّب · ابنِ سيرتك
               <br />
-              <span className="text-primary">مستقبل التوظيف يبدأ هنا</span>
+              <span className="text-primary">انطلق للوظيفة الحكومية</span>
             </h1>
 
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              منصة متطورة باستخدام محرك واكب للذكاء الاصطناعي لإعداد المرشحين وتقييمهم في المقابلات الوظيفية
+              منصّة تدريب متكاملة بـ AI عربي. تدرّب على المقابلات بأمان، ابنِ سيرتك بطرق متعدّدة،
+              واحصل على تغذية راجعة تعليمية تشرح لك "لماذا" — لا فقط درجة.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
               <Button
                 size="lg"
                 className="rounded-2xl text-base px-10 py-7 shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5"
                 asChild
               >
-                <Link to="/interview/text">
-                  ابدأ المقابلة التجريبية
+                <Link to={user ? "/dashboard" : "/login?tab=signup"}>
+                  ابدأ التدريب المجاني
                   <ChevronLeft className="w-5 h-5 mr-1" />
                 </Link>
               </Button>
@@ -236,22 +205,22 @@ const Index = () => {
                 className="rounded-2xl text-base px-10 py-7 border-2"
                 asChild
               >
-                <a href="#features">تعرف على المزيد</a>
+                <a href="#features">اعرف ماذا نقدّم</a>
               </Button>
             </div>
           </div>
 
-          {/* Stats bar */}
+          {/* Stats — training-first */}
           <div className="mt-20 max-w-3xl mx-auto">
             <div className="grid grid-cols-3 gap-4 bg-card/80 backdrop-blur-sm rounded-2xl border border-border p-6 shadow-lg">
               {[
-                { value: "١٠٠٠+", label: "مقابلة مكتملة", icon: Users },
-                { value: "٩٥%", label: "دقة التحليل", icon: TrendingUp },
-                { value: "٥٠+", label: "شركة شريكة", icon: Award },
+                { value: "آمن للفشل", label: "وضع تدريب خاص بك", icon: GraduationCap },
+                { value: "STAR + DISC", label: "تحليل لكل إجابة", icon: Brain },
+                { value: "٣ طرق للسيرة", label: "محادثة · يدوي · تقييم", icon: FileText },
               ].map((stat, i) => (
                 <div key={i} className="text-center space-y-1">
                   <stat.icon className="w-5 h-5 mx-auto text-secondary mb-1" />
-                  <p className="text-2xl md:text-3xl font-extrabold text-primary">{stat.value}</p>
+                  <p className="text-xl md:text-2xl font-extrabold text-primary">{stat.value}</p>
                   <p className="text-xs md:text-sm text-muted-foreground font-medium">{stat.label}</p>
                 </div>
               ))}
@@ -260,178 +229,271 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ── Features Section ── */}
+      {/* ── Features Grid (6 cards) ── */}
       <section id="features" className="py-24 bg-card">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16 space-y-3">
-            <span className="text-sm font-semibold text-secondary tracking-wide">مميزات المنصة</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground">كل ما تحتاجه للتميز في المقابلات</h2>
-            <p className="text-muted-foreground text-lg max-w-xl mx-auto">أدوات متقدمة مصممة خصيصاً لمساعدتك على التحضير والنجاح</p>
+          <div className="text-center mb-14 space-y-3">
+            <span className="text-sm font-semibold text-secondary tracking-wide">ماذا نقدّم</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">
+              منصّة كاملة لرحلتك التدريبية
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              من جلسة التدريب الأولى إلى المقابلة الحقيقية — كل أداة تحتاجها بالعربية الفصحى ودعم
+              إنجليزي.
+            </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Card 1 */}
-            <Card className="group rounded-2xl border-2 border-transparent hover:border-primary/20 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-              <div className="h-1.5 bg-gradient-to-l from-primary to-primary/60" />
-              <CardContent className="p-8 space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                  <Video className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground">مقابلات فيديو ذكية</h3>
-                <p className="text-muted-foreground leading-relaxed text-sm">
-                  سجّل مقابلتك بالفيديو واحصل على تحليل فوري يشمل المحتوى ونبرة الصوت والثقة بالنفس باستخدام محرك واكب للذكاء الاصطناعي
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <span className="text-xs bg-primary/5 text-primary px-3 py-1 rounded-full font-medium">تحليل الفيديو</span>
-                  <span className="text-xs bg-primary/5 text-primary px-3 py-1 rounded-full font-medium">تقييم الثقة</span>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            {[
+              {
+                icon: GraduationCap,
+                title: "وضع التدريب (آمن للفشل)",
+                desc: "كل جلسة تدريب خاصّة بك. لا يراها HR. تخطئ، تتعلّم، تكرّر بدون قلق.",
+                badges: ["practice mode", "STAR coaching"],
+                href: "/login?tab=signup",
+                grad: "from-emerald-500 to-emerald-300",
+              },
+              {
+                icon: Target,
+                title: "تقييم رسمي بمعايير IPA",
+                desc: "عند الجاهزية، شغّل وضع التقييم. DISC + ٥ أبعاد + توصية معتمَدة للوظائف الحكومية.",
+                badges: ["DISC", "٥ أبعاد"],
+                href: "/jobs",
+                grad: "from-primary to-primary/60",
+              },
+              {
+                icon: PenLine,
+                title: "منشئ سيرة ذاتية ذكي",
+                desc: "Stepper من ٧ خطوات. اكتب وصفاً حرّاً، AI يحوّله إلى STAR bullets احترافية.",
+                badges: ["AI assist", "حفظ تلقائي"],
+                href: "/cv/builder",
+                grad: "from-secondary to-secondary/60",
+              },
+              {
+                icon: MessagesSquare,
+                title: "سيرة من الصفر بالمحادثة",
+                desc: "١٥ سؤال موجَّه. AI يقترح إجابات. تنتهي بمسوّدة سيرة جاهزة للتعديل.",
+                badges: ["محادثة موجَّهة", "جديد"],
+                href: "/cv/interview",
+                grad: "from-amber-500 to-amber-300",
+              },
+              {
+                icon: ScanSearch,
+                title: "تقييم وحوار حول سيرتك",
+                desc: "ارفع PDF. احصل على radar للأقسام، اقتراحات، ومحادثة تشرح لماذا كل ملاحظة.",
+                badges: ["justifications", "PDPL آمن"],
+                href: "/cv/review",
+                grad: "from-purple-500 to-purple-300",
+              },
+              {
+                icon: Users,
+                title: "للمدرّبين: لوحة الدفعات",
+                desc: "أنشئ دفعات IPA، تابع تقدّم الطلاب، أضف تعليقات timestamped على إجاباتهم.",
+                badges: ["IPA-grade", "RLS-secure"],
+                href: "/dashboard/instructor",
+                grad: "from-blue-500 to-blue-300",
+              },
+            ].map((f, i) => {
+              const Icon = f.icon;
+              return (
+                <Card
+                  key={i}
+                  className="group rounded-2xl border-2 border-transparent hover:border-primary/20 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden"
+                >
+                  <div className={`h-1.5 bg-gradient-to-l ${f.grad}`} />
+                  <CardContent className="p-6 space-y-3">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-bold text-foreground">{f.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {f.badges.map((b) => (
+                        <span
+                          key={b}
+                          className="text-[11px] bg-primary/5 text-primary px-2.5 py-1 rounded-full font-medium"
+                        >
+                          {b}
+                        </span>
+                      ))}
+                    </div>
+                    <Link
+                      to={f.href}
+                      className="inline-flex items-center text-sm text-primary hover:underline pt-1"
+                    >
+                      تجربة الميزة
+                      <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+                    </Link>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
 
-            {/* Card 2 */}
-            <Card className="group rounded-2xl border-2 border-transparent hover:border-secondary/20 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-              <div className="h-1.5 bg-gradient-to-l from-secondary to-secondary/60" />
-              <CardContent className="p-8 space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-secondary/10 flex items-center justify-center group-hover:bg-secondary/20 transition-colors">
-                  <Brain className="w-7 h-7 text-secondary" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground">تحليل الشخصية الآلي</h3>
-                <p className="text-muted-foreground leading-relaxed text-sm">
-                  تقييم شخصيتك المهنية وفق نموذج DISC لتحديد نقاط القوة وأسلوب العمل المناسب لك ولبيئة العمل المستهدفة
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <span className="text-xs bg-secondary/5 text-secondary px-3 py-1 rounded-full font-medium">نموذج DISC</span>
-                  <span className="text-xs bg-secondary/5 text-secondary px-3 py-1 rounded-full font-medium">توافق مهني</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Card 3 */}
-            <Card className="group rounded-2xl border-2 border-transparent hover:border-accent/40 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-              <div className="h-1.5 bg-gradient-to-l from-accent to-accent/60" />
-              <CardContent className="p-8 space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
-                  <BarChart3 className="w-7 h-7 text-accent-foreground" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground">تقارير احترافية</h3>
-                <p className="text-muted-foreground leading-relaxed text-sm">
-                  احصل على تقارير مفصّلة بصيغة PDF تشمل درجاتك التفصيلية ونقاط التحسين مع شهادة إتمام معتمدة
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <span className="text-xs bg-accent/10 text-accent-foreground px-3 py-1 rounded-full font-medium">تقرير PDF</span>
-                  <span className="text-xs bg-accent/10 text-accent-foreground px-3 py-1 rounded-full font-medium">شهادة إتمام</span>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="text-center mt-10">
+            <Button variant="outline" size="lg" className="rounded-2xl" asChild>
+              <Link to="/features">
+                صفحة المزايا الكاملة
+                <ChevronLeft className="w-5 h-5 mr-1" />
+              </Link>
+            </Button>
           </div>
         </div>
       </section>
 
-      {/* ── How It Works ── */}
+      {/* ── Three Learning Paths ── */}
       <section id="how-it-works" className="py-24">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16 space-y-3">
-            <span className="text-sm font-semibold text-secondary tracking-wide">خطوات بسيطة</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground">كيف تعمل المنصة؟</h2>
+          <div className="text-center mb-14 space-y-3">
+            <span className="text-sm font-semibold text-secondary tracking-wide">كيف تعمل</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">ثلاث رحلات تعليمية</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              اختر مسارك بحسب موقعك من رحلة الوظيفة.
+            </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {[
-              { step: "١", icon: LogIn, title: "سجل الدخول", desc: "أنشئ حسابك أو سجل الدخول للبدء" },
-              { step: "٢", icon: MessageSquare, title: "اختر نوع المقابلة", desc: "اختر بين المقابلة الكتابية أو الصوتية أو الفيديو" },
-              { step: "٣", icon: Mic, title: "أجب على الأسئلة", desc: "أجب على أسئلة محرك واكب للذكاء الاصطناعي المخصصة لمجالك" },
-              { step: "٤", icon: Award, title: "احصل على تقييمك", desc: "استلم تقييماً مفصلاً مع شهادة إتمام المقابلة" },
-            ].map((item, i) => (
-              <div key={i} className="relative text-center group">
-                {/* Connector line (hidden on first and mobile) */}
-                {i < 3 && (
-                  <div className="hidden lg:block absolute top-8 -left-4 w-8 h-0.5 bg-border" />
-                )}
-                <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center mb-4 group-hover:bg-primary group-hover:border-primary transition-colors duration-300">
-                  <item.icon className="w-7 h-7 text-primary group-hover:text-primary-foreground transition-colors duration-300" />
+              {
+                step: "١",
+                title: "المسار التدريبي",
+                color: "emerald",
+                stages: [
+                  "ابدأ جلسة practice",
+                  "تتلقّى STAR coaching لكل إجابة",
+                  "ترى الفجوات وتكرّر",
+                ],
+                outcome: "جاهزية للمقابلات الحقيقية",
+              },
+              {
+                step: "٢",
+                title: "مسار السيرة الذاتية",
+                color: "amber",
+                stages: [
+                  "محادثة / منشئ يدوي / رفع موجود",
+                  "AI يحلّل ويقترح",
+                  "تحدّث مع سيرتك للتفهّم",
+                ],
+                outcome: "سيرة معتمَدة لـ IPA",
+              },
+              {
+                step: "٣",
+                title: "المسار المؤسسي (للمدرّبين)",
+                color: "primary",
+                stages: [
+                  "إنشاء دفعة + تسجيل طلاب",
+                  "إنشاء مهام + متابعة",
+                  "تعليقات timestamped",
+                ],
+                outcome: "تقدّم قابل للقياس",
+              },
+            ].map((p, i) => (
+              <Card key={i} className="rounded-2xl shadow-lg overflow-hidden">
+                <div
+                  className={`p-5 text-center bg-${p.color}-500/10 border-b border-${p.color}-500/20`}
+                >
+                  <div
+                    className={`inline-flex items-center justify-center w-12 h-12 rounded-full bg-${p.color}-500/20 text-${p.color}-700 dark:text-${p.color}-300 font-bold text-lg mb-2`}
+                  >
+                    {p.step}
+                  </div>
+                  <h3 className="text-lg font-bold text-foreground">{p.title}</h3>
                 </div>
-                <span className="inline-block text-xs font-bold text-secondary mb-2">الخطوة {item.step}</span>
-                <h3 className="text-lg font-bold text-foreground mb-2">{item.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
-              </div>
+                <CardContent className="p-5 space-y-3">
+                  <ul className="space-y-2">
+                    {p.stages.map((s, si) => (
+                      <li key={si} className="flex items-start gap-2 text-sm">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="border-t border-border pt-3">
+                    <p className="text-xs text-muted-foreground">الناتج:</p>
+                    <p className="text-sm font-semibold text-foreground">{p.outcome}</p>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Job Vacancies Section ── */}
-      {vacancies.length > 0 && (
-        <section id="vacancies" className="py-24 bg-card">
-          <div className="container mx-auto px-4">
-            <div className="text-center mb-16 space-y-3">
-              <span className="text-sm font-semibold text-secondary tracking-wide">فرص العمل</span>
-              <h2 className="text-3xl md:text-4xl font-bold text-foreground">الوظائف المتاحة</h2>
-              <p className="text-muted-foreground text-lg max-w-xl mx-auto">تصفح أحدث الفرص الوظيفية وقدّم عليها لبدء مقابلتك الذكية</p>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-              {vacancies.map((v) => (
-                <Card key={v.id} className="rounded-2xl shadow-md hover:shadow-xl transition-all border-0 bg-background group">
-                  <CardContent className="p-6 space-y-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">{v.title}</h3>
-                      <Badge variant="secondary" className="shrink-0 text-xs">
-                        {employmentTypeMap[v.employment_type] || v.employment_type}
-                      </Badge>
-                    </div>
-                    {v.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">{v.description}</p>
-                    )}
-                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                      {v.department && (
-                        <span className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5" />{v.department}</span>
-                      )}
-                      {v.location && (
-                        <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{v.location}</span>
-                      )}
-                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{new Date(v.created_at).toLocaleDateString("ar-SA")}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            <div className="text-center mt-10">
-              <Button size="lg" className="rounded-2xl px-10" asChild>
-                <Link to="/jobs">
-                  عرض جميع الوظائف
-                  <ChevronLeft className="w-5 h-5 mr-1" />
-                </Link>
-              </Button>
-            </div>
+      {/* ── Differentiators ── */}
+      <section id="differentiators" className="py-24 bg-card">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-14 space-y-3">
+            <span className="text-sm font-semibold text-secondary tracking-wide">ما يميّزنا</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">
+              لماذا منصّة IPA وليس أداة عامّة؟
+            </h2>
           </div>
-        </section>
-      )}
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-6xl mx-auto">
+            {[
+              {
+                icon: Mic,
+                title: "صوت سعودي حقيقي",
+                desc: "محاوِر بصوت ElevenLabs العربي — هيثم/سناء.",
+              },
+              {
+                icon: Brain,
+                title: "تغذية STAR + إعادة كتابة",
+                desc: "لكل إجابة: تحليل، نسخة محسّنة، وإجابة نموذجية.",
+              },
+              {
+                icon: Sparkles,
+                title: "Justifications لكل ملاحظة",
+                desc: "تتعلّم لماذا — لا فقط ماذا. observation + rule + why.",
+              },
+              {
+                icon: ShieldCheck,
+                title: "PDPL + RLS صارم",
+                desc: "موافقات صريحة + rate limiting + اعتماد ملكية.",
+              },
+            ].map((d, i) => {
+              const Icon = d.icon;
+              return (
+                <Card key={i} className="rounded-2xl text-center p-5 shadow-md">
+                  <div className="w-12 h-12 mx-auto rounded-xl bg-secondary/10 flex items-center justify-center mb-3">
+                    <Icon className="w-6 h-6 text-secondary" />
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground mb-1.5">{d.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{d.desc}</p>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
       {/* ── Testimonials ── */}
-      <section className="py-24 bg-card">
+      <section className="py-24">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16 space-y-3">
+          <div className="text-center mb-14 space-y-3">
             <span className="text-sm font-semibold text-secondary tracking-wide">آراء المستخدمين</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground">ماذا يقول مستخدمونا؟</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">من تجارب طلاب IPA</h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {[
               {
                 name: "أحمد الغامدي",
-                role: "مرشح - إدارة أعمال",
-                quote: "المنصة ساعدتني على اجتياز مقابلتي الأولى بثقة. التقييم الفوري من محرك واكب للذكاء الاصطناعي أظهر لي نقاط ضعفي قبل المقابلة الحقيقية.",
+                role: "طالب IPA — برنامج الإدارة العامة",
+                quote:
+                  "وضع التدريب غيّر كل شيء. كنت أتجمّد في المقابلات السابقة. الآن أدخل ٥ جلسات practice، أقرأ الـ STAR coaching، أتحسّن. مقابلتي الرسمية كانت أسهل من التدريبات.",
               },
               {
                 name: "نورة القحطاني",
-                role: "مرشحة - موارد بشرية",
-                quote: "تحليل الشخصية وفق نموذج DISC كان مفيداً جداً. فهمت نقاط قوتي وكيف أقدمها في المقابلات بشكل أفضل.",
+                role: "خرّيجة موارد بشرية",
+                quote:
+                  "بدأت سيرتي من الصفر بالمحادثة — ١٥ سؤال فقط، وحصلت على مسوّدة احترافية. ثم استخدمت تقييم السيرة وفهمت لماذا قسم الإنجازات لديّ ضعيف، مع أمثلة محدّدة.",
               },
               {
-                name: "محمد العتيبي",
-                role: "مرشح - تقنية معلومات",
-                quote: "أنصح كل مرشح باستخدام هذه المنصة. التدريب على المقابلة الصوتية كان كأنه مقابلة حقيقية.",
+                name: "د. خالد العنزي",
+                role: "مدرّب IPA",
+                quote:
+                  "لوحة الدفعات وفّرت عليّ ساعات. أضع تعليقات على لحظة محدّدة من فيديو الطالب، وهو يرى التعليق مع timestamp. التعلّم تسارع.",
               },
             ].map((t, i) => (
               <Card key={i} className="rounded-2xl shadow-md hover:shadow-lg transition-shadow border-0 bg-background">
@@ -467,9 +529,11 @@ const Index = () => {
             <div className="absolute inset-0 bg-gradient-to-bl from-primary via-primary to-primary/80" />
             <div className="absolute top-0 left-0 w-40 h-40 rounded-full bg-secondary/20 blur-3xl" />
             <div className="relative z-10 space-y-6">
-              <h2 className="text-2xl md:text-3xl font-bold text-primary-foreground">جاهز لخوض تجربة المقابلة الذكية؟</h2>
+              <h2 className="text-2xl md:text-3xl font-bold text-primary-foreground">
+                ابدأ رحلتك التدريبية مع IPA
+              </h2>
               <p className="text-primary-foreground/80 text-base max-w-md mx-auto">
-                سجل الآن وابدأ بالتدريب على مقابلاتك الوظيفية مع محرك واكب للذكاء الاصطناعي
+                مجّاناً. خمس دقائق لإنشاء حسابك، وأنت في وضع التدريب الأوّل.
               </p>
               <Button
                 size="lg"
@@ -491,45 +555,58 @@ const Index = () => {
       <footer id="footer" className="border-t border-border bg-card pt-16 pb-8">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-12 mb-12">
-            {/* Brand */}
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="w-10 h-10 rounded-xl object-contain" />
+                <img src="/ipa-logo.png" alt="IPA" className="w-10 h-10 rounded-xl object-contain" />
                 <div>
-                  <h3 className="font-bold text-foreground">منصة المقابلات الذكية - معهد الإدارة العامة</h3>
-                  <p className="text-xs text-muted-foreground">مدعومة بالذكاء الاصطناعي</p>
+                  <h3 className="font-bold text-foreground">منصّة تدريب IPA</h3>
+                  <p className="text-xs text-muted-foreground">إعداد للوظائف الحكومية بالذكاء الاصطناعي</p>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                منصة رائدة في التدريب على المقابلات الوظيفية باستخدام الذكاء الاصطناعي، مصممة لمساعدة المرشحين على التحضير والنجاح.
+                منصّة تدريب رائدة لإعداد الكوادر السعودية للقطاع العام — تدريب مقابلات + سيرة ذاتية +
+                تغذية تعليمية تشرح "لماذا".
               </p>
             </div>
 
-            {/* Quick links */}
             <div className="space-y-4">
-              <h3 className="font-bold text-foreground">روابط سريعة</h3>
+              <h3 className="font-bold text-foreground">الميزات</h3>
               <ul className="space-y-2">
-                {["سياسة الخصوصية", "الشروط والأحكام", "مركز المساعدة", "تواصل معنا"].map((l) => (
-                  <li key={l}>
-                    <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{l}</a>
+                {[
+                  { l: "وضع التدريب", h: "#features" },
+                  { l: "منشئ السيرة", h: "/cv/builder" },
+                  { l: "تقييم السيرة + chat", h: "/cv/review" },
+                  { l: "للمدرّبين", h: "/dashboard/instructor" },
+                  { l: "صفحة المزايا الكاملة", h: "/features" },
+                ].map((l) => (
+                  <li key={l.l}>
+                    {l.h.startsWith("#") ? (
+                      <a href={l.h} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                        {l.l}
+                      </a>
+                    ) : (
+                      <Link to={l.h} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                        {l.l}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* Contact */}
             <div className="space-y-4">
-              <h3 className="font-bold text-foreground">تواصل معنا</h3>
+              <h3 className="font-bold text-foreground">تواصل ومعلومات</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>البريد: info@smartinterview.sa</li>
+                <li>البريد: info@ipa-training.sa</li>
                 <li>الرياض، المملكة العربية السعودية</li>
+                <li>متوافقة مع نظام حماية البيانات (PDPL)</li>
               </ul>
             </div>
           </div>
 
           <div className="border-t border-border pt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} منصة المقابلات الذكية - معهد الإدارة العامة - جميع الحقوق محفوظة
+              © {new Date().getFullYear()} منصّة تدريب IPA — جميع الحقوق محفوظة
             </p>
           </div>
         </div>

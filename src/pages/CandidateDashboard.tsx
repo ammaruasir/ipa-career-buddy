@@ -21,6 +21,7 @@ import {
 import TrainingSection from "@/components/training/TrainingSection";
 import ExitConfirmationDialog from "@/components/interview/ExitConfirmationDialog";
 import ConsentBanner from "@/components/consent/ConsentBanner";
+import CVHubSection from "@/components/cv-hub/CVHubSection";
 import { toast } from "sonner";
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -236,6 +237,9 @@ const CandidateDashboard = () => {
 
         {/* PDPL consent (auto-prompts on first visit if any required consent is missing) */}
         <ConsentBanner language="ar" />
+
+        {/* CV Hub — 3 paths to build/review a CV with AI */}
+        <CVHubSection />
 
         {/* Practice Mode */}
         <TrainingSection interviews={interviews} evaluations={evaluations} />

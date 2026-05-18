@@ -71,8 +71,10 @@ const TrainingSection = ({ interviews, evaluations }: TrainingSectionProps) => {
         <div className="flex items-center gap-3 mb-4">
           <Sparkles className="w-6 h-6 text-secondary" />
           <div>
-            <p className="font-bold text-foreground">وضع التدريب</p>
-            <p className="text-sm text-muted-foreground">تدرب على مقابلات وهمية مع محرك واكب للذكاء الاصطناعي</p>
+            <p className="font-bold text-foreground">وضع التدريب — آمن للفشل</p>
+            <p className="text-sm text-muted-foreground">
+              لا أحد من فريق HR يرى جلستك. تخطئ، تتعلّم، تكرّر. كل جلسة تنتهي بتغذية STAR تشرح "لماذا".
+            </p>
           </div>
         </div>
 
