@@ -376,7 +376,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const action: "start" | "submit" | "finalize" = body.action;
+    const action: "start" | "submit" | "back" | "finalize" = body.action;
     const sessionId: string | undefined = body.session_id;
     const language: "ar" | "en" | "bilingual" = body.language ?? "ar";
 
