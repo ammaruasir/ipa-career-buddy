@@ -106,9 +106,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
       });
       if (resp.error) throw resp.error;
       let aiReply = resp.data?.choices?.[0]?.message?.content || "مرحباً! دعنا نبدأ المقابلة.";
-      aiReply = aiReply
-        .replace(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i, "")
-        .trim();
+      aiReply = stripPhaseTags(aiReply).cleaned;
       setMessages([{ role: "assistant", content: aiReply }]);
       setQuestionCount(1);
       setCurrentPhase("intro");
