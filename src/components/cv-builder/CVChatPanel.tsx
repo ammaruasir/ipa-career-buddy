@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { MessagesSquare, Send, Loader2, Lightbulb, Sparkles, User2 } from "lucide-react";
+import { MessagesSquare, Send, Loader2, Lightbulb, Sparkles, User2, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import JustificationCard, { type Justification } from "./JustificationCard";
 import { cn } from "@/lib/utils";
