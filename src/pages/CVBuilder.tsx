@@ -590,7 +590,11 @@ const CVBuilder = () => {
               <ArrowLeft className="w-4 h-4 mr-2" />
             </Button>
           ) : (
-            <Button onClick={() => exportPdf(draft, user?.id ?? "")} className="rounded-xl">
+            <Button
+              data-tour="export-pdf"
+              onClick={() => exportPdf(draft, user?.id ?? "")}
+              className="rounded-xl"
+            >
               <Download className="w-4 h-4 ml-2" />
               تصدير PDF
             </Button>

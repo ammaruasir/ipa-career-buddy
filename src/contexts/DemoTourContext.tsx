@@ -2,8 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useNavigate } from "react-router-dom";
 import { tourScript } from "@/demo/tour-script";
 import { featureSpec } from "@/demo/feature-spec";
-import type { TourAction, TourState, TourStatus, TourStep } from "@/demo/types";
+import type { CursorState, DemoRuntimeContext, TourAction, TourState, TourStatus, TourStep } from "@/demo/types";
 import { useDemoVoice } from "@/hooks/useDemoVoice";
+import { candidateVoiceId } from "@/demo/voices";
+import { demoCandidate } from "@/demo/demo-candidate";
 import { supabase } from "@/integrations/supabase/client";
 
 type TranscriptEntry = { role: "presenter" | "viewer"; text: string };
@@ -137,56 +139,15 @@ async function swapDemoSession(role: "candidate" | "admin" | "hr" | "instructor"
   });
 }
 
-async function runAction(
-  action: TourAction,
-  navigate: (to: string) => void,
-  cancelRef: { current: boolean },
-): Promise<void> {
-  if (cancelRef.current) return;
-  switch (action.kind) {
-    case "navigate":
-      navigate(action.to);
-      await sleep(400);
-      return;
-    case "wait":
-      await sleep(action.ms);
-      return;
-    case "click": {
-      if (action.delayMs) await sleep(action.delayMs);
-      if (cancelRef.current) return;
-      const el = await findElement(action.selector);
-      el?.click();
-      return;
-    }
-    case "type": {
-      const el = (await findElement(action.selector)) as
-        | HTMLInputElement
-        | HTMLTextAreaElement
-        | null;
-      if (!el) return;
-      el.focus();
-      const speed = action.speedMs ?? 40;
-      let current = "";
-      for (const ch of action.text) {
-        if (cancelRef.current) return;
-        current += ch;
-        setNativeInputValue(el, current);
-        await sleep(speed);
-      }
-      return;
-    }
-    case "swap-session": {
-      await swapDemoSession(action.role);
-      return;
-    }
-  }
-}
-
 const DemoTourContext = createContext<DemoTourContextValue | null>(null);
 
 export function DemoTourProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const voice = useDemoVoice();
+  // Second voice instance for the AI candidate during ai-vs-ai turns. Distinct
+  // hook → distinct audio element → can talk concurrently with the presenter
+  // (in practice we pause the presenter first to avoid mic + double TTS chaos).
+  const candidateVoice = useDemoVoice();
 
   const [status, setStatus] = useState<TourStatus>("idle");
   const [stepIndex, setStepIndex] = useState(0);
@@ -201,8 +162,47 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
   const [showActEndPrompt, setShowActEndPrompt] = useState(false);
   const [actEndLabel, setActEndLabel] = useState<string | null>(null);
 
+  const [cursor, setCursor] = useState<CursorState>({
+    x: 0,
+    y: 0,
+    visible: false,
+    clicking: false,
+  });
+
+  // Runtime context shared across action handlers. Held in a ref so callbacks
+  // capture the live value instead of a stale closure snapshot.
+  const runtimeCtxRef = useRef<DemoRuntimeContext>({ lastInterviewId: null });
+
   const cancelRef = useRef(false);
   const currentStep: TourStep | null = tourScript[stepIndex] ?? null;
+
+  // ── Cursor helpers ────────────────────────────────────────────────────────
+  const moveCursorTo = useCallback(
+    async (selector: string, opts?: { settleMs?: number }): Promise<HTMLElement | null> => {
+      const el = await findElement(selector);
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      setCursor({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        visible: true,
+        clicking: false,
+      });
+      await sleep(opts?.settleMs ?? 500);
+      return el;
+    },
+    []
+  );
+
+  const flashClick = useCallback(async () => {
+    setCursor((c) => ({ ...c, clicking: true }));
+    await sleep(260);
+    setCursor((c) => ({ ...c, clicking: false }));
+  }, []);
+
+  const hideCursor = useCallback(() => {
+    setCursor((c) => ({ ...c, visible: false, clicking: false }));
+  }, []);
 
   // ── Auto-dismiss popups during the tour ──────────────────────────────────
   // When status is "running", any modal/dialog that appears (e.g. the PDPL
@@ -250,12 +250,180 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
     setTranscript((prev) => [...prev.slice(-19), entry]);
   }, []);
 
+  // ── Action runner (declared inside provider so it can use cursor helpers) ─
+  const runAction = useCallback(
+    async (action: TourAction): Promise<void> => {
+      if (cancelRef.current) return;
+      switch (action.kind) {
+        case "navigate":
+          hideCursor();
+          navigate(action.to);
+          await sleep(400);
+          return;
+        case "wait":
+          await sleep(action.ms);
+          return;
+        case "click": {
+          if (action.delayMs) await sleep(action.delayMs);
+          if (cancelRef.current) return;
+          const el = await moveCursorTo(action.selector);
+          if (!el) return;
+          await flashClick();
+          el.click();
+          return;
+        }
+        case "type": {
+          const el = (await moveCursorTo(action.selector)) as
+            | HTMLInputElement
+            | HTMLTextAreaElement
+            | null;
+          if (!el) return;
+          el.focus();
+          const speed = action.speedMs ?? 40;
+          let current = "";
+          for (const ch of action.text) {
+            if (cancelRef.current) return;
+            current += ch;
+            setNativeInputValue(el, current);
+            await sleep(speed);
+          }
+          return;
+        }
+        case "swap-session": {
+          hideCursor();
+          await swapDemoSession(action.role);
+          return;
+        }
+        case "pause-voice": {
+          voice.pause();
+          return;
+        }
+        case "resume-voice": {
+          await voice.resume();
+          return;
+        }
+        case "start-live-interview": {
+          hideCursor();
+          // The voice interview page exposes a "ابدأ المقابلة" / start button.
+          // Click whichever start-like button is rendered.
+          const startBtn =
+            (await findElement(
+              "button:not([disabled])[data-tour='start-interview']",
+              1500,
+            )) ??
+            (await findElement(
+              "main button:not([disabled])",
+              3000,
+            ));
+          if (!startBtn) {
+            console.warn("start-live-interview: no start button found");
+            return;
+          }
+          await moveCursorTo("button:not([disabled])");
+          await flashClick();
+          startBtn.click();
+          // Wait for the interview UI to flip into "active" state (transcript
+          // entry, mic indicator). 12s gives the AI time to ask the first Q.
+          await sleep(12_000);
+          return;
+        }
+        case "ai-vs-ai-turn": {
+          // Read the latest interviewer question from the on-screen transcript.
+          // The voice interview page renders an [data-tour='interview-transcript']
+          // container OR falls back to the last assistant bubble.
+          const transcriptEl =
+            document.querySelector("[data-tour='interview-transcript']") ??
+            document.querySelector("main");
+          const text = transcriptEl?.textContent ?? "";
+          // Heuristic: take the last ~400 chars as the question context. The
+          // bot prompt handles cases where it isn't a pure question.
+          const question = text.slice(-400).trim() || "أخبرنا عن نفسك ولماذا أنت مرشّحة لهذا الدور.";
+
+          try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const accessToken =
+              sessionData.session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+            const botResp = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-candidate-bot`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                  Authorization: `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({
+                  question,
+                  context: action.context,
+                  questionIndex: action.questionIndex,
+                  totalQuestions: action.totalQuestions,
+                  persona: demoCandidate,
+                  history: [],
+                }),
+              },
+            );
+            const botData = (await botResp.json()) as { answer?: string; error?: string };
+            const answer = (botData.answer ?? "").trim();
+            if (!answer) {
+              console.warn("ai-vs-ai-turn: empty candidate answer", botData.error);
+              return;
+            }
+
+            // Speak the answer in the candidate's voice, then inject as text
+            // into the interview pipeline so the real evaluator scores it.
+            await candidateVoice.speak(answer, candidateVoiceId);
+
+            // Find the live interview hook's text-injection bridge. The page
+            // exposes it via a global window hook installed in VoiceInterview.
+            const submit = (window as any).__demoSubmitAnswerText as
+              | ((t: string) => Promise<void>)
+              | undefined;
+            if (submit) {
+              await submit(answer);
+            } else {
+              console.warn(
+                "ai-vs-ai-turn: window.__demoSubmitAnswerText not installed — VoiceInterview must register it.",
+              );
+            }
+            // Give the real interviewer pipeline time to emit the next Q + TTS.
+            await sleep(8_000);
+          } catch (e) {
+            console.error("ai-vs-ai-turn failed:", e);
+          }
+          return;
+        }
+        case "end-live-interview": {
+          // Try to find an end / "إنهاء" button; if not found, the AI may have
+          // already emitted [END] and ended the interview itself.
+          const endBtn =
+            (await findElement("[data-tour='end-interview']", 1500)) ??
+            Array.from(document.querySelectorAll("button"))
+              .find((b) => /إنهاء|انهاء|end/i.test(b.textContent ?? "")) ??
+            null;
+          if (endBtn instanceof HTMLElement) {
+            await moveCursorTo("button");
+            await flashClick();
+            endBtn.click();
+          }
+          // Capture the just-completed interview's id from the global bridge,
+          // for downstream steps that navigate to /interview/:id/results.
+          const lastId = (window as any).__demoLastInterviewId as string | null | undefined;
+          if (lastId) runtimeCtxRef.current.lastInterviewId = lastId;
+          await sleep(2_000);
+          return;
+        }
+      }
+    },
+    [navigate, voice, candidateVoice, moveCursorTo, flashClick, hideCursor]
+  );
+
   const runStep = useCallback(
     async (step: TourStep) => {
       const isSessionSwap = step.action?.kind === "swap-session";
 
       if (isSessionSwap) {
-        await runAction(step.action!, navigate, cancelRef);
+        await runAction(step.action!);
         if (cancelRef.current) return;
         // After swapping to the candidate session, pre-grant PDPL consents so
         // the ConsentBanner doesn't pop up mid-tour.
@@ -264,8 +432,10 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      if (step.route) {
-        navigate(step.route);
+      const resolvedRoute =
+        typeof step.route === "function" ? step.route(runtimeCtxRef.current) : step.route;
+      if (resolvedRoute) {
+        navigate(resolvedRoute);
         await sleep(400);
       }
       if (cancelRef.current) return;
@@ -274,7 +444,7 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       const speaking = voice.speak(step.narration, undefined, step.id);
 
       if (step.action && !isSessionSwap && !takeOverMode) {
-        runAction(step.action, navigate, cancelRef).catch((e) =>
+        runAction(step.action).catch((e) =>
           console.warn("Tour action failed:", e)
         );
       }
@@ -292,7 +462,7 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       // if voice ended first, wait the remaining min duration.
       await Promise.all([speaking, minWait]);
     },
-    [navigate, voice, appendTranscript, takeOverMode]
+    [navigate, voice, appendTranscript, takeOverMode, runAction]
   );
 
   const start = useCallback(async () => {
@@ -300,12 +470,14 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
     setStepIndex(0);
     setTranscript([]);
     setQaCount(0);
+    runtimeCtxRef.current = { lastInterviewId: null };
 
     // CRITICAL: prime the audio context BEFORE any async work — this is the
     // last moment we're inside the user-gesture window for the click that
     // invoked start(). Without it, autoplay policy blocks the first TTS
     // audio.play() and the whole tour silently rushes through.
     await voice.primeAudio();
+    await candidateVoice.primeAudio();
 
     setStatus("running");
     for (let i = 0; i < tourScript.length; i++) {
@@ -323,13 +495,16 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       }
     }
     setStatus("finished");
-  }, [runStep, voice]);
+    hideCursor();
+  }, [runStep, voice, candidateVoice, hideCursor]);
 
   const pause = useCallback(() => {
     cancelRef.current = true;
     voice.stop();
+    candidateVoice.stop();
     setStatus("paused");
-  }, [voice]);
+    hideCursor();
+  }, [voice, candidateVoice, hideCursor]);
 
   const resume = useCallback(async () => {
     cancelRef.current = false;
@@ -340,27 +515,31 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       await runStep(tourScript[i]);
     }
     setStatus("finished");
-  }, [runStep, stepIndex]);
+    hideCursor();
+  }, [runStep, stepIndex, hideCursor]);
 
   const next = useCallback(async () => {
     cancelRef.current = true;
     voice.stop();
+    candidateVoice.stop();
     const ni = Math.min(stepIndex + 1, tourScript.length - 1);
     setStepIndex(ni);
     cancelRef.current = false;
     setStatus("running");
     await runStep(tourScript[ni]);
     if (ni === tourScript.length - 1) setStatus("finished");
-  }, [runStep, stepIndex, voice]);
+  }, [runStep, stepIndex, voice, candidateVoice]);
 
   const exit = useCallback(() => {
     cancelRef.current = true;
     voice.stop();
+    candidateVoice.stop();
     setStatus("idle");
     setStepIndex(0);
     setTranscript([]);
     setPendingAnswer(null);
-  }, [voice]);
+    hideCursor();
+  }, [voice, candidateVoice, hideCursor]);
 
   const askText = useCallback(
     async (text: string) => {
@@ -477,7 +656,7 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<DemoTourContextValue>(
     () => ({
       status, stepIndex, totalSteps: tourScript.length, currentStep,
-      isSpeaking: voice.isSpeaking, takeOverMode,
+      isSpeaking: voice.isSpeaking, takeOverMode, cursor,
       start, pause, resume, next, exit, setTakeOverMode,
       askText, beginVoiceQuestion, endVoiceQuestion,
       isRecording: voice.isRecording, transcript, pendingAnswer,
@@ -486,7 +665,7 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       status, stepIndex, currentStep, voice.isSpeaking, voice.isRecording,
-      takeOverMode, start, pause, resume, next, exit,
+      takeOverMode, cursor, start, pause, resume, next, exit,
       askText, beginVoiceQuestion, endVoiceQuestion,
       transcript, pendingAnswer, micConsentState, setMicConsent, qaCount,
       showActEndPrompt, actEndLabel, dismissActEndPrompt,

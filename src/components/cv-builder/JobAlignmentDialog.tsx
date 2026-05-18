@@ -133,7 +133,7 @@ const JobAlignmentDialog = ({ draftId, language, onAcceptRewrite }: JobAlignment
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="rounded-xl gap-1.5">
+        <Button data-tour="job-align" variant="outline" size="sm" className="rounded-xl gap-1.5">
           <Target className="w-3.5 h-3.5" />
           {t.button}
         </Button>
@@ -154,6 +154,7 @@ const JobAlignmentDialog = ({ draftId, language, onAcceptRewrite }: JobAlignment
               <Label htmlFor="jd">{t.jdLabel}</Label>
               <Textarea
                 id="jd"
+                data-tour="job-align-jd"
                 value={jd}
                 onChange={(e) => setJd(e.target.value)}
                 placeholder={lang === "ar"
@@ -162,7 +163,12 @@ const JobAlignmentDialog = ({ draftId, language, onAcceptRewrite }: JobAlignment
                 rows={6}
                 dir={dir}
               />
-              <Button onClick={analyze} disabled={loading || !draftId} className="w-full rounded-xl">
+              <Button
+                data-tour="job-align-analyze"
+                onClick={analyze}
+                disabled={loading || !draftId}
+                className="w-full rounded-xl"
+              >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 ml-2 animate-spin" />

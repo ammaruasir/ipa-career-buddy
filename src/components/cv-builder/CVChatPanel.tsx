@@ -358,6 +358,7 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
         {/* Input */}
         <div className="border-t p-3 space-y-2">
           <Textarea
+            data-tour="cv-chat-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -372,7 +373,13 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
             className="resize-none"
           />
           <div className="flex justify-end">
-            <Button onClick={() => send()} disabled={!input.trim() || loading} size="sm" className="rounded-xl">
+            <Button
+              data-tour="cv-chat-send"
+              onClick={() => send()}
+              disabled={!input.trim() || loading}
+              size="sm"
+              className="rounded-xl"
+            >
               <Send className="w-3.5 h-3.5 ml-1.5" />
               {t.send}
             </Button>

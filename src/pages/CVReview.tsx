@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -104,8 +104,73 @@ const COMPLIANCE_ITEMS: { key: keyof Omit<SaudiCompliance, "recommendations">; l
   { key: "jadarat_link_present", label: "رابط جدارات" },
 ];
 
+// Hardcoded sample CV analysis used when ?demo=preloaded is in the URL. Lets
+// the AI demo tour show a populated CVReview without needing a real PDF upload.
+const DEMO_PRELOADED_DOC: CVDocument = {
+  id: "demo-preloaded",
+  uploaded_at: new Date().toISOString(),
+  file_name: "سارة-الراشد-CV.pdf",
+  section_scores: {
+    contact: 92,
+    summary: 71,
+    experience: 84,
+    education: 88,
+    skills: 79,
+    achievements: 66,
+    language_quality: 81,
+  },
+  weaknesses: [
+    {
+      section: "summary",
+      issue: "الملخّص عام جداً ولا يذكر أرقام نتائج",
+      original_text: "مهندسة واجهات أمامية شغوفة بتجارب المستخدم.",
+      severity: "moderate",
+    },
+    {
+      section: "achievements",
+      issue: "لا توجد إنجازات قابلة للقياس — كلها مهام لا نتائج",
+      original_text: "عملت على تحسين الأداء وتنسيق التصميم.",
+      severity: "major",
+    },
+    {
+      section: "skills",
+      issue: "قائمة المهارات طويلة بدون مستويات إتقان",
+      original_text: "React, Vue, Angular, Node, PHP, Python...",
+      severity: "minor",
+    },
+  ],
+  rewrites: [
+    {
+      original: "مهندسة واجهات أمامية شغوفة بتجارب المستخدم.",
+      improved:
+        "مهندسة واجهات أمامية بـ 3 سنوات خبرة، قادت إعادة بناء بوّابة عملاء رفعت معدّل التحوّل من 2.1% إلى 3.8% وزادت NPS بـ 22 نقطة.",
+      reason:
+        "النسخة الأصلية مجرّد صفة (شغوفة) بلا دليل. النسخة المحسّنة تضع رقم خبرة + إنجاز قابل للقياس + قيمة عمل واضحة.",
+    },
+    {
+      original: "عملت على تحسين الأداء وتنسيق التصميم.",
+      improved:
+        "خفضت زمن تحميل الصفحة الرئيسية (LCP) من 4.2s إلى 1.2s عبر SSR + CDN caching، ووحّدت 3 منتجات على design system مشترك قلّل وقت بناء ميزات بنسبة 40%.",
+      reason:
+        "الأرقام المحدّدة تفصل بين 'عملت على' و'حقّقت' — هذا الفرق بين مرشّحة عادية ومرشّحة مميّزة.",
+    },
+  ],
+  saudi_compliance: {
+    uses_hijri_dates: false,
+    address_format_correct: true,
+    military_service_mentioned: false,
+    jadarat_link_present: false,
+    recommendations: [
+      "أضف تواريخ هجرية بجانب الميلادية للوظائف الحكومية",
+      "أرفق رابط ملف جدارات للتقديم على وظائف القطاع العام",
+    ],
+  },
+  extraction: null,
+};
+
 const CVReview = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const [doc, setDoc] = useState<CVDocument | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,6 +178,7 @@ const CVReview = () => {
   const [resumeUrl, setResumeUrl] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [editedImproved, setEditedImproved] = useState<Record<number, string>>({});
+  const isDemoPreloaded = searchParams.get("demo") === "preloaded";
   const { revision, acceptRewrite, rejectRewrite, saving } = useCvRevision(user?.id, doc?.id);
 
   const loadAnalysis = async (uid: string) => {
@@ -165,6 +231,14 @@ const CVReview = () => {
   };
 
   useEffect(() => {
+    // Demo mode short-circuit: skip auth + DB and render a hardcoded analysis
+    // so the AI demo can showcase the review experience without an actual PDF.
+    if (isDemoPreloaded) {
+      setDoc(DEMO_PRELOADED_DOC);
+      setLoading(false);
+      return;
+    }
+
     if (!authLoading && !user) {
       navigate("/login");
       return;
@@ -180,7 +254,7 @@ const CVReview = () => {
         .maybeSingle();
       const url = (profile as any)?.resume_url ?? null;
       setResumeUrl(url);
-      
+
 
       if (existing) {
         setDoc(existing);
@@ -194,7 +268,7 @@ const CVReview = () => {
       }
     };
     load();
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, isDemoPreloaded]);
 
   if (loading) {
     return (

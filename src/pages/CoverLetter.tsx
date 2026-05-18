@@ -179,6 +179,7 @@ const CoverLetter = () => {
               <Label htmlFor="jd">الوصف الوظيفي (اختياري — كلّما زادت التفاصيل، كانت الرسالة أدقّ)</Label>
               <Textarea
                 id="jd"
+                data-tour="cover-letter-jd"
                 value={jobDescription}
                 onChange={(e) => setJobDescription(e.target.value)}
                 placeholder="الصق وصف الوظيفة من إعلان التوظيف هنا..."
@@ -186,7 +187,12 @@ const CoverLetter = () => {
                 dir="rtl"
               />
             </div>
-            <Button onClick={generate} disabled={generating} className="rounded-xl w-full">
+            <Button
+              data-tour="cover-letter-generate"
+              onClick={generate}
+              disabled={generating}
+              className="rounded-xl w-full"
+            >
               {generating ? (
                 <>
                   <Loader2 className="w-4 h-4 ml-2 animate-spin" />

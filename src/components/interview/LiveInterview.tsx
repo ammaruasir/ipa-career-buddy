@@ -88,6 +88,25 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
     }
   }, [type, live.videoElementRef]);
 
+  // Demo-mode bridge — exposes the text-answer injection point and the
+  // current interview id on window so the demo presenter (DemoTourContext) can
+  // drive an AI-vs-AI cameo and then navigate to the just-completed results.
+  // No-op in normal use; only the demo tour reads these globals.
+  useEffect(() => {
+    (window as any).__demoSubmitAnswerText = (live as any).submitAnswerText ?? null;
+    return () => {
+      if ((window as any).__demoSubmitAnswerText === (live as any).submitAnswerText) {
+        (window as any).__demoSubmitAnswerText = null;
+      }
+    };
+  }, [(live as any).submitAnswerText]);
+
+  useEffect(() => {
+    if (live.interviewId) {
+      (window as any).__demoLastInterviewId = live.interviewId;
+    }
+  }, [live.interviewId]);
+
   const handleBack = () => {
     if (live.isCallActive) {
       setShowExit(true);
@@ -287,6 +306,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
         <div className="flex items-center gap-4">
           {!live.isCallActive && !live.isConnecting && !live.isCompleted && (
             <Button
+              data-tour="start-interview"
               onClick={live.startCall}
               size="lg"
               className="rounded-full gap-2 px-8 bg-emerald-600 hover:bg-emerald-700"
@@ -308,6 +328,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
                 </Button>
               )}
               <Button
+                data-tour="end-interview"
                 onClick={() => setShowEndConfirm(true)}
                 size="lg"
                 variant="destructive"

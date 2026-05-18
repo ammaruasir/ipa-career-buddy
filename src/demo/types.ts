@@ -8,12 +8,41 @@ export type TourAction =
   | { kind: "click"; selector: string; delayMs?: number }
   | { kind: "type"; selector: string; text: string; speedMs?: number }
   | { kind: "wait"; ms: number }
-  | { kind: "swap-session"; role: "candidate" | "admin" | "hr" | "instructor" };
+  | { kind: "swap-session"; role: "candidate" | "admin" | "hr" | "instructor" }
+  | { kind: "pause-voice" }
+  | { kind: "resume-voice" }
+  | {
+      kind: "start-live-interview";
+      mode: "practice" | "assessment";
+      questionCount: number;
+      jobPosition?: string;
+    }
+  | {
+      kind: "ai-vs-ai-turn";
+      questionIndex: number;
+      totalQuestions: number;
+      context: "practice_interview" | "assessment_interview";
+    }
+  | { kind: "end-live-interview" };
+
+export type CursorState = {
+  x: number;
+  y: number;
+  visible: boolean;
+  clicking: boolean;
+};
+
+export type DemoRuntimeContext = {
+  lastInterviewId: string | null;
+};
 
 export type TourStep = {
   id: string;
   act: string;
-  route?: string;
+  /** Route to navigate to before the narration begins. Can be a static string
+   *  or a function that resolves at run time from the demo runtime context
+   *  (useful for navigating to a just-created interview's results page). */
+  route?: string | ((ctx: DemoRuntimeContext) => string);
   narration: string;
   spotlight?: SpotlightSpec;
   action?: TourAction;
@@ -30,4 +59,5 @@ export type TourState = {
   currentStep: TourStep | null;
   isSpeaking: boolean;
   takeOverMode: boolean;
+  cursor: CursorState;
 };
