@@ -1,4 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+} from "../_shared/guards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,13 +11,30 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Voice IDs are validated by shape, not whitelist. The admin can now pick any
+// voice in the org's ElevenLabs account via elevenlabs-voices; locking this
+// function to a hard-coded list would defeat that. Auth gate + rate limit
+// are the real abuse defense.
+const VOICE_ID_RE = /^[A-Za-z0-9_-]{16,32}$/;
+
+const ALLOWED_MODELS = new Set([
+  "eleven_flash_v2_5",
+  "eleven_multilingual_v2",
+]);
+
+const DEFAULT_VOICE_ID = "QsV9PCczMIklRM6xLPAS";
+const MAX_TEXT_LENGTH = 1500;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { text, voiceId, model } = await req.json();
+    // --- Auth gate: require a signed-in user (or service-role for server calls) ---
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 
     if (!ELEVENLABS_API_KEY) {
@@ -22,12 +44,61 @@ serve(async (req) => {
       });
     }
 
-    // Default to first user-provided Arabic voice. Admin can override per request.
-    const selectedVoiceId = voiceId || "QsV9PCczMIklRM6xLPAS";
-    // Flash v2.5 → ~75ms first-byte, supports Arabic. Falls back to multilingual_v2 on error.
-    const primaryModel = model || "eleven_flash_v2_5";
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const isServerCall = authHeader === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`;
 
-    console.log(`[TTS] voice=${selectedVoiceId} model=${primaryModel} chars=${text?.length ?? 0}`);
+    let userId: string | null = null;
+    if (!isServerCall) {
+      if (!authHeader.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const token = authHeader.replace("Bearer ", "");
+      const { data, error } = await userClient.auth.getUser(token);
+      if (error || !data?.user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = data.user.id;
+    }
+
+    // --- Body parse + input validation ---
+    const body = await req.json().catch(() => ({}));
+    const { text, voiceId, model } = body as { text?: string; voiceId?: string; model?: string };
+
+    if (typeof text !== "string" || text.trim().length === 0) {
+      return new Response(JSON.stringify({ error: "text is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (text.length > MAX_TEXT_LENGTH) {
+      return new Response(JSON.stringify({ error: `text exceeds ${MAX_TEXT_LENGTH} chars` }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const selectedVoiceId =
+      typeof voiceId === "string" && VOICE_ID_RE.test(voiceId) ? voiceId : DEFAULT_VOICE_ID;
+    const primaryModel = model && ALLOWED_MODELS.has(model) ? model : "eleven_flash_v2_5";
+
+    // --- Rate limit per signed-in user (skipped for server calls) ---
+    if (userId) {
+      const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      // 60 TTS requests per minute is generous (≈1/sec) but blocks runaway scripts.
+      const rl = await checkRateLimit(supabaseAdmin, userId, "tts", 60, 60);
+      if (!rl.allowed) return rateLimitResponse(rl.retryAfter, corsHeaders);
+    }
+
+    console.log(`[TTS] user=${userId ?? "server"} voice=${selectedVoiceId} model=${primaryModel} chars=${text.length}`);
 
     const callElevenLabs = async (modelId: string) =>
       fetch(

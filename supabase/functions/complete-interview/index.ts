@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { interview_id, recording_url } = await req.json();
+    const { interview_id, recording_url, recording_status, end_reason } = await req.json();
     if (!interview_id) {
       return new Response(JSON.stringify({ error: "interview_id required" }), {
         status: 400,
@@ -73,12 +73,44 @@ Deno.serve(async (req) => {
     if (safeRecordingUrl) {
       updateData.recording_url = safeRecordingUrl;
     }
+    if (recording_status && ["pending", "recording", "complete", "incomplete", "failed"].includes(recording_status)) {
+      updateData.recording_status = recording_status;
+    }
+    if (end_reason && ["completed", "cancelled", "terminated_by_proctor", "disconnected"].includes(end_reason)) {
+      updateData.end_reason = end_reason;
+    }
 
-    const { error } = await adminClient
+    // First attempt: only update from in_progress → completed atomically so
+    // a late beacon doesn't reopen a finished interview.
+    const { data: stillRunning, error: txnErr } = await adminClient
       .from("interviews")
       .update(updateData)
       .eq("id", interview_id)
-      .eq("status", "in_progress");
+      .eq("status", "in_progress")
+      .select("id");
+    let error = txnErr;
+
+    // Second attempt: if the row was already completed (common: client
+    // updated status synchronously inside endInterview() before the beacon
+    // fired), still record end_reason / recording_status without touching
+    // status. Without this fallback the "disconnected" flag is silently lost.
+    if (!error && (!stillRunning || stillRunning.length === 0)) {
+      const beaconOnly: Record<string, unknown> = {};
+      if (recording_status && ["pending", "recording", "complete", "incomplete", "failed"].includes(recording_status)) {
+        beaconOnly.recording_status = recording_status;
+      }
+      if (end_reason && ["completed", "cancelled", "terminated_by_proctor", "disconnected"].includes(end_reason)) {
+        beaconOnly.end_reason = end_reason;
+      }
+      if (safeRecordingUrl) beaconOnly.recording_url = safeRecordingUrl;
+      if (Object.keys(beaconOnly).length > 0) {
+        const r = await adminClient
+          .from("interviews")
+          .update(beaconOnly)
+          .eq("id", interview_id);
+        error = r.error;
+      }
+    }
 
     if (error) {
       console.error("Failed to complete interview:", error);

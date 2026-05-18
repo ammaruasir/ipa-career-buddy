@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useSystemSettings } from "@/hooks/useSystemSettings";
 
 type Msg = { role: "user" | "assistant" | "system"; content: string };
+type Phase = "intro" | "core" | "closing" | "end";
 type InterviewType = "text" | "voice" | "video";
 
 interface UseInterviewSessionOptions {
@@ -25,15 +26,19 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
   const [questionCount, setQuestionCount] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
-  
+  const [currentPhase, setCurrentPhase] = useState<Phase>("intro");
+  const [coreQuestionCount, setCoreQuestionCount] = useState(0);
 
   const contextSummaryRef = useRef<string>("");
   const interviewIdRef = useRef<string | null>(null);
   const completedRef = useRef(false);
   const lastQuestionRef = useRef(false);
+  const currentPhaseRef = useRef<Phase>("intro");
+  const coreQuestionCountRef = useRef(0);
 
   const totalQuestions = overrideTotalQuestions ?? settings.questions_per_type[type] ?? 8;
   const timerDuration = settings.time_per_question[type] ?? 300;
+  const interviewer = settings.interviewer_voice;
 
   const startInterview = useCallback(async (job: string) => {
     if (!user) return;
@@ -91,17 +96,27 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
           interview_type: type,
           vacancy_id: vacancyId,
           user_id: user.id,
+          interviewer_name: interviewer?.name,
+          interviewer_gender: interviewer?.gender,
+          current_phase: "intro",
+          core_question_count: 0,
+          total_questions: totalQuestions,
         },
       });
       if (resp.error) throw resp.error;
-      const aiReply = resp.data?.choices?.[0]?.message?.content || "مرحباً! دعنا نبدأ المقابلة.";
+      let aiReply = resp.data?.choices?.[0]?.message?.content || "مرحباً! دعنا نبدأ المقابلة.";
+      aiReply = aiReply
+        .replace(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i, "")
+        .trim();
       setMessages([{ role: "assistant", content: aiReply }]);
       setQuestionCount(1);
+      setCurrentPhase("intro");
+      currentPhaseRef.current = "intro";
     } catch {
       toast.error("حدث خطأ في الاتصال بمحرك واكب للذكاء الاصطناعي");
     }
     setIsLoading(false);
-  }, [user, type, totalQuestions, searchParams]);
+  }, [user, type, totalQuestions, searchParams, interviewer]);
 
   // Auto-start
   useEffect(() => {
@@ -154,35 +169,54 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     const vacancyId = searchParams.get("vacancy_id");
 
     try {
-      // Use optimized path: context_summary + last_answer
+      // Send a trailing slice of conversation (last 10 turns) alongside the summary
+      // so the AI has both global context and recent verbatim history.
+      const recentTail = newMessages.slice(-10);
       const resp = await supabase.functions.invoke("chat", {
         body: {
           context_summary: contextSummaryRef.current,
           last_answer: answerText.trim(),
+          messages: recentTail,
           job_position: selectedJob,
           interview_type: type,
           vacancy_id: vacancyId,
           user_id: user?.id,
+          interviewer_name: interviewer?.name,
+          interviewer_gender: interviewer?.gender,
+          current_phase: currentPhaseRef.current,
+          core_question_count: coreQuestionCountRef.current,
+          total_questions: totalQuestions,
         },
       });
       if (resp.error) throw resp.error;
       let aiReply = resp.data?.choices?.[0]?.message?.content || "";
-      const isFollowUp = aiReply.startsWith("[FOLLOW_UP]");
-      aiReply = aiReply.replace(/^\[(NEW_Q|FOLLOW_UP)\]\s*/, "");
+
+      const phaseMatch = aiReply.match(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i);
+      const phaseTag = phaseMatch ? phaseMatch[1].toUpperCase() : null;
+      aiReply = aiReply.replace(/^\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END)\]?\s*:?\s*/i, "").trim();
+
       setMessages((prev) => [...prev, { role: "assistant", content: aiReply }]);
-      if (!isFollowUp) {
-        setQuestionCount((c) => c + 1);
+
+      const isFollowUp = phaseTag === "FOLLOW_UP";
+      if (phaseTag === "INTRO") { setCurrentPhase("intro"); currentPhaseRef.current = "intro"; }
+      else if (phaseTag === "CORE") {
+        setCurrentPhase("core"); currentPhaseRef.current = "core";
+        const next = coreQuestionCountRef.current + 1;
+        coreQuestionCountRef.current = next;
+        setCoreQuestionCount(next);
+      } else if (phaseTag === "CLOSING") {
+        setCurrentPhase("closing"); currentPhaseRef.current = "closing";
       }
 
-      // Auto-end when last question is answered
-      if (lastQuestionRef.current) {
+      if (!isFollowUp) setQuestionCount((c) => c + 1);
+
+      if (phaseTag === "END" || lastQuestionRef.current) {
         lastQuestionRef.current = false;
         setIsLoading(false);
         await confirmEnd();
         return;
       }
 
-      // Mark if the next answer will be the last
       if (!isFollowUp && questionCount + 1 >= totalQuestions) {
         lastQuestionRef.current = true;
       }
@@ -190,7 +224,7 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
       toast.error("حدث خطأ في الاتصال");
     }
     setIsLoading(false);
-  }, [messages, isLoading, interviewId, selectedJob, questionCount, totalQuestions, type, searchParams]);
+  }, [messages, isLoading, interviewId, selectedJob, questionCount, totalQuestions, type, searchParams, interviewer]);
 
   const confirmEnd = useCallback(async () => {
     if (!interviewId || !user) return;
@@ -249,6 +283,8 @@ export const useInterviewSession = ({ type, totalQuestions: overrideTotalQuestio
     isCompleted,
     isEvaluating,
     settingsLoading,
+    currentPhase,
+    coreQuestionCount,
     startInterview,
     sendAnswer,
     confirmEnd,

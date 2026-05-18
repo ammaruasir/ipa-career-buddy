@@ -2,26 +2,43 @@ import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { MessagesSquare, Send, Loader2, Lightbulb, Sparkles, User2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { MessagesSquare, Send, Loader2, Lightbulb, Sparkles, User2, CheckCircle2, PlusCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import JustificationCard, { type Justification } from "./JustificationCard";
+import { proofreadText } from "./ProofreadInput";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type Lang = "ar" | "en";
+
+interface Replacement {
+  original: string;
+  improved: string;
+  section?: string;
+}
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   justifications?: Justification[];
   suggested_actions?: string[];
+  replacements?: Replacement[];
   created_at?: string;
 }
 
 interface CVChatPanelProps {
   cvDocumentId: string;
   language?: Lang;
+  onAcceptImprovement?: (improved: string, original: string, section?: string) => Promise<void> | void;
 }
 
 const TEXT = {
@@ -61,15 +78,32 @@ const TEXT = {
   },
 };
 
-const CVChatPanel = ({ cvDocumentId, language = "ar" }: CVChatPanelProps) => {
+const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVChatPanelProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerImproved, setPickerImproved] = useState("");
+  const [pickerOriginal, setPickerOriginal] = useState("");
+  const [pickerSection, setPickerSection] = useState("other");
+  const [accepting, setAccepting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const t = TEXT[language];
   const dir = language === "ar" ? "rtl" : "ltr";
+
+  const acceptOne = async (improved: string, original: string, section?: string) => {
+    if (!onAcceptImprovement) return;
+    try {
+      await onAcceptImprovement(improved, original, section);
+      toast.success(
+        language === "en" ? "Added to accepted improvements" : "تمت إضافته للتحسينات المعتمدة",
+      );
+    } catch (e: any) {
+      toast.error(e?.message || (language === "en" ? "Failed to save" : "تعذّر الحفظ"));
+    }
+  };
 
   // Auto-scroll on new message
   useEffect(() => {
@@ -79,12 +113,14 @@ const CVChatPanel = ({ cvDocumentId, language = "ar" }: CVChatPanelProps) => {
   }, [messages]);
 
   const send = async (text?: string) => {
-    const msg = (text ?? input).trim();
-    if (!msg || loading) return;
+    const raw = (text ?? input).trim();
+    if (!raw || loading) return;
 
     setInput("");
-    setMessages((m) => [...m, { role: "user", content: msg }]);
     setLoading(true);
+    // Silent Arabic proofread before sending (only auto-applies single-option fixes)
+    const msg = language === "ar" ? await proofreadText(raw, "general") : raw;
+    setMessages((m) => [...m, { role: "user", content: msg }]);
 
     try {
       const { data, error } = await supabase.functions.invoke("chat-with-cv", {
@@ -96,19 +132,24 @@ const CVChatPanel = ({ cvDocumentId, language = "ar" }: CVChatPanelProps) => {
         },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.message) throw new Error(language === "en" ? "Empty response" : "استجابة فارغة");
       if (data.conversation_id) setConversationId(data.conversation_id);
       setMessages((m) => [...m, data.message]);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error("chat-with-cv failed:", e);
+      const fallback =
+        e?.message?.includes("Failed to fetch") || e?.name === "FunctionsFetchError"
+          ? language === "en"
+            ? "Connection issue. Please check your internet and try again."
+            : "تعذّر الاتصال. تحقّق من الإنترنت وحاول مجدداً."
+          : e?.message ||
+            (language === "en" ? "Something went wrong. Please try again." : "حدث خطأ. حاول مرّة أخرى.");
+      toast.error(fallback);
+      setInput(msg);
       setMessages((m) => [
         ...m,
-        {
-          role: "assistant",
-          content:
-            language === "en"
-              ? "Sorry, something went wrong. Please try again."
-              : "عذراً، حدث خطأ. حاول مرّة أخرى.",
-        },
+        { role: "assistant", content: `⚠️ ${fallback}` },
       ]);
     } finally {
       setLoading(false);
@@ -187,6 +228,94 @@ const CVChatPanel = ({ cvDocumentId, language = "ar" }: CVChatPanelProps) => {
                   >
                     {m.content}
                   </div>
+                  {m.role === "assistant" && onAcceptImprovement && !m.content.startsWith("⚠️") && (
+                    <div className="space-y-2 mt-1.5">
+                      {/* Structured replacements from AI */}
+                      {m.replacements && m.replacements.length > 0 && (
+                        <div className="space-y-2">
+                          {m.replacements.map((rep, ri) => {
+                            const isAddition = !rep.original?.trim();
+                            return (
+                              <div
+                                key={ri}
+                                className="rounded-lg border border-primary/20 bg-background p-2.5 space-y-2"
+                              >
+                                {isAddition ? (
+                                  <div>
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <PlusCircle className="w-3 h-3 text-emerald-600" />
+                                      <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                                        {language === "en" ? "New addition" : "إضافة جديدة"}
+                                      </span>
+                                      {rep.section && (
+                                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                                          {rep.section}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
+                                      {rep.improved}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div>
+                                      <div className="flex items-center gap-1.5 mb-0.5">
+                                        <span className="text-[10px] font-semibold text-muted-foreground">
+                                          {language === "en" ? "Original" : "الأصلي"}
+                                        </span>
+                                        {rep.section && (
+                                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                                            {rep.section}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <p className="text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground line-through">
+                                        {rep.original}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5">
+                                        {language === "en" ? "Improved" : "المُحسَّن"}
+                                      </div>
+                                      <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
+                                        {rep.improved}
+                                      </p>
+                                    </div>
+                                  </>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7 w-full"
+                                  onClick={() => acceptOne(rep.improved, rep.original || "", rep.section)}
+                                >
+                                  <CheckCircle2 className="w-3 h-3 ml-1" />
+                                  {language === "en" ? "Accept this improvement" : "اعتمد هذا التحسين"}
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Generic "use this whole reply" button */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-7"
+                        onClick={() => {
+                          setPickerImproved(m.content);
+                          setPickerOriginal("");
+                          setPickerSection("other");
+                          setPickerOpen(true);
+                        }}
+                      >
+                        <CheckCircle2 className="w-3 h-3 ml-1" />
+                        {language === "en" ? "Use as improvement" : "اعتمد كتحسين على السيرة"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -250,6 +379,91 @@ const CVChatPanel = ({ cvDocumentId, language = "ar" }: CVChatPanelProps) => {
           </div>
         </div>
       </CardContent>
+
+      {/* Manual accept dialog (used when AI didn't return structured replacements) */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent dir={dir} className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {language === "en" ? "Accept improvement" : "اعتماد التحسين"}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {language === "en"
+                ? "Optionally paste the original text from your CV to replace. Leave it empty to add this as a new bullet in the chosen section — it will still be merged on export."
+                : "اختياري: الصق النص الأصلي من سيرتك ليُستبدل. اتركه فارغاً لإضافته كبند جديد في القسم المحدد — وسيُدمج تلقائياً عند التصدير."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
+                {language === "en" ? "Improved (from AI)" : "النص المُحسَّن (من الذكاء)"}
+              </div>
+              <Textarea
+                value={pickerImproved}
+                onChange={(e) => setPickerImproved(e.target.value)}
+                rows={4}
+                dir={dir}
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground mb-1">
+                {language === "en" ? "Original text from CV (optional)" : "النص الأصلي من السيرة (اختياري)"}
+              </div>
+              <Textarea
+                value={pickerOriginal}
+                onChange={(e) => setPickerOriginal(e.target.value)}
+                rows={3}
+                dir={dir}
+                placeholder={
+                  language === "en"
+                    ? "Leave empty to add as a new bullet"
+                    : "اتركه فارغاً لإضافته كبند جديد"
+                }
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground mb-1">
+                {language === "en" ? "Section" : "القسم"}
+              </div>
+              <select
+                value={pickerSection}
+                onChange={(e) => setPickerSection(e.target.value)}
+                className="w-full text-sm border border-input bg-background rounded-md h-9 px-2"
+                dir={dir}
+              >
+                <option value="summary">{language === "en" ? "Summary" : "الملخّص"}</option>
+                <option value="experience">{language === "en" ? "Experience" : "الخبرة"}</option>
+                <option value="education">{language === "en" ? "Education" : "التعليم"}</option>
+                <option value="skills">{language === "en" ? "Skills" : "المهارات"}</option>
+                <option value="achievements">{language === "en" ? "Achievements" : "الإنجازات"}</option>
+                <option value="certifications">{language === "en" ? "Certifications" : "الشهادات"}</option>
+                <option value="other">{language === "en" ? "Other" : "أخرى"}</option>
+              </select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPickerOpen(false)} disabled={accepting}>
+              {language === "en" ? "Cancel" : "إلغاء"}
+            </Button>
+            <Button
+              disabled={!pickerImproved.trim() || accepting}
+              onClick={async () => {
+                setAccepting(true);
+                await acceptOne(pickerImproved.trim(), pickerOriginal.trim(), pickerSection);
+                setAccepting(false);
+                setPickerOpen(false);
+              }}
+            >
+              {accepting && <Loader2 className="w-3.5 h-3.5 ml-1.5 animate-spin" />}
+              {language === "en" ? "Accept & merge on export" : "اعتمد ودمج عند التصدير"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

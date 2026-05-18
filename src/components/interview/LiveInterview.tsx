@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useLiveInterview } from "@/hooks/useLiveInterview";
 import { useAntiCheat } from "@/hooks/useAntiCheat";
 import { useCheatCamera } from "@/hooks/useCheatCamera";
@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import AIAvatarScene from "@/components/interview/AIAvatarScene";
+import ProctorBadge from "@/components/interview/ProctorBadge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,12 +34,16 @@ interface LiveInterviewProps {
 
 const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterviewProps) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [showExit, setShowExit] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
-  const { tabSwitchCount, showWarning } = useAntiCheat({ enableTabDetection: true });
   const { settings, loading: settingsLoading } = useSystemSettings();
 
   const iv = settings.interviewer_voice;
+  const isPractice = useMemo(
+    () => searchParams.get("practice") === "true",
+    [searchParams],
+  );
 
   const live = useLiveInterview({
     type,
@@ -47,6 +52,12 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
     interviewerName: iv.name,
     interviewerGender: iv.gender,
     interviewerVoiceId: iv.voice_id,
+  });
+
+  const { tabSwitchCount, showWarning } = useAntiCheat({
+    enableTabDetection: true,
+    interviewId: live.interviewId,
+    mode: isPractice ? "practice" : "assessment",
   });
 
   // Cheat camera for voice mode (video mode already has camera via useLiveInterview)
@@ -169,6 +180,7 @@ const LiveInterview = ({ type, jobPosition, totalQuestions, onBack }: LiveInterv
 
   return (
     <div className="min-h-screen bg-background flex flex-col" dir="rtl">
+      <ProctorBadge proctors={live.activeProctors} messages={live.proctorMessages} />
       <InterviewHeader
         timerFormatted="مباشر"
         isWarning={false}

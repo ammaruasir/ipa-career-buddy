@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { useCvRevision } from "@/hooks/useCvRevision";
+import { buildImprovedCV, exportToDocx, exportToPdf } from "@/lib/cv-export";
+import { Check, X, Download, FileDown } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -29,7 +33,15 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import CVChatPanel from "@/components/cv-builder/CVChatPanel";
+
+// Extract storage path "<user_id>/<file>" from a full Supabase public/signed URL
+const extractResumePath = (resumeUrl: string | null, userId: string): string => {
+  if (!resumeUrl) return `${userId}/resume.pdf`;
+  const m = resumeUrl.match(/\/resumes\/(.+?)(?:\?|$)/);
+  return m?.[1] ?? `${userId}/resume.pdf`;
+};
 
 interface Weakness {
   section: string;
@@ -60,6 +72,7 @@ interface CVDocument {
   weaknesses: Weakness[] | null;
   rewrites: Rewrite[] | null;
   saudi_compliance: SaudiCompliance | null;
+  extraction: any | null;
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -96,6 +109,60 @@ const CVReview = () => {
   const { user, loading: authLoading } = useAuth();
   const [doc, setDoc] = useState<CVDocument | null>(null);
   const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [resumeUrl, setResumeUrl] = useState<string | null>(null);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [editedImproved, setEditedImproved] = useState<Record<number, string>>({});
+  const { revision, acceptRewrite, rejectRewrite, saving } = useCvRevision(user?.id, doc?.id);
+
+  const loadAnalysis = async (uid: string) => {
+    const { data } = await supabase
+      .from("cv_documents" as any)
+      .select("id, uploaded_at, file_name, section_scores, weaknesses, rewrites, saudi_compliance, extraction")
+      .eq("user_id", uid)
+      .order("uploaded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return (data as unknown as CVDocument) ?? null;
+  };
+
+  const triggerAnalysis = async (overrideUrl?: string | null) => {
+    if (!user) return;
+    setAnalyzing(true);
+    setAnalyzeError(null);
+    const loadingId = toast.loading("جارٍ تحليل سيرتك… قد يستغرق حتى دقيقة");
+    try {
+      const path = extractResumePath(overrideUrl ?? resumeUrl, user.id);
+      const { data, error } = await supabase.functions.invoke("analyze-resume", {
+        body: { resume_path: path },
+      });
+      // Prefer the function's own error payload over the generic FunctionsHttpError
+      const serverMsg = (data as any)?.error;
+      if (serverMsg) throw new Error(serverMsg);
+      if (error) {
+        // Try to read the function's error body for a better message
+        const ctxMsg =
+          (error as any)?.context?.body && typeof (error as any).context.body === "string"
+            ? (() => { try { return JSON.parse((error as any).context.body)?.error; } catch { return null; } })()
+            : null;
+        throw new Error(ctxMsg || error.message);
+      }
+      const fresh = await loadAnalysis(user.id);
+      if (!fresh) throw new Error("تعذّر قراءة نتيجة التحليل بعد الحفظ");
+      setDoc(fresh);
+      toast.success("اكتمل تحليل سيرتك الذاتية", { id: loadingId });
+    } catch (e: any) {
+      console.error("analyze-resume failed:", e);
+      const msg =
+        e?.message?.includes("Failed to fetch") || e?.name === "FunctionsFetchError"
+          ? "تعذّر الاتصال بخدمة التحليل، تحقّق من اتصالك وحاول مجدداً"
+          : e?.message || "حدث خطأ غير متوقّع أثناء التحليل";
+      setAnalyzeError(msg);
+      toast.error(msg, { id: loadingId });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -105,15 +172,26 @@ const CVReview = () => {
     if (!user) return;
 
     const load = async () => {
-      const { data } = await supabase
-        .from("cv_documents")
-        .select("id, uploaded_at, file_name, section_scores, weaknesses, rewrites, saudi_compliance")
+      const existing = await loadAnalysis(user.id);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("resume_url")
         .eq("user_id", user.id)
-        .order("uploaded_at", { ascending: false })
-        .limit(1)
         .maybeSingle();
-      setDoc((data as unknown as CVDocument) ?? null);
+      const url = (profile as any)?.resume_url ?? null;
+      setResumeUrl(url);
+      
+
+      if (existing) {
+        setDoc(existing);
+        setLoading(false);
+        return;
+      }
       setLoading(false);
+      if (url) {
+        // Auto-trigger analysis on first visit
+        await triggerAnalysis(url);
+      }
     };
     load();
   }, [user, authLoading, navigate]);
@@ -130,10 +208,26 @@ const CVReview = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 px-4" dir="rtl">
         <FileText className="w-12 h-12 text-muted-foreground" />
-        <p className="text-muted-foreground text-lg text-center">
-          لم يتمّ تحليل سيرة ذاتية بعد. ارفع سيرتك من إعدادات الملف الشخصي لتبدأ.
-        </p>
-        <Button onClick={() => navigate("/settings/profile")}>الذهاب لرفع السيرة</Button>
+        {resumeUrl ? (
+          <>
+            <p className="text-muted-foreground text-lg text-center">
+              سيرتك الذاتية مرفوعة. اضغط لتحليلها بالذكاء الاصطناعي.
+            </p>
+            {analyzeError && (
+              <p className="text-sm text-destructive text-center max-w-md">{analyzeError}</p>
+            )}
+            <Button onClick={() => triggerAnalysis()} disabled={analyzing}>
+              {analyzing ? "جارٍ التحليل..." : analyzeError ? "إعادة المحاولة" : "حلّل سيرتي الآن"}
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="text-muted-foreground text-lg text-center">
+              لم يتمّ تحليل سيرة ذاتية بعد. ارفع سيرتك من إعدادات الملف الشخصي لتبدأ.
+            </p>
+            <Button onClick={() => navigate("/settings/profile")}>الذهاب لرفع السيرة</Button>
+          </>
+        )}
       </div>
     );
   }
@@ -255,49 +349,155 @@ const CVReview = () => {
           </Card>
         )}
 
-        {/* Rewrites */}
+        {/* Rewrites — accept / edit / reject */}
         {rewrites.length > 0 && (
           <Card className="rounded-2xl shadow-lg">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-emerald-600" />
-                اقتراحات إعادة الكتابة
+                تحسينات الذكاء الاصطناعي — اعتمد ما يناسبك
               </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                يمكنك تعديل النسخة المحسّنة قبل اعتمادها. التحسينات المعتمدة ستظهر في النسخة النهائية القابلة للتصدير.
+              </p>
             </CardHeader>
             <CardContent>
               <Accordion type="multiple" className="space-y-2">
-                {rewrites.map((r, idx) => (
-                  <AccordionItem
-                    key={idx}
-                    value={`rw-${idx}`}
-                    className="border rounded-xl px-3"
-                  >
-                    <AccordionTrigger className="hover:no-underline py-2 text-sm text-right">
-                      {r.reason}
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-2 pt-1">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div className="rounded-lg bg-muted/40 p-3">
-                          <p className="text-xs text-muted-foreground mb-1">الأصلي</p>
-                          <p className="text-sm text-foreground">{r.original}</p>
+                {rewrites.map((r, idx) => {
+                  const accepted = revision?.accepted_rewrites?.find((a) => a.original === r.original);
+                  const currentValue = editedImproved[idx] ?? accepted?.improved ?? r.improved;
+                  return (
+                    <AccordionItem key={idx} value={`rw-${idx}`} className="border rounded-xl px-3">
+                      <AccordionTrigger className="hover:no-underline py-2 text-sm text-right">
+                        <div className="flex items-center gap-2 flex-1 text-right">
+                          <span className="flex-1">{r.reason}</span>
+                          {accepted && (
+                            <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px]">
+                              معتمد
+                            </Badge>
+                          )}
                         </div>
-                        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3">
-                          <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-1">
-                            النسخة المحسّنة
-                          </p>
-                          <p className="text-sm text-foreground">{r.improved}</p>
+                      </AccordionTrigger>
+                      <AccordionContent className="space-y-3 pt-1">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="text-xs text-muted-foreground mb-1">الأصلي</p>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{r.original}</p>
+                          </div>
+                          <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3 space-y-2">
+                            <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                              النسخة المحسّنة (قابلة للتعديل)
+                            </p>
+                            <Textarea
+                              dir="rtl"
+                              value={currentValue}
+                              onChange={(e) =>
+                                setEditedImproved((prev) => ({ ...prev, [idx]: e.target.value }))
+                              }
+                              rows={4}
+                              className="text-sm bg-background/60"
+                            />
+                          </div>
                         </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
+                        <div className="flex flex-wrap gap-2 justify-end">
+                          {accepted && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={saving}
+                              onClick={async () => {
+                                await rejectRewrite(r.original);
+                                toast.success("تم إلغاء اعتماد التحسين");
+                              }}
+                            >
+                              <X className="w-3.5 h-3.5 ml-1" />
+                              إلغاء الاعتماد
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            disabled={saving}
+                            onClick={async () => {
+                              await acceptRewrite(r.original, currentValue);
+                              toast.success("تم اعتماد التحسين");
+                            }}
+                          >
+                            <Check className="w-3.5 h-3.5 ml-1" />
+                            {accepted ? "حفظ التعديلات" : "اعتماد التحسين"}
+                          </Button>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
               </Accordion>
             </CardContent>
           </Card>
         )}
 
+        {/* Export improved CV */}
+        <Card className="rounded-2xl shadow-lg border-primary/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Download className="w-5 h-5 text-primary" />
+              تصدير سيرتك المحسّنة
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              يتم دمج جميع التحسينات التي اعتمدتها في النص الأصلي للسيرة، ثم تصديرها بصيغة Word أو PDF.
+              {revision?.accepted_rewrites?.length
+                ? ` (${revision.accepted_rewrites.length} تحسين معتمد)`
+                : " (لم يتم اعتماد أي تحسين بعد — سيتم تصدير النص الأصلي)"}
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button
+              onClick={async () => {
+                try {
+                  const data = buildImprovedCV(
+                    doc.extraction,
+                    revision?.accepted_rewrites ?? [],
+                    doc.file_name ?? "السيرة الذاتية",
+                  );
+                  await exportToDocx(data, `cv-${Date.now()}.docx`, { language: "ar" });
+                  toast.success("تم تصدير ملف Word");
+                } catch (e: any) {
+                  toast.error(e?.message || "فشل تصدير Word");
+                }
+              }}
+            >
+              <FileDown className="w-4 h-4 ml-1.5" />
+              تصدير Word (.docx)
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                try {
+                  const data = buildImprovedCV(
+                    doc.extraction,
+                    revision?.accepted_rewrites ?? [],
+                    doc.file_name ?? "السيرة الذاتية",
+                  );
+                  exportToPdf(data, `cv-${Date.now()}.pdf`, { language: "ar" });
+                  toast.success("افتح نافذة الطباعة واختر 'حفظ كـ PDF'");
+                } catch (e: any) {
+                  toast.error(e?.message || "فشل تصدير PDF");
+                }
+              }}
+            >
+              <FileDown className="w-4 h-4 ml-1.5" />
+              تصدير PDF
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* P0.4: AI chat about this CV */}
-        <CVChatPanel cvDocumentId={doc.id} language="ar" />
+        <CVChatPanel
+          cvDocumentId={doc.id}
+          language="ar"
+          onAcceptImprovement={async (improved, original, section) => {
+            await acceptRewrite(original, improved, section);
+          }}
+        />
 
         {/* Saudi compliance */}
         {compliance && (
