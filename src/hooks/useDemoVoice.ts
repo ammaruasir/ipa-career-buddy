@@ -103,14 +103,70 @@ export function useDemoVoice() {
     });
   }, []);
 
+  /**
+   * Low-level fetch used by both speak() and provider-side preload. Bounded
+   * with a 12s timeout so a stalled upstream never wedges the tour. Returns
+   * null on failure (caller decides what to do).
+   */
+  const fetchTtsBlob = useCallback(
+    async (text: string, voiceId: string = presenterVoiceId): Promise<Blob | null> => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 12_000);
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-wakeb-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({ text: cleanTextForTTS(text), voiceId }),
+            signal: ctrl.signal,
+          },
+        );
+        if (!response.ok) {
+          console.warn(`demo-wakeb-tts failed: ${response.status}`);
+          return null;
+        }
+        return await response.blob();
+      } catch (e) {
+        console.warn("demo-wakeb-tts fetch error:", e);
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+    [],
+  );
+
+  const ttsFailureWarnedRef = useRef(false);
+  const warnTtsFailureOnce = useCallback(() => {
+    if (ttsFailureWarnedRef.current) return;
+    ttsFailureWarnedRef.current = true;
+    toast.error("تعذّر تشغيل الصوت — تكمل الجولة بدون نطق.", { duration: 6000 });
+  }, []);
+
   const speak = useCallback(
-    async (text: string, voiceId: string = presenterVoiceId, cacheKey?: string): Promise<void> => {
+    async (
+      text: string,
+      voiceId: string = presenterVoiceId,
+      cacheKey?: string,
+      preloadedBlob?: Blob | null,
+    ): Promise<void> => {
       stop();
       setIsSpeaking(true);
 
-      // Try pre-cached MP3 first (Phase F cost-saver). Validate Content-Type
-      // because in dev/preview missing files are rewritten to the SPA HTML
-      // shell with status 200, which would otherwise be played as "audio".
+      // 1. Preloaded blob (provider-side first-step preload) — fastest path.
+      if (preloadedBlob && preloadedBlob.size > 0) {
+        const url = URL.createObjectURL(preloadedBlob);
+        const audio = new Audio(url);
+        return playAudioFromUrl(audio, [url]);
+      }
+
+      // 2. Pre-cached MP3 shipped in /public/demo-audio (Phase F). Validate
+      // Content-Type — in dev/preview, missing files are rewritten to the
+      // SPA HTML shell with 200, which would otherwise be played as "audio".
       if (cacheKey) {
         try {
           const cacheResp = await fetch(`/demo-audio/${encodeURIComponent(cacheKey)}.mp3`);
@@ -126,29 +182,19 @@ export function useDemoVoice() {
         }
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-wakeb-tts`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({ text: cleanTextForTTS(text), voiceId }),
-        }
-      );
-
-      if (!response.ok) {
+      // 3. Live TTS — non-throwing. On failure, degrade gracefully to silent
+      // narration so the tour keeps moving instead of freezing the engine.
+      const audioBlob = await fetchTtsBlob(text, voiceId);
+      if (!audioBlob) {
+        warnTtsFailureOnce();
         setIsSpeaking(false);
-        throw new Error(`TTS request failed: ${response.status}`);
+        return;
       }
-
-      const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       return playAudioFromUrl(audio, [audioUrl]);
     },
-    [stop, playAudioFromUrl]
+    [stop, playAudioFromUrl, fetchTtsBlob, warnTtsFailureOnce],
   );
 
   const startRecording = useCallback(async (): Promise<void> => {

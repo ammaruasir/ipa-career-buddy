@@ -1,72 +1,76 @@
-## Goals
+# Fix: Demo tour hangs at "tour is starting" + slow first launch
 
-Address five interlinked issues in Training (text) and Assessment (voice/video) interviews:
+## Root cause analysis
 
-1. Phase tags like `[CORE]`, `[INTRO]` leak into the spoken/displayed text.
-2. The interviewer's name/gender (currently "نورة female") doesn't match the voice (male Jeddawi).
-3. The header status pill stays on "المرحلة التعريفية" and never advances to Core/Closing.
-4. The overall interaction tone is inconsistent — sometimes too casual, sometimes off-brand.
-5. The interviewer over-uses the candidate's name every turn — feels unnatural.
+The demo button stays stuck on **"الجولة قيد التشغيل…"** because of this chain in `src/contexts/DemoTourContext.tsx → start()`:
 
----
+```
+setStatus("running")        // button now shows "starting…"
+await runStep(tourScript[0])
+└── voice.speak(step.narration, undefined, step.id)
+    ├── try cached /demo-audio/act1-intro.mp3  (no file in /public → falls through, correct)
+    └── POST /functions/v1/demo-wakeb-tts
+        └── if !response.ok → throws "TTS request failed: <status>"
+```
 
-## 1. Stop phase-tag leaks (server + client double-strip)
+If the TTS POST fails for any reason (IP rate-limit `429` after repeated tries, transient `5xx`, network timeout, autoplay block), `speak()` **throws**. The throw bubbles out of `runStep` → out of the `for` loop in `start()` → the final `setStatus("finished")` never runs, so `status` stays at `"running"` and the button label is frozen.
 
-Leading-only regex sanitization is fragile; the model sometimes emits `[CORE]` mid-text, drops brackets, or double-tags.
+There is also **no timeout** on the TTS fetch, so a stalled upstream (ElevenLabs hiccup) hangs the entire tour indefinitely.
 
-- `**supabase/functions/chat/index.ts**` — sanitize before returning:
-  - Capture the leading phase tag and expose it as a new top-level `phase` field on the response.
-  - Globally strip every occurrence of `\[?(INTRO|CORE|FOLLOW_UP|CLOSING|END|NEW_Q)\]?\s*:?\s*` (case-insensitive, bracketed and bare), then collapse double spaces.
-  - Strengthen the system rule: "العلامة تظهر مرة واحدة فقط في أول الرد بين قوسين مربعين، ولا تذكر أبداً داخل النص المنطوق."
-- `**useLiveInterview.ts**` (greeting, `getNextAIResponse`, closing fallback) and `**useInterviewSession.ts**` (`startInterview`, `sendAnswer`) — replace leading-only strip with the same global strip; prefer the new `phase` field, fall back to regex.
-- One shared helper `stripPhaseTags(text)` in `src/lib/arabic-utils.ts` so both hooks use identical logic.
+The "takes too much time to start" complaint is a separate but related issue: the very first step has no pre-cached audio, so after the click the user waits for `primeAudio + TTS roundtrip + first audio chunk` (~2–4 s) of silence before anything visible happens.
 
-## 2. Lock persona to a single source of truth that matches the available voice
+I verified `demo-wakeb-tts` itself responds in ~1.5 s with valid `audio/mpeg`, so the function is healthy — the client just isn't resilient to the cases where it isn't.
 
-Only one production Arabic voice exists today (Jeddawi male, `yXEnnEln9armDCyhkXcA`). DB already stores `عبدالله / male`, but several fallbacks still introduce "نورة female", so name and audio drift apart.
+## Plan
 
-- `**src/hooks/useSystemSettings.ts**` — change `DEFAULT_SETTINGS.interviewer_voice` to `{ name: "عبدالله", gender: "male", voice_id: "yXEnnEln9armDCyhkXcA", avatar_url: "" }`.
-- `**src/hooks/useLiveInterview.ts**` — change default params to `interviewerName = "عبدالله"`, `interviewerGender = "male"`. Move both into refs that re-sync via `useEffect` (same pattern as `interviewerVoiceIdRef`) so the greeting prompt always uses the latest settings, not a stale closure.
-- `**supabase/functions/chat/index.ts**` — change `ivName` fallback to `"عبدالله"` and gender default to `"male"`.
-- `**src/pages/AdminSettings.tsx**` — when admin changes name/gender, validate that `voice_id` belongs to the chosen gender; show an inline warning if not. Surface voice gender metadata from `wakeb-voices`.
+### 1. Make `voice.speak` non-throwing + bounded
+File: `src/hooks/useDemoVoice.ts`
 
-> If the user wants to keep Noura instead, the alternative is procuring a female Khaleeji voice (Phase B.5 voice cloning) — out of scope unless requested.
+- Wrap the `demo-wakeb-tts` POST with an `AbortController` and a **12 s timeout**.
+- If the request fails or times out, log a `console.warn`, surface a one-time `toast.error` ("تعذّر تشغيل الصوت — تكمل الجولة بدون نطق")، **resolve** instead of throwing, and clear `isSpeaking`.
+- Same treatment for the cache-fetch branch (already swallowed, keep as-is).
+- Net effect: a TTS failure degrades to silent narration; the tour keeps moving.
 
-## 3. Make the phase status bar actually advance
+### 2. Harden `start()` / `runStep` in the tour engine
+File: `src/contexts/DemoTourContext.tsx`
 
-- `**useLiveInterview.ts` `getNextAIResponse**` — match `phaseTag` anywhere in the first ~40 chars (not anchored at `^`) and prefer the server-returned `phase` field. If a `[CORE]` tag arrives while `currentPhase` is still `"intro"`, force the transition.
-- `**TextInterview.tsx**` — pass `phaseLabel` (derived from `session.currentPhase`) into `InterviewHeader`, mirroring `LiveInterview.tsx`. Without this, text mode never shows phase progression.
-- `**InterviewHeader.tsx**` — no change; it already renders `phaseLabel`.
+- Wrap each `await runStep(tourScript[i])` in `try { … } catch (e) { console.warn(...) }` so one bad step never freezes the whole tour status.
+- In `start()`, if the loop exits via `cancelRef`, leave status untouched; otherwise always end with `setStatus("finished")` (already the case once #1 stops the throw).
+- Add a guard so `start()` is a no-op if `status === "running" | "qna"` (prevents the button from re-arming a second loop on accidental double-click).
 
-## 4. Raise the interviewer's professionalism
+### 3. Immediate visual feedback after click
+File: `src/contexts/DemoTourContext.tsx` + `src/pages/Demo.tsx`
 
-In `supabase/functions/chat/index.ts` system prompt:
+- Move `setStatus("running")` to **before** `voice.primeAudio()` so the `DemoOverlay` mounts instantly with a "جاري تجهيز الجولة…" indicator instead of the page sitting silent for 2–4 s.
+- Update the Demo page button label: `status === "running" && stepIndex === 0 && !voice.isSpeaking` → show "جاري تجهيز الصوت…" (more honest than "قيد التشغيل").
 
-- Replace the loose persona ("ودود وطبيعي … عندك حس خفيف") with: "محاور وظيفي محترف، هادئ ومنظم، يستخدم لهجة سعودية مهنية مع لمسة دافئة دون مبالغة. يتجنب العامية الزائدة والمزاح."
-- Forbid filler openers like "هلا والله"، "تمام كذا"، "حلو هذي نقطة مهمة" in the first message; allow short professional acknowledgments only mid-interview ("شكراً لك"، "ملاحظة مفيدة"، "واضح").
-- Force first-message structure: greeting + self-introduction (name + role) + position + one open intro question — no commentary on a non-existent prior answer.
-- In `useLiveInterview.startCall`, update the dynamic greeting prompt and the static fallback (line 1074) to the new professional opener: "السلام عليكم، أنا ${interviewerName} من محرك واكب الذكي. سأجري معك اليوم مقابلة لوظيفة ${jobPosition}. لنبدأ — عرّفني على نفسك وخلفيتك المهنية."
+### 4. Preload the first narration to eliminate the cold-start gap
+File: `src/contexts/DemoTourContext.tsx`
 
-## 5. Stop over-using the candidate's name
+- On `DemoTourProvider` mount, fire a low-priority `fetch` (no playback) to `demo-wakeb-tts` for the first step's narration, store the resulting `Blob` in a ref keyed by `tourScript[0].id`.
+- Modify `voice.speak()` to accept an optional pre-fetched `Blob` and play it directly, skipping the network round-trip on the first step.
+- Cancel/ignore the preload if `start()` is invoked before it resolves (no double-play).
+- Saves ~2–3 s on the very first click and avoids the silent gap that users perceive as "stuck".
 
-The current prompt has a loud "⚠️ تنبيه مهم" that instructs the model to address the candidate by name — the model then repeats the name almost every turn.
+### 5. Surface failures instead of hiding them
+File: `src/contexts/DemoTourContext.tsx`
 
-In `supabase/functions/chat/index.ts`:
-
-- Replace the existing `candidateNameInstruction` block with a softer, frequency-capped rule: "اسم المرشح هو ${candidateName}. استخدم اسمه مرة واحدة فقط عند التحية الأولى، ومرة عند الختام. خلال بقية المقابلة استخدم ضمائر مهذبة (أنت) ولا تكرر اسمه."
-- Add an explicit "قواعد المخاطبة" section under "قواعد عامة": "ممنوع تكرار اسم المرشح في كل رد. الاسم يُذكر عند التحية والختام فقط."
-- Mirror the rule in the greeting prompt inside `useLiveInterview.startCall` so the first message uses the name once, and in `useInterviewSession.startInterview`.
-
----
+- When the catch in #2 fires, append a `TranscriptEntry` `{ role: "presenter", text: "(تعذّر النطق لهذه الخطوة)" }` so the operator sees what happened in the transcript panel.
 
 ## Out of scope
 
-- Procuring a real female voice (Phase B.5 voice cloning).
-- Changing evaluation logic, scoring, or storage.
-- Touching the demo/AI-vs-AI cameo pipeline beyond the shared sanitizer.
+- Recording / committing pre-rendered `/demo-audio/*.mp3` cache files (separate Phase F task).
+- Changes to `demo-wakeb-tts` itself (function is healthy).
+- Procuring distinct presenter/candidate voices.
+- Touching the interviewer (Noura/عبدالله) flow — those fixes already shipped in the previous turn.
 
-## Verification
+## Technical notes
 
-- Run one practice text interview: status bar moves intro → core → closing; no `[TAG]` strings appear; candidate name appears at most in the first and last messages.
-- Start a voice interview: greeting introduces "عبدالله" with male voice; name not repeated each turn.
-- Tail `function_edge_logs` for `chat` after the run — confirm sanitized output and new `phase` field.
+- AbortController pattern:
+  ```ts
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12_000);
+  try { … fetch(url, { signal: ctrl.signal }) … } finally { clearTimeout(timer); }
+  ```
+- The preload-blob ref shape: `Map<stepId, Promise<Blob | null>>` so a single in-flight preload is awaited rather than refetched if `speak()` races it.
+- Button-disabled condition in `Demo.tsx` stays the same; only the label changes based on `stepIndex` and `isSpeaking`.
