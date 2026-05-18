@@ -276,6 +276,36 @@ export type Database = {
           },
         ]
       }
+      cv_revisions: {
+        Row: {
+          accepted_rewrites: Json
+          content: Json
+          created_at: string
+          cv_document_id: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accepted_rewrites?: Json
+          content?: Json
+          created_at?: string
+          cv_document_id?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accepted_rewrites?: Json
+          content?: Json
+          created_at?: string
+          cv_document_id?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       evaluations: {
         Row: {
           ai_feedback_ar: string | null

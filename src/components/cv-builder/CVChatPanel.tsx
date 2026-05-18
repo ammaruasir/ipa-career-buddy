@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { MessagesSquare, Send, Loader2, Lightbulb, Sparkles, User2 } from "lucide-react";
+import { MessagesSquare, Send, Loader2, Lightbulb, Sparkles, User2, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import JustificationCard, { type Justification } from "./JustificationCard";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ interface ChatMessage {
 interface CVChatPanelProps {
   cvDocumentId: string;
   language?: Lang;
+  onAcceptImprovement?: (improved: string, original: string) => Promise<void> | void;
 }
 
 const TEXT = {
@@ -62,7 +63,7 @@ const TEXT = {
   },
 };
 
-const CVChatPanel = ({ cvDocumentId, language = "ar" }: CVChatPanelProps) => {
+const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVChatPanelProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -193,6 +194,32 @@ const CVChatPanel = ({ cvDocumentId, language = "ar" }: CVChatPanelProps) => {
                   >
                     {m.content}
                   </div>
+                  {m.role === "assistant" && onAcceptImprovement && !m.content.startsWith("⚠️") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-7 mt-1.5"
+                      onClick={async () => {
+                        const original = window.prompt(
+                          language === "en"
+                            ? "Paste the original text from your CV that this improvement should replace:"
+                            : "الصق النص الأصلي من سيرتك الذاتية الذي تريد استبداله بهذا التحسين:",
+                        );
+                        if (!original?.trim()) return;
+                        try {
+                          await onAcceptImprovement(m.content, original.trim());
+                          toast.success(
+                            language === "en" ? "Added to accepted improvements" : "تمت إضافته للتحسينات المعتمدة",
+                          );
+                        } catch (e: any) {
+                          toast.error(e?.message || (language === "en" ? "Failed to save" : "تعذّر الحفظ"));
+                        }
+                      }}
+                    >
+                      <CheckCircle2 className="w-3 h-3 ml-1" />
+                      {language === "en" ? "Use as improvement" : "اعتمد كتحسين على السيرة"}
+                    </Button>
+                  )}
                 </div>
               </div>
 
