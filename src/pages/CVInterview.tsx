@@ -421,22 +421,20 @@ const CVInterview = () => {
     if (!sessionId || !question) return;
     setSuggesting(true);
     try {
-      // We trigger a suggestion by submitting a dummy "regenerate" — actually we need
-      // a separate endpoint. For simplicity we ask submit endpoint to re-yield current Q.
-      // Instead, call AI directly by re-fetching with want_suggestion=true on next step.
-      // Workaround: do a no-op submit with empty answer if non-required? Not ideal.
-      // Cleanest path: separate endpoint. For now, get a contextual hint client-side:
-      const { data, error } = await supabase.functions.invoke("improve-cv-summary", {
-        body: {
-          current_summary: "",
-          full_profile: { question: question.label_ar },
-          target_role: "",
-          language: uiLang,
-        },
+      const { data, error } = await supabase.functions.invoke("cv-interview-step", {
+        body: { action: "suggest", session_id: sessionId, language },
       });
       if (error) throw error;
-      const text = uiLang === "en" ? data.en?.improved : data.ar?.improved;
-      setSuggestion(text ?? null);
+      const text: string | null = data?.suggestion ?? null;
+      if (text && text.trim()) {
+        setSuggestion(text.trim());
+      } else {
+        toast.info(
+          uiLang === "en"
+            ? "No suggestion available — try writing your own and AI will improve it later."
+            : "لا يوجد اقتراح الآن — جرّب اكتب إجابتك وسيحسّنها AI لاحقاً.",
+        );
+      }
     } catch (e) {
       console.warn("suggestion error:", e);
       toast.error(uiLang === "en" ? "Could not generate suggestion" : "تعذّر توليد الاقتراح");
@@ -444,6 +442,7 @@ const CVInterview = () => {
       setSuggesting(false);
     }
   };
+
 
   const finalize = async () => {
     if (!sessionId) return;

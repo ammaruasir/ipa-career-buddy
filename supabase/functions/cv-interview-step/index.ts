@@ -317,19 +317,48 @@ async function suggestForQuestion(
   answersSoFar: Record<string, any>,
   language: string,
 ) {
-  // Only suggest for free-text and textarea questions
-  if (q.type !== "textarea" && q.type !== "list_text" && q.type !== "structured_list") return null;
+  // No suggestions for pure choice questions — answer is a selection
+  if (q.type === "choice") return null;
 
   try {
     const { apiKey, apiUrl, model } = pickProvider();
+
+    // Per-type guidance so the AI returns something the user can paste verbatim
+    let formatHint_ar = "اكتب مسوّدة موجزة (٣-٥ أسطر) جاهزة للنسخ.";
+    let formatHint_en = "Write a concise draft (3-5 lines) ready to paste.";
+    if (q.type === "repeater_simple") {
+      formatHint_ar = "اكتب ٣ إنجازات قويّة، كل واحد في سطر منفصل، بأرقام واضحة وأفعال قويّة (بنمط STAR مختصر).";
+      formatHint_en = "Write 3 strong achievements, one per line, with numbers and strong verbs (compact STAR style).";
+    } else if (q.type === "repeater") {
+      formatHint_ar = "اكتب مثال بند واحد فقط (وظيفة/مؤهّل/شهادة/لغة) بصياغة احترافية على شكل أسطر مفصولة.";
+      formatHint_en = "Write a single sample item (job/degree/cert/language) in professional form, line-separated.";
+    } else if (q.type === "chips") {
+      formatHint_ar = "اقترح ٦-١٠ مهارات تقنية ملائمة للوظيفة المستهدفة، مفصولة بفواصل.";
+      formatHint_en = "Suggest 6-10 technical skills relevant to the target role, comma-separated.";
+    } else if (q.type === "form") {
+      formatHint_ar = "اكتب مثالاً نموذجياً لكل حقل من حقول النموذج، كل حقل في سطر بصيغة 'المفتاح: القيمة'.";
+      formatHint_en = "Write a sample value for each field, one per line as 'key: value'.";
+    } else if (q.type === "text") {
+      formatHint_ar = "اقترح إجابة محدّدة قصيرة (سطر واحد) ملائمة لسياق المستخدم.";
+      formatHint_en = "Suggest a short, specific one-line answer fitting the user's context.";
+    }
+
     const sysPrompt =
       language === "en"
-        ? "You are a CV coach. Suggest a concise starter draft (3-5 lines) for the user's current question, based on their prior answers. Be specific to their context."
-        : "أنت مدرّب سير ذاتية. اقترح مسوّدة موجزة (٣-٥ أسطر) للسؤال الحالي بناءً على إجاباته السابقة. كن محدّداً لسياقه.";
+        ? `You are a professional CV coach for Saudi Arabia's IPA. Output ONLY the suggestion text the user can paste, no preface, no markdown, no quotes. ${formatHint_en}`
+        : `أنت مدرّب سير ذاتية محترف لمعهد الإدارة العامة. أعِد فقط نصّ الاقتراح القابل للنسخ، بدون مقدّمة ولا تنسيق markdown ولا علامات تنصيص. ${formatHint_ar}`;
+
+    const contextSummary = {
+      experience_level: answersSoFar?.experience_level?.answer,
+      target_role: answersSoFar?.target_role?.answer,
+      target_industry: answersSoFar?.target_industry?.answer,
+    };
 
     const userPrompt =
-      `Question: ${language === "en" ? q.label_en : q.label_ar}\n\n` +
-      `Prior answers:\n${JSON.stringify(answersSoFar, null, 2).slice(0, 2000)}`;
+      `Question: ${language === "en" ? q.label_en : q.label_ar}\n` +
+      `Hint: ${language === "en" ? q.hint_en : q.hint_ar}\n` +
+      `User context: ${JSON.stringify(contextSummary)}\n` +
+      `All prior answers (truncated):\n${JSON.stringify(answersSoFar, null, 2).slice(0, 1500)}`;
 
     const resp = await fetch(apiUrl, {
       method: "POST",
@@ -340,14 +369,18 @@ async function suggestForQuestion(
           { role: "system", content: sysPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 400,
+        max_tokens: 500,
         stream: false,
       }),
     });
 
-    if (!resp.ok) return null;
+    if (!resp.ok) {
+      console.warn("Suggestion HTTP", resp.status, await resp.text().catch(() => ""));
+      return null;
+    }
     const data = await resp.json();
-    return data.choices?.[0]?.message?.content ?? null;
+    const text = data.choices?.[0]?.message?.content;
+    return typeof text === "string" ? text.trim() : null;
   } catch (e) {
     console.warn("Suggestion failed:", e);
     return null;
@@ -707,7 +740,28 @@ serve(async (req) => {
       );
     }
 
-    // ----- action: finalize — generate cv_drafts row -----
+    // ----- action: suggest — AI hint for current question -----
+    if (action === "suggest") {
+      const stepIdx: number = session.current_step;
+      const currentQ = QUESTIONS[stepIdx];
+      if (!currentQ) throw new Error("Invalid step");
+
+      const answers = (session.answers as any) ?? {};
+      const lang = session.language ?? language;
+      const suggestion = await suggestForQuestion(currentQ, answers, lang);
+
+      return new Response(
+        JSON.stringify({
+          session_id: sessionId,
+          current_step: stepIdx,
+          question: currentQ,
+          suggestion,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+
     if (action === "finalize") {
       const draftRecord = buildDraftFromAnswers((session.answers as any) ?? {});
 
