@@ -431,8 +431,8 @@ const CVInterview = () => {
       } else {
         toast.info(
           uiLang === "en"
-            ? "No suggestion available — try writing your own and AI will improve it later."
-            : "لا يوجد اقتراح الآن — جرّب اكتب إجابتك وسيحسّنها AI لاحقاً.",
+            ? "No suggestion available — try writing your own and Wakeb AI will improve it later."
+            : "لا يوجد اقتراح الآن — جرّب اكتب إجابتك وسيحسّنها واكب AI لاحقاً.",
         );
       }
     } catch (e) {
