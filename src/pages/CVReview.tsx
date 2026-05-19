@@ -509,7 +509,42 @@ const CVReview = () => {
           </Card>
         )}
 
+        {/* Unified final review of every approved improvement (from analyzer + chat) */}
+        {(revision?.accepted_rewrites?.length ?? 0) > 0 && (
+          <Card className="rounded-2xl shadow-lg border-emerald-500/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                مراجعة نهائية للتحسينات المعتمدة ({revision?.accepted_rewrites?.length ?? 0})
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                هذه قائمة كل التحسينات المعتمدة (من التحليل ومن المحادثة). راجعها وعدّلها أو احذفها قبل التصدير النهائي.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(revision?.accepted_rewrites ?? []).map((a, idx) => (
+                <ApprovedRewriteRow
+                  key={`${a.original}-${a.improved}-${idx}`}
+                  accepted={a}
+                  saving={saving}
+                  onSave={async (newImproved) => {
+                    // Replace this entry: remove old then add new (preserves section)
+                    await rejectRewrite(a.original, a.improved);
+                    await acceptRewrite(a.original, newImproved, a.section);
+                    toast.success("تم حفظ التعديل");
+                  }}
+                  onDelete={async () => {
+                    await rejectRewrite(a.original, a.improved);
+                    toast.success("تم حذف التحسين");
+                  }}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Export improved CV */}
+
         <Card className="rounded-2xl shadow-lg border-primary/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
