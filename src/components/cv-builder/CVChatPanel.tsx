@@ -370,8 +370,9 @@ const CVChatPanel = ({
                         variant="outline"
                         className="text-xs h-7"
                         onClick={() => {
-                          setPickerImproved(extractImprovementFromReply(fullText));
-                          setPickerOriginal("");
+                          const { original, improved } = extractSuggestion(fullText);
+                          setPickerImproved(improved);
+                          setPickerOriginal(original);
                           setPickerSection("other");
                           setPickerOpen(true);
                         }}
