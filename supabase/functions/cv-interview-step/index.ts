@@ -740,7 +740,28 @@ serve(async (req) => {
       );
     }
 
-    // ----- action: finalize — generate cv_drafts row -----
+    // ----- action: suggest — AI hint for current question -----
+    if (action === "suggest") {
+      const stepIdx: number = session.current_step;
+      const currentQ = QUESTIONS[stepIdx];
+      if (!currentQ) throw new Error("Invalid step");
+
+      const answers = (session.answers as any) ?? {};
+      const lang = session.language ?? language;
+      const suggestion = await suggestForQuestion(currentQ, answers, lang);
+
+      return new Response(
+        JSON.stringify({
+          session_id: sessionId,
+          current_step: stepIdx,
+          question: currentQ,
+          suggestion,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+
     if (action === "finalize") {
       const draftRecord = buildDraftFromAnswers((session.answers as any) ?? {});
 
