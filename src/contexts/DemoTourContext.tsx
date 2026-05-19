@@ -459,8 +459,15 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       if (spotlightSel) {
         const target = document.querySelector(spotlightSel) as HTMLElement | null;
         if (target) {
-          target.scrollIntoView({ behavior: "smooth", block: "center" });
-          await sleep(380);
+          const r = target.getBoundingClientRect();
+          const viewportArea = window.innerWidth * window.innerHeight;
+          const area = viewportArea > 0 ? (r.width * r.height) / viewportArea : 1;
+          // Skip pre-scroll for oversize targets (e.g. generic `main`) —
+          // landing at the centre of a huge element is worse than not scrolling.
+          if (area <= 0.7) {
+            target.scrollIntoView({ behavior: "smooth", block: "center" });
+            await sleep(380);
+          }
         }
       }
       if (cancelRef.current) return;
