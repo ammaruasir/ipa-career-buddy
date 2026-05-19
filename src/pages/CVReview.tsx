@@ -363,7 +363,7 @@ const CVReview = () => {
             </p>
           </Card>
 
-          <Card className="rounded-2xl shadow-lg md:col-span-2">
+          <Card data-tour="cv-review-radar" className="rounded-2xl shadow-lg md:col-span-2">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">جودة الأقسام</CardTitle>
             </CardHeader>

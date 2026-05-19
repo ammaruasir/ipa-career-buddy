@@ -379,7 +379,7 @@ const CVBuilder = () => {
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
-      <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
+      <header data-tour="cv-builder-toolbar" className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto flex items-center justify-between py-4 px-4">
           <div className="flex items-center gap-3">
             <FileText className="w-6 h-6 text-primary" />
