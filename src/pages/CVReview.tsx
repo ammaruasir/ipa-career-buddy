@@ -168,6 +168,59 @@ const DEMO_PRELOADED_DOC: CVDocument = {
   extraction: null,
 };
 
+interface ApprovedRewriteRowProps {
+  accepted: { original: string; improved: string; section?: string };
+  saving: boolean;
+  onSave: (newImproved: string) => Promise<void> | void;
+  onDelete: () => Promise<void> | void;
+}
+
+const ApprovedRewriteRow = ({ accepted, saving, onSave, onDelete }: ApprovedRewriteRowProps) => {
+  const [edited, setEdited] = useState(accepted.improved);
+  const dirty = edited.trim() !== accepted.improved.trim();
+  return (
+    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <Badge variant="outline" className="text-[10px]">
+          {accepted.section ? (SECTION_LABELS[accepted.section] ?? accepted.section) : "تحسين"}
+        </Badge>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div className="rounded-lg bg-background p-2.5 border">
+          <p className="text-[10px] font-semibold text-muted-foreground mb-1">قبل (الأصلي)</p>
+          <p className="text-xs whitespace-pre-wrap text-muted-foreground line-through min-h-[2rem]">
+            {accepted.original?.trim() || "(إضافة جديدة — لا يوجد نص يُستبدل)"}
+          </p>
+        </div>
+        <div className="rounded-lg bg-background p-2.5 border border-emerald-500/40 space-y-1.5">
+          <p className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">بعد (قابل للتعديل)</p>
+          <Textarea
+            dir="rtl"
+            value={edited}
+            onChange={(e) => setEdited(e.target.value)}
+            rows={4}
+            className="text-xs bg-background"
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 justify-end">
+        <Button size="sm" variant="ghost" disabled={saving} onClick={onDelete}>
+          <X className="w-3.5 h-3.5 ml-1" />
+          حذف
+        </Button>
+        <Button
+          size="sm"
+          disabled={saving || !dirty || !edited.trim()}
+          onClick={() => onSave(edited.trim())}
+        >
+          <Check className="w-3.5 h-3.5 ml-1" />
+          حفظ التعديل
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 const CVReview = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -509,7 +562,42 @@ const CVReview = () => {
           </Card>
         )}
 
+        {/* Unified final review of every approved improvement (from analyzer + chat) */}
+        {(revision?.accepted_rewrites?.length ?? 0) > 0 && (
+          <Card className="rounded-2xl shadow-lg border-emerald-500/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                مراجعة نهائية للتحسينات المعتمدة ({revision?.accepted_rewrites?.length ?? 0})
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                هذه قائمة كل التحسينات المعتمدة (من التحليل ومن المحادثة). راجعها وعدّلها أو احذفها قبل التصدير النهائي.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(revision?.accepted_rewrites ?? []).map((a, idx) => (
+                <ApprovedRewriteRow
+                  key={`${a.original}-${a.improved}-${idx}`}
+                  accepted={a}
+                  saving={saving}
+                  onSave={async (newImproved) => {
+                    // Replace this entry: remove old then add new (preserves section)
+                    await rejectRewrite(a.original, a.improved);
+                    await acceptRewrite(a.original, newImproved, a.section);
+                    toast.success("تم حفظ التعديل");
+                  }}
+                  onDelete={async () => {
+                    await rejectRewrite(a.original, a.improved);
+                    toast.success("تم حذف التحسين");
+                  }}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Export improved CV */}
+
         <Card className="rounded-2xl shadow-lg border-primary/30">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
