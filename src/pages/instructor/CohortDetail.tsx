@@ -70,6 +70,48 @@ const CohortDetail = () => {
     }
     if (!user || !id) return;
 
+    // Demo-tour shortcut: when the route is /dashboard/instructor/cohort/demo
+    // (used by the AI demo presenter), render a hard-coded preview so the
+    // [data-tour='cohort-students'] spotlight target always has content.
+    if (id === "demo") {
+      setCohort({
+        id: "demo",
+        name: "دفعة معهد الإدارة العامة — تجريبية",
+        description: "دفعة عرض تستعرض كيف يتابع المدرّب طلّابه عبر المنصّة.",
+        track: "تطوير الذات",
+        status: "active",
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90).toISOString(),
+        capacity: 12,
+      } as unknown as Cohort);
+      setEnrollments([
+        {
+          id: "demo-1",
+          student_id: "demo-1",
+          status: "active",
+          enrolled_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
+          profile: { full_name: "سارة الراشد" },
+        },
+        {
+          id: "demo-2",
+          student_id: "demo-2",
+          status: "active",
+          enrolled_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
+          profile: { full_name: "خالد العتيبي" },
+        },
+        {
+          id: "demo-3",
+          student_id: "demo-3",
+          status: "active",
+          enrolled_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+          profile: { full_name: "نوف الحربي" },
+        },
+      ] as unknown as Enrollment[]);
+      setAssignments([]);
+      setLoading(false);
+      return;
+    }
+
     const load = async () => {
       const [cohortRes, enrollRes, assignRes] = await Promise.all([
         supabase
