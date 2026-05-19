@@ -1,0 +1,1 @@
+ALTER TABLE public.cv_interview_sessions ALTER COLUMN total_steps SET DEFAULT 14;
