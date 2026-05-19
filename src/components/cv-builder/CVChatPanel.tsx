@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type UIMessage } from "ai";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -11,29 +13,31 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { MessagesSquare, Send, Loader2, Lightbulb, Sparkles, User2, CheckCircle2, PlusCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import JustificationCard, { type Justification } from "./JustificationCard";
-import { proofreadText } from "./ProofreadInput";
-import { cn } from "@/lib/utils";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
+import {
+  PromptInput,
+  PromptInputTextarea,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputButton,
+  usePromptInputAttachments,
+  type PromptInputMessage,
+} from "@/components/ai-elements/prompt-input";
+import { Shimmer } from "@/components/ai-elements/shimmer";
+import { MessagesSquare, Lightbulb, CheckCircle2, Paperclip, X } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type Lang = "ar" | "en";
-
-interface Replacement {
-  original: string;
-  improved: string;
-  section?: string;
-}
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  justifications?: Justification[];
-  suggested_actions?: string[];
-  replacements?: Replacement[];
-  created_at?: string;
-}
 
 interface CVChatPanelProps {
   cvDocumentId: string;
@@ -46,12 +50,13 @@ const TEXT = {
     title: "تحدّث مع واكب AI حول سيرتك",
     intro:
       "اطرح أي سؤال عن سيرتك ('ما الذي يجب تحسينه في خبراتي؟' / 'أعد كتابة الملخّص' / 'لماذا هذا البند ضعيف؟'). واكب AI سيشرح لك المنطق وراء كل ملاحظة.",
-    placeholder: "اكتب سؤالك...",
-    send: "إرسال",
-    sending: "جارٍ التحليل...",
-    suggestedActions: "خطوات مقترحة",
+    placeholder: "اكتب سؤالك... (Enter للإرسال، Shift+Enter لسطر جديد)",
+    thinking: "واكب AI يفكّر...",
     you: "أنت",
-    coach: "المدرّب",
+    coach: "واكب AI",
+    attach: "إرفاق ملف",
+    useAsImprovement: "اعتمد كتحسين على السيرة",
+    suggestionsHeader: "جرّب أحد هذه:",
     suggestionsPrompts: [
       "ما أكبر ٣ نقاط ضعف في سيرتي؟",
       "كيف أحسّن قسم الخبرات؟",
@@ -62,13 +67,14 @@ const TEXT = {
   en: {
     title: "Chat with Wakeb AI about your CV",
     intro:
-      "Ask any question about your CV ('What should I improve in my experience?' / 'Rewrite the summary' / 'Why is this bullet weak?'). Wakeb AI will explain the reasoning behind every observation.",
-    placeholder: "Type your question...",
-    send: "Send",
-    sending: "Analyzing...",
-    suggestedActions: "Suggested next steps",
+      "Ask any question about your CV ('What should I improve?' / 'Rewrite the summary' / 'Why is this weak?'). Wakeb AI will explain every observation.",
+    placeholder: "Type your question... (Enter to send, Shift+Enter for newline)",
+    thinking: "Wakeb AI is thinking...",
     you: "You",
-    coach: "Coach",
+    coach: "Wakeb AI",
+    attach: "Attach file",
+    useAsImprovement: "Use as improvement",
+    suggestionsHeader: "Try one of these:",
     suggestionsPrompts: [
       "What are my CV's top 3 weaknesses?",
       "How do I improve the experience section?",
@@ -79,56 +85,133 @@ const TEXT = {
 };
 
 // Extract the actionable improvement text from a chatty AI reply.
-// Priority: fenced code block -> quoted block -> text after a labelled cue
-// ("النص المحسّن:", "Improved:", "النسخة المحسّنة:" ...) -> longest paragraph >40 chars.
 const extractImprovementFromReply = (text: string): string => {
   if (!text) return "";
   const trimmed = text.trim();
-
-  // 1) Fenced code block ```...```
   const fence = trimmed.match(/```[a-zA-Z]*\n?([\s\S]+?)```/);
   if (fence?.[1]?.trim()) return fence[1].trim();
-
-  // 2) Labelled cue — capture text after the label until a blank line or end
   const labelRe =
     /(?:النص\s*المحسّن|النسخة\s*المحسّنة|المحسّن|المقترح|Improved(?:\s*version)?|Rewrite|Suggested)\s*[:：\-—]\s*([\s\S]+?)(?:\n\s*\n|$)/i;
   const labelled = trimmed.match(labelRe);
   if (labelled?.[1]?.trim()) {
-    return labelled[1].replace(/^["'“”«»]+|["'“”«»]+$/g, "").trim();
+    return labelled[1].replace(/^["'""«»]+|["'""«»]+$/g, "").trim();
   }
-
-  // 3) Quoted block — first triple/double quoted chunk
   const quoted =
     trimmed.match(/"{3}([\s\S]+?)"{3}/) ||
     trimmed.match(/"([^"]{40,})"/) ||
     trimmed.match(/«([^»]{20,})»/);
   if (quoted?.[1]?.trim()) return quoted[1].trim();
-
-  // 4) Longest paragraph >40 chars
   const paragraphs = trimmed.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
   const long = paragraphs.filter((p) => p.length > 40);
   if (long.length) {
     long.sort((a, b) => b.length - a.length);
     return long[0];
   }
-
   return "";
 };
 
-const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVChatPanelProps) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+const messageText = (m: UIMessage): string =>
+  (m.parts ?? [])
+    .filter((p: any) => p.type === "text")
+    .map((p: any) => p.text)
+    .join("\n");
+
+// Attachment button + thumbnails – mounted INSIDE <PromptInput>
+const AttachmentControls = ({ label }: { label: string }) => {
+  const att = usePromptInputAttachments();
+  return (
+    <>
+      <PromptInputButton
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        tooltip={label}
+        onClick={() => att.openFileDialog()}
+      >
+        <Paperclip className="w-4 h-4" />
+      </PromptInputButton>
+      {att.files.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 px-3 pb-2">
+          {att.files.map((f: any) => (
+            <div
+              key={f.id}
+              className="flex items-center gap-1.5 rounded-md border bg-muted/40 pl-2 pr-1 py-1 text-[11px]"
+            >
+              <Paperclip className="w-3 h-3 text-muted-foreground" />
+              <span className="max-w-[140px] truncate">{f.filename || "file"}</span>
+              <button
+                type="button"
+                onClick={() => att.remove(f.id)}
+                className="hover:bg-destructive/15 rounded p-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+};
+
+const CVChatPanel = ({
+  cvDocumentId,
+  language = "ar",
+  onAcceptImprovement,
+}: CVChatPanelProps) => {
+  const t = TEXT[language];
+  const dir = language === "ar" ? "rtl" : "ltr";
+
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerImproved, setPickerImproved] = useState("");
   const [pickerOriginal, setPickerOriginal] = useState("");
   const [pickerSection, setPickerSection] = useState("other");
   const [accepting, setAccepting] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const t = TEXT[language];
-  const dir = language === "ar" ? "rtl" : "ltr";
+  // Fetch fresh access token for the streaming function
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) setAuthToken(data.session?.access_token ?? null);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setAuthToken(session?.access_token ?? null);
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  const transport = useRef<DefaultChatTransport<UIMessage> | null>(null);
+  if (!transport.current && authToken) {
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cv-chat-stream`;
+    transport.current = new DefaultChatTransport({
+      api: url,
+      headers: () => ({
+        Authorization: `Bearer ${authToken}`,
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      }),
+      body: () => ({
+        cv_document_id: cvDocumentId,
+        language,
+      }),
+    });
+  }
+
+  const { messages, sendMessage, status, stop, error } = useChat({
+    id: `cv-chat-${cvDocumentId}`,
+    transport: transport.current ?? undefined,
+    onError: (e) => {
+      console.error("chat error:", e);
+      toast.error(
+        language === "en"
+          ? "Connection issue. Please try again."
+          : "تعذّر الاتصال. حاول مرة أخرى.",
+      );
+    },
+  });
 
   const acceptOne = async (improved: string, original: string, section?: string) => {
     if (!onAcceptImprovement) return;
@@ -142,286 +225,166 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
     }
   };
 
-  // Auto-scroll on new message
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  const send = async (text?: string) => {
-    const raw = (text ?? input).trim();
-    if (!raw || loading) return;
-
-    setInput("");
-    setLoading(true);
-    // Silent Arabic proofread before sending (only auto-applies single-option fixes)
-    const msg = language === "ar" ? await proofreadText(raw, "general") : raw;
-    setMessages((m) => [...m, { role: "user", content: msg }]);
-
-    try {
-      const { data, error } = await supabase.functions.invoke("chat-with-cv", {
-        body: {
-          cv_document_id: cvDocumentId,
-          conversation_id: conversationId,
-          message: msg,
-          language,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (!data?.message) throw new Error(language === "en" ? "Empty response" : "استجابة فارغة");
-      if (data.conversation_id) setConversationId(data.conversation_id);
-      setMessages((m) => [...m, data.message]);
-    } catch (e: any) {
-      console.error("chat-with-cv failed:", e);
-      const fallback =
-        e?.message?.includes("Failed to fetch") || e?.name === "FunctionsFetchError"
-          ? language === "en"
-            ? "Connection issue. Please check your internet and try again."
-            : "تعذّر الاتصال. تحقّق من الإنترنت وحاول مجدداً."
-          : e?.message ||
-            (language === "en" ? "Something went wrong. Please try again." : "حدث خطأ. حاول مرّة أخرى.");
-      toast.error(fallback);
-      setInput(msg);
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: `⚠️ ${fallback}` },
-      ]);
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = (msg: PromptInputMessage) => {
+    const text = (msg.text ?? "").trim();
+    const files = msg.files ?? [];
+    if (!text && files.length === 0) return;
+    sendMessage({ text, files });
   };
 
+  const isBusy = status === "submitted" || status === "streaming";
+
   return (
-    <Card className="rounded-2xl shadow-lg flex flex-col h-[600px]" dir={dir}>
-      <CardHeader className="pb-3 border-b">
+    <Card className="rounded-2xl shadow-lg flex flex-col h-[600px] overflow-hidden" dir={dir}>
+      <CardHeader className="pb-3 border-b shrink-0">
         <CardTitle className="text-base flex items-center gap-2">
           <MessagesSquare className="w-5 h-5 text-primary" />
           {t.title}
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
-        {/* Messages */}
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto p-4 space-y-4"
-        >
-          {messages.length === 0 && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground leading-relaxed">{t.intro}</p>
-              <div className="space-y-1.5 pt-2">
-                <p className="text-xs font-semibold text-muted-foreground">
-                  {language === "en" ? "Try one of these:" : "جرّب أحد هذه:"}
+      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden min-h-0">
+        <Conversation className="flex-1 min-h-0">
+          <ConversationContent className="px-4 py-4">
+            {messages.length === 0 && (
+              <div className="space-y-3" dir={dir}>
+                <p className="text-sm text-muted-foreground leading-relaxed">{t.intro}</p>
+                <p className="text-xs font-semibold text-muted-foreground pt-2">
+                  {t.suggestionsHeader}
                 </p>
-                {t.suggestionsPrompts.map((p, i) => (
-                  <button
-                    key={i}
-                    onClick={() => send(p)}
-                    className="w-full text-start text-sm p-2.5 rounded-lg border border-dashed border-border hover:border-primary/40 hover:bg-muted/30 transition-all"
-                  >
-                    <Lightbulb className="w-3.5 h-3.5 inline-block ml-1.5 text-amber-500" />
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {messages.map((m, idx) => (
-            <div key={idx} className="space-y-2">
-              <div
-                className={cn(
-                  "flex gap-2",
-                  m.role === "user" ? "justify-start" : "justify-start",
-                )}
-              >
-                <div
-                  className={cn(
-                    "w-7 h-7 rounded-full flex items-center justify-center shrink-0",
-                    m.role === "user"
-                      ? "bg-muted text-foreground"
-                      : "bg-primary/15 text-primary",
-                  )}
-                >
-                  {m.role === "user" ? (
-                    <User2 className="w-3.5 h-3.5" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5" />
-                  )}
+                <div className="space-y-1.5">
+                  {t.suggestionsPrompts.map((p, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={isBusy || !authToken}
+                      onClick={() => sendMessage({ text: p })}
+                      className="w-full text-start text-sm p-2.5 rounded-lg border border-dashed border-border hover:border-primary/50 hover:bg-muted/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Lightbulb className="w-3.5 h-3.5 inline-block mx-1.5 text-amber-500" />
+                      {p}
+                    </button>
+                  ))}
                 </div>
-                <div className="flex-1 space-y-1.5 min-w-0">
-                  <div className="text-xs font-semibold text-muted-foreground">
-                    {m.role === "user" ? t.you : t.coach}
-                  </div>
-                  <div
-                    className={cn(
-                      "rounded-xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
-                      m.role === "user"
-                        ? "bg-muted text-foreground"
-                        : "bg-primary/5 border border-primary/20 text-foreground",
-                    )}
-                  >
-                    {m.content}
-                  </div>
-                  {m.role === "assistant" && onAcceptImprovement && !m.content.startsWith("⚠️") && (
-                    <div className="space-y-2 mt-1.5">
-                      {/* Structured replacements from AI */}
-                      {m.replacements && m.replacements.length > 0 && (
-                        <div className="space-y-2">
-                          {m.replacements.map((rep, ri) => {
-                            const isAddition = !rep.original?.trim();
-                            return (
-                              <div
-                                key={ri}
-                                className="rounded-lg border border-primary/20 bg-background p-2.5 space-y-2"
-                              >
-                                {isAddition ? (
-                                  <div>
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                      <PlusCircle className="w-3 h-3 text-emerald-600" />
-                                      <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
-                                        {language === "en" ? "New addition" : "إضافة جديدة"}
-                                      </span>
-                                      {rep.section && (
-                                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                                          {rep.section}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
-                                      {rep.improved}
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div>
-                                      <div className="flex items-center gap-1.5 mb-0.5">
-                                        <span className="text-[10px] font-semibold text-muted-foreground">
-                                          {language === "en" ? "Original" : "الأصلي"}
-                                        </span>
-                                        {rep.section && (
-                                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                                            {rep.section}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      <p className="text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground line-through">
-                                        {rep.original}
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <div className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 mb-0.5">
-                                        {language === "en" ? "Improved" : "المُحسَّن"}
-                                      </div>
-                                      <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground">
-                                        {rep.improved}
-                                      </p>
-                                    </div>
-                                  </>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-xs h-7 w-full"
-                                  onClick={() => acceptOne(rep.improved, rep.original || "", rep.section)}
-                                >
-                                  <CheckCircle2 className="w-3 h-3 ml-1" />
-                                  {language === "en" ? "Accept this improvement" : "اعتمد هذا التحسين"}
-                                </Button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+              </div>
+            )}
 
-                      {/* Generic "use this whole reply" button */}
+            {messages.map((m) => {
+              const isAssistant = m.role === "assistant";
+              const fullText = messageText(m);
+              return (
+                <div key={m.id} className="space-y-1.5" dir={dir}>
+                  <Message from={m.role as any}>
+                    <MessageContent
+                      variant={isAssistant ? "flat" : "contained"}
+                      className={cn(
+                        isAssistant
+                          ? "bg-transparent p-0 text-foreground"
+                          : "bg-primary text-primary-foreground",
+                      )}
+                    >
+                      {(m.parts ?? []).map((part: any, i: number) => {
+                        if (part.type === "text") {
+                          return (
+                            <MessageResponse key={i}>{part.text}</MessageResponse>
+                          );
+                        }
+                        if (part.type === "file" && part.mediaType?.startsWith("image/")) {
+                          return (
+                            <img
+                              key={i}
+                              src={part.url}
+                              alt={part.filename ?? "attachment"}
+                              className="max-w-[240px] rounded-md mt-1.5 border"
+                            />
+                          );
+                        }
+                        if (part.type === "file") {
+                          return (
+                            <div
+                              key={i}
+                              className="inline-flex items-center gap-1.5 rounded-md border bg-background/50 px-2 py-1 text-xs mt-1.5"
+                            >
+                              <Paperclip className="w-3 h-3" />
+                              {part.filename ?? "file"}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </MessageContent>
+                  </Message>
+
+                  {isAssistant && onAcceptImprovement && fullText && status !== "streaming" && (
+                    <div className="flex justify-start ps-1">
                       <Button
                         size="sm"
                         variant="outline"
                         className="text-xs h-7"
                         onClick={() => {
-                          const extracted = extractImprovementFromReply(m.content);
-                          setPickerImproved(extracted);
+                          setPickerImproved(extractImprovementFromReply(fullText));
                           setPickerOriginal("");
                           setPickerSection("other");
                           setPickerOpen(true);
                         }}
                       >
                         <CheckCircle2 className="w-3 h-3 ml-1" />
-                        {language === "en" ? "Use as improvement" : "اعتمد كتحسين على السيرة"}
+                        {t.useAsImprovement}
                       </Button>
                     </div>
                   )}
                 </div>
+              );
+            })}
+
+            {status === "submitted" && (
+              <div className="ps-1 pt-1">
+                <Shimmer>{t.thinking}</Shimmer>
               </div>
+            )}
 
-              {/* Justifications */}
-              {m.justifications && m.justifications.length > 0 && (
-                <div className="space-y-2 ps-9">
-                  {m.justifications.map((j, ji) => (
-                    <JustificationCard key={ji} justification={j} language={language} />
-                  ))}
-                </div>
-              )}
+            {error && status === "error" && (
+              <p className="text-xs text-destructive ps-1">
+                {language === "en" ? "Failed to reach AI. Try again." : "تعذّر الوصول للذكاء الاصطناعي. حاول مجدداً."}
+              </p>
+            )}
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
 
-              {/* Suggested actions */}
-              {m.suggested_actions && m.suggested_actions.length > 0 && (
-                <div className="ps-9 rounded-lg bg-emerald-500/5 border border-emerald-500/20 p-3">
-                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1.5">
-                    {t.suggestedActions}
-                  </p>
-                  <ul className="space-y-1 text-sm text-foreground">
-                    {m.suggested_actions.map((a, ai) => (
-                      <li key={ai} className="flex items-start gap-2">
-                        <span className="text-emerald-600 mt-0.5">→</span>
-                        <span>{a}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {loading && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              {t.sending}
-            </div>
-          )}
-        </div>
-
-        {/* Input */}
-        <div className="border-t p-3 space-y-2">
-          <Textarea
-            data-tour="cv-chat-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            placeholder={t.placeholder}
-            rows={2}
-            dir={dir}
-            className="resize-none"
-          />
-          <div className="flex justify-end">
-            <Button
-              data-tour="cv-chat-send"
-              onClick={() => send()}
-              disabled={!input.trim() || loading}
-              size="sm"
-              className="rounded-xl"
-            >
-              <Send className="w-3.5 h-3.5 ml-1.5" />
-              {t.send}
-            </Button>
-          </div>
+        <div className="border-t shrink-0 p-3">
+          <PromptInput
+            onSubmit={handleSubmit}
+            accept="image/*,application/pdf"
+            multiple
+            maxFiles={3}
+            maxFileSize={8 * 1024 * 1024}
+            onError={(err) =>
+              toast.error(
+                err.code === "max_file_size"
+                  ? language === "en"
+                    ? "File too large (max 8MB)"
+                    : "الملف كبير جداً (الحد ٨ ميجا)"
+                  : err.message,
+              )
+            }
+          >
+            <PromptInputTextarea
+              placeholder={t.placeholder}
+              dir={dir}
+              disabled={!authToken}
+            />
+            <PromptInputFooter className="justify-between">
+              <AttachmentControls label={t.attach} />
+              <PromptInputSubmit
+                status={status}
+                onStop={stop}
+                disabled={!authToken}
+                size="icon-sm"
+                className="rounded-full h-9 w-9"
+              />
+            </PromptInputFooter>
+          </PromptInput>
         </div>
       </CardContent>
 
@@ -468,8 +431,8 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
                 dir={dir}
                 placeholder={
                   language === "en"
-                    ? "We couldn't auto-extract a clean rewrite from the AI reply. Paste or edit the improved version here."
-                    : "تعذّر استخراج نص محسّن واضح من رد الذكاء الاصطناعي. الصق أو عدّل النسخة المحسّنة هنا."
+                    ? "Paste or edit the improved version here."
+                    : "الصق أو عدّل النسخة المحسّنة هنا."
                 }
                 className="text-sm"
               />
@@ -494,7 +457,6 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
               </select>
             </div>
 
-            {/* Before / After preview */}
             {(pickerOriginal.trim() || pickerImproved.trim()) && (
               <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
                 <p className="text-[11px] font-semibold text-muted-foreground">
@@ -535,7 +497,6 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
                 setPickerOpen(false);
               }}
             >
-              {accepting && <Loader2 className="w-3.5 h-3.5 ml-1.5 animate-spin" />}
               {language === "en" ? "Accept & merge on export" : "اعتمد ودمج عند التصدير"}
             </Button>
           </DialogFooter>
