@@ -85,7 +85,14 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const messages: UIMessage[] = body.messages ?? [];
+    if (!Array.isArray(body?.messages)) {
+      return new Response(JSON.stringify({ error: "Invalid messages payload" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const messages: UIMessage[] = body.messages;
     const cvDocumentId: string | undefined = body.cv_document_id;
     const language: "ar" | "en" = body.language === "en" ? "en" : "ar";
 
