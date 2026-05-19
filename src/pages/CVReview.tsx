@@ -59,7 +59,6 @@ interface Rewrite {
 interface SaudiCompliance {
   uses_hijri_dates: boolean;
   address_format_correct: boolean;
-  military_service_mentioned: boolean;
   jadarat_link_present: boolean;
   recommendations: string[];
 }
@@ -100,7 +99,6 @@ const SEVERITY_LABEL: Record<string, string> = {
 const COMPLIANCE_ITEMS: { key: keyof Omit<SaudiCompliance, "recommendations">; label: string }[] = [
   { key: "uses_hijri_dates", label: "استخدام التواريخ الهجرية" },
   { key: "address_format_correct", label: "تنسيق العنوان السعودي" },
-  { key: "military_service_mentioned", label: "ذكر خدمة العلم" },
   { key: "jadarat_link_present", label: "رابط جدارات" },
 ];
 
@@ -158,9 +156,9 @@ const DEMO_PRELOADED_DOC: CVDocument = {
   saudi_compliance: {
     uses_hijri_dates: false,
     address_format_correct: true,
-    military_service_mentioned: false,
     jadarat_link_present: false,
     recommendations: [
+
       "أضف تواريخ هجرية بجانب الميلادية للوظائف الحكومية",
       "أرفق رابط ملف جدارات للتقديم على وظائف القطاع العام",
     ],

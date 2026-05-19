@@ -100,7 +100,7 @@ const sections = [
     subtitle: "اعرف ما الذي يحتاج تحسيناً ولماذا",
     color: "purple",
     body: [
-      "ارفع PDF سيرتك. خلال ٣٠ ثانية: radar chart لجودة كل قسم (Contact / Summary / Experience / Education / Skills / Achievements / Language quality)، قائمة نقاط الضعف باقتباس حرفي، اقتراحات إعادة كتابة، وفحص الامتثال السعودي (تواريخ هجرية، خدمة العلم، رابط جدارات).",
+      "ارفع PDF سيرتك. خلال ٣٠ ثانية: radar chart لجودة كل قسم (Contact / Summary / Experience / Education / Skills / Achievements / Language quality)، قائمة نقاط الضعف باقتباس حرفي، اقتراحات إعادة كتابة، وفحص الامتثال السعودي (تواريخ هجرية، تنسيق العنوان، رابط جدارات).",
       "ثمّ تحدّث مع سيرتك. اسأل 'لماذا قسم خبرتي ضعيف؟'، 'كيف أحسّن الملخّص؟'، 'هل سيرتي مناسبة لوظيفة حكومية؟'. كل جواب فيه justification يشرح المنطق.",
     ],
     features: [
