@@ -342,7 +342,8 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
                         variant="outline"
                         className="text-xs h-7"
                         onClick={() => {
-                          setPickerImproved(m.content);
+                          const extracted = extractImprovementFromReply(m.content);
+                          setPickerImproved(extracted);
                           setPickerOriginal("");
                           setPickerSection("other");
                           setPickerOpen(true);
