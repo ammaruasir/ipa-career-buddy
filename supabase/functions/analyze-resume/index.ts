@@ -72,7 +72,8 @@ serve(async (req) => {
 2) تقييم جودة كل قسم من 0 إلى 100.
 3) رصد نقاط الضعف بأمثلة حرفية من النصّ.
 4) اقتراح إعادة كتابة عربية فصحى للنقاط الضعيفة فقط (لا تختلق حقائق).
-5) فحص الامتثال للمعايير السعودية: التواريخ الهجرية، تنسيق العنوان، ذكر خدمة العلم، رابط جدارات.
+5) فحص الامتثال للمعايير السعودية: التواريخ الهجرية، تنسيق العنوان، رابط جدارات.
+
 أجب دائماً باستخدام الأداة المحدّدة. تجنّب الترويج العدواني للذات (غير ملائم ثقافياً).`,
           },
           {
@@ -153,16 +154,16 @@ serve(async (req) => {
                       additionalProperties: false,
                     },
                   },
-                  saudi_compliance: {
-                    type: "object",
-                    properties: {
-                      uses_hijri_dates: { type: "boolean" },
-                      address_format_correct: { type: "boolean" },
-                      military_service_mentioned: { type: "boolean" },
-                      jadarat_link_present: { type: "boolean" },
-                      recommendations: { type: "array", items: { type: "string" } },
-                    },
-                    required: ["uses_hijri_dates", "address_format_correct", "military_service_mentioned", "jadarat_link_present", "recommendations"],
+                    saudi_compliance: {
+                      type: "object",
+                      properties: {
+                        uses_hijri_dates: { type: "boolean" },
+                        address_format_correct: { type: "boolean" },
+                        jadarat_link_present: { type: "boolean" },
+                        recommendations: { type: "array", items: { type: "string" } },
+                      },
+                      required: ["uses_hijri_dates", "address_format_correct", "jadarat_link_present", "recommendations"],
+
                     additionalProperties: false,
                   },
                 },
@@ -236,10 +237,10 @@ serve(async (req) => {
     const saudi_compliance = analysis.saudi_compliance ?? {
       uses_hijri_dates: false,
       address_format_correct: false,
-      military_service_mentioned: false,
       jadarat_link_present: false,
       recommendations: [],
     };
+
 
     const serviceClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 

@@ -737,9 +737,9 @@ const RESUME_EVALUATION_TOOL = {
           properties: {
             uses_hijri_dates: { type: 'boolean' },
             address_format_correct: { type: 'boolean' },
-            military_service_mentioned: { type: 'boolean' },
             jadarat_link_present: { type: 'boolean' },
             recommendations: { type: 'array', items: { type: 'string' } }
+
           }
         }
       }
