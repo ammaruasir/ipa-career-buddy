@@ -34,11 +34,6 @@ serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (question.length > 1500) {
-      return new Response(JSON.stringify({ error: "question too long (max 1500 chars)" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     const stepIdsLine = body.stepIds?.length
       ? `\nمعرّفات خطوات الجولة المتاحة: ${body.stepIds.join("، ")}`
