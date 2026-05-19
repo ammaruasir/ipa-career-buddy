@@ -13,7 +13,7 @@ import { toArabicNumerals, formatArabicPercent } from "@/lib/arabic-utils";
 import {
   Users, FileText, TrendingUp, Award, LogOut,
   Search, Eye, Loader2, Briefcase, GraduationCap,
-  ChevronDown, ChevronUp, Star, AlertCircle, Kanban, GitCompareArrows,
+  ChevronDown, ChevronUp, Star, AlertCircle, Kanban, GitCompareArrows, Radio,
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import {
@@ -179,6 +179,12 @@ const HRDashboard = () => {
             <h2 className="text-lg font-bold text-foreground">لوحة تحليل السير الذاتية</h2>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/admin/proctor">
+                <Radio className="w-4 h-4 ml-1 text-destructive" />
+                المراقبة المباشرة
+              </Link>
+            </Button>
             <Button variant="ghost" size="sm" asChild>
               <Link to="/dashboard/hr/pipeline">
                 <Kanban className="w-4 h-4 ml-1" />
