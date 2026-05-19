@@ -346,7 +346,7 @@ export const tourScript: TourStep[] = [
   {
     id: "act5-assessment-open",
     act: "Act 5 — Formal Assessment",
-    route: "/interview/voice?job=demo&question_count=2",
+    route: "/interview/voice?question_count=2",
     narration:
       "نفس الفكرة بس في الوضع الرسمي. تتطلّب موافقة صريحة وفحص ميكروفون، ثم تنطلق الجلسة المُسجَّلة. تعال نشوفها قصيرة.",
     spotlight: { selector: "main", label: "المقابلة الرسمية" },
