@@ -138,8 +138,8 @@ const QUESTIONS: QuestionDef[] = [
     ],
     label_ar: "خبراتك الوظيفية (الأحدث أوّلاً)",
     label_en: "Work experience (most recent first)",
-    hint_ar: "لا تقلق بشأن الصياغة — AI سيحوّلها لـ STAR bullets قويّة لاحقاً.",
-    hint_en: "Don't worry about phrasing — AI will polish to STAR bullets later.",
+    hint_ar: "لا تقلق بشأن الصياغة — واكب AI سيحوّلها لـ STAR bullets قويّة لاحقاً.",
+    hint_en: "Don't worry about phrasing — Wakeb AI will polish to STAR bullets later.",
   },
   {
     id: "key_achievements",
