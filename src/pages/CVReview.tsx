@@ -168,6 +168,59 @@ const DEMO_PRELOADED_DOC: CVDocument = {
   extraction: null,
 };
 
+interface ApprovedRewriteRowProps {
+  accepted: { original: string; improved: string; section?: string };
+  saving: boolean;
+  onSave: (newImproved: string) => Promise<void> | void;
+  onDelete: () => Promise<void> | void;
+}
+
+const ApprovedRewriteRow = ({ accepted, saving, onSave, onDelete }: ApprovedRewriteRowProps) => {
+  const [edited, setEdited] = useState(accepted.improved);
+  const dirty = edited.trim() !== accepted.improved.trim();
+  return (
+    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <Badge variant="outline" className="text-[10px]">
+          {accepted.section ? (SECTION_LABELS[accepted.section] ?? accepted.section) : "تحسين"}
+        </Badge>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div className="rounded-lg bg-background p-2.5 border">
+          <p className="text-[10px] font-semibold text-muted-foreground mb-1">قبل (الأصلي)</p>
+          <p className="text-xs whitespace-pre-wrap text-muted-foreground line-through min-h-[2rem]">
+            {accepted.original?.trim() || "(إضافة جديدة — لا يوجد نص يُستبدل)"}
+          </p>
+        </div>
+        <div className="rounded-lg bg-background p-2.5 border border-emerald-500/40 space-y-1.5">
+          <p className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">بعد (قابل للتعديل)</p>
+          <Textarea
+            dir="rtl"
+            value={edited}
+            onChange={(e) => setEdited(e.target.value)}
+            rows={4}
+            className="text-xs bg-background"
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 justify-end">
+        <Button size="sm" variant="ghost" disabled={saving} onClick={onDelete}>
+          <X className="w-3.5 h-3.5 ml-1" />
+          حذف
+        </Button>
+        <Button
+          size="sm"
+          disabled={saving || !dirty || !edited.trim()}
+          onClick={() => onSave(edited.trim())}
+        >
+          <Check className="w-3.5 h-3.5 ml-1" />
+          حفظ التعديل
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 const CVReview = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
