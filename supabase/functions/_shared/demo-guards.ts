@@ -33,21 +33,13 @@ export function getAdminClient(): SupabaseClient {
 }
 
 export async function enforceIpRateLimit(
-  req: Request,
-  scope: string,
-  max: number,
-  windowSeconds: number,
-  corsHeaders: Record<string, string>,
+  _req: Request,
+  _scope: string,
+  _max: number,
+  _windowSeconds: number,
+  _corsHeaders: Record<string, string>,
 ): Promise<Response | null> {
-  try {
-    const ip = getClientIp(req);
-    const fakeUserId = await ipToUuid(ip);
-    const admin = getAdminClient();
-    const rl = await checkRateLimit(admin, fakeUserId, scope, max, windowSeconds);
-    if (!rl.allowed) return rateLimitResponse(rl.retryAfter, corsHeaders);
-    return null;
-  } catch (e) {
-    console.warn(`enforceIpRateLimit(${scope}) failed open:`, e);
-    return null;
-  }
+  // Rate limiting disabled — always allow.
+  return null;
 }
+
