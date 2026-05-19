@@ -623,14 +623,8 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       const question = text.trim();
       if (!question) return;
 
-      if (qaCount >= QA_CAP) {
-        const capMessage =
-          "وصلنا للحدّ الأقصى من الأسئلة في هذه الجلسة. تقدر تعيد تشغيل الجولة لتجربة جديدة.";
-        appendTranscript({ role: "presenter", text: capMessage });
-        await voice.speak(capMessage);
-        return;
-      }
       setQaCount((c) => c + 1);
+
 
       cancelRef.current = true;
       voice.stop();
