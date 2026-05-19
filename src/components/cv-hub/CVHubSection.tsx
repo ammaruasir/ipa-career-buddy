@@ -73,7 +73,7 @@ const CVHubSection = () => {
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            ثلاث طرق لبناء سيرتك — اختر ما يناسبك. كلها بـ AI ودعم عربي + إنجليزي.
+            ثلاث طرق لبناء سيرتك — اختر ما يناسبك. كلها بـ واكب AI ودعم عربي + إنجليزي.
           </p>
         </div>
       </div>
