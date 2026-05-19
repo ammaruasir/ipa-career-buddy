@@ -404,7 +404,7 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
           <div className="space-y-3">
             <div>
               <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
-                {language === "en" ? "Improved (from AI)" : "النص المُحسَّن (من الذكاء)"}
+                {language === "en" ? "Improved (from Wakeb AI)" : "النص المُحسَّن (من واكب AI)"}
               </div>
               <Textarea
                 value={pickerImproved}
