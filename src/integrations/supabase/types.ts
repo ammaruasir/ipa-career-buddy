@@ -566,11 +566,19 @@ export type Database = {
       interviews: {
         Row: {
           created_at: string
+          end_reason: string | null
+          flagged_at: string | null
+          flagged_by: string | null
+          flagged_reason: string | null
           id: string
           is_demo: boolean
           job_position: string | null
           mode: Database["public"]["Enums"]["interview_mode"]
           questions: Json | null
+          recording_chunk_count: number | null
+          recording_chunks_path: string | null
+          recording_duration_ms: number | null
+          recording_status: string | null
           recording_url: string | null
           status: Database["public"]["Enums"]["interview_status"]
           type: Database["public"]["Enums"]["interview_type"]
@@ -580,11 +588,19 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          end_reason?: string | null
+          flagged_at?: string | null
+          flagged_by?: string | null
+          flagged_reason?: string | null
           id?: string
           is_demo?: boolean
           job_position?: string | null
           mode?: Database["public"]["Enums"]["interview_mode"]
           questions?: Json | null
+          recording_chunk_count?: number | null
+          recording_chunks_path?: string | null
+          recording_duration_ms?: number | null
+          recording_status?: string | null
           recording_url?: string | null
           status?: Database["public"]["Enums"]["interview_status"]
           type: Database["public"]["Enums"]["interview_type"]
@@ -594,11 +610,19 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          end_reason?: string | null
+          flagged_at?: string | null
+          flagged_by?: string | null
+          flagged_reason?: string | null
           id?: string
           is_demo?: boolean
           job_position?: string | null
           mode?: Database["public"]["Enums"]["interview_mode"]
           questions?: Json | null
+          recording_chunk_count?: number | null
+          recording_chunks_path?: string | null
+          recording_duration_ms?: number | null
+          recording_status?: string | null
           recording_url?: string | null
           status?: Database["public"]["Enums"]["interview_status"]
           type?: Database["public"]["Enums"]["interview_type"]
