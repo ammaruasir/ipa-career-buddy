@@ -1,69 +1,43 @@
-# المشكلة
+# التغيير المطلوب
 
-في صفحة `/cv/interview`، زر **"اطلب اقتراح AI"** لا يعرض شيئاً عند الضغط. السبب موجود حرفياً في الكود (`src/pages/CVInterview.tsx` السطر 420-446):
+إعادة تسمية جميع نصوص الواجهة الظاهرة للمستخدم في مسار السيرة الذاتية لتنسب الاقتراحات إلى **واكب AI / Wakeb AI** بدل "AI" أو "الذكاء" المجرّدة، توافقاً مع الهوية الرسمية للمنصّة (WAKEB AI Engine).
 
-```ts
-const askSuggestion = async () => {
-  // تعليق المطوّر السابق: "Workaround... Not ideal. Cleanest path: separate endpoint."
-  const { data } = await supabase.functions.invoke("improve-cv-summary", {
-    body: { current_summary: "", full_profile: { question: question.label_ar }, ... }
-  });
-  const text = uiLang === "en" ? data.en?.improved : data.ar?.improved;
-  setSuggestion(text ?? null);  // ← غالباً null، فلا يظهر شيء
-};
-```
-
-أي أن الزر:
-1. يستدعي `improve-cv-summary` — وهي دالة مخصّصة لتحسين **ملخّص سيرة موجود**، لا لإعطاء اقتراح لسؤال.
-2. يمرّر `current_summary: ""` فارغاً + يحشر السؤال داخل `full_profile.question` بشكل غير متوقّع.
-3. الـ JSON Schema الصارم في الدالة يجبر النموذج على إعادة `{ar, en}` ملخّص. مع مدخل فارغ تماماً، يعيد غالباً `null` لكل منهما أو ملخّصاً عاماً بلا معنى → `setSuggestion(null)` → لا شيء يظهر للمستخدم، فقط `setSuggesting(false)`.
-
-كما أن backend (`cv-interview-step`) يدعم `want_suggestion: true` لكن فقط داخل action `submit` (يعطي اقتراحاً للسؤال **التالي** بعد الإجابة)، ولا يوجد action لطلب اقتراح لـ **السؤال الحالي** بناءً على ما أدخله المستخدم سابقاً.
-
----
-
-# الحل المقترح
-
-## ١) إضافة action جديد `suggest` في `supabase/functions/cv-interview-step/index.ts`
-
-- يستقبل `{ action: "suggest", session_id, language }`.
-- يقرأ من الـ session: مستوى الخبرة + الوظيفة المستهدفة + القطاع + رقم الخطوة الحالية + الإجابات السابقة.
-- يحدّد السؤال الحالي من `QUESTIONS[currentStep]`.
-- يبني prompt مختصر لـ Lovable AI Gateway (`google/gemini-2.5-flash`) يقول:
-  > "أنت مدرّب سير ذاتية. المستخدم في سؤال: {label}. خبرته: {level}، وظيفته المستهدفة: {role}. أعطه **مثالاً واحداً قصيراً** (٢-٤ أسطر) للإلهام بصياغة محترفة، باللغة المطلوبة. لا تشرح، فقط النص."
-- لأسئلة `repeater` (الخبرات/التعليم/الإنجازات) يعيد عيّنة بند واحد مكتوبة بصياغة قويّة بنمط STAR.
-- لأسئلة `choice` لا يستدعى أصلاً (الزر مخفي حالياً، نُبقي ذلك).
-- يعيد `{ suggestion: string }`.
-- يطبّق `checkRateLimit` (الموجود في `_shared/guards.ts`).
-
-## ٢) ربط الواجهة بـ action الجديد في `src/pages/CVInterview.tsx`
-
-- استبدال جسم `askSuggestion` ليستدعي:
-  ```ts
-  supabase.functions.invoke("cv-interview-step", {
-    body: { action: "suggest", session_id: sessionId, language }
-  })
-  ```
-- `setSuggestion(data.suggestion)`.
-- إظهار `toast.info` ودّي إذا كانت الاستجابة فارغة (بدل toast.error صامت).
-- إضافة fallback نصّي محلّي بسيط (مثال جاهز للسؤال) إذا فشل النداء، حتى لا يبقى الزر "ميتاً" أبداً.
-
-## ٣) تنظيف الكود
-
-- حذف التعليقات المضلّلة (`Workaround...`, `Not ideal.`) السطور 423-428.
-- لا تغيير على `improve-cv-summary` (تبقى كما هي لقسم الـ Summary في CV Builder).
-
----
+النطاق: نصوص واجهة فقط (UI copy). لا تغيير في المنطق، الـ endpoints، أو الـ system prompts.
 
 # الملفات المعدّلة
 
-| الملف | التغيير |
-|------|---------|
-| `supabase/functions/cv-interview-step/index.ts` | + action `suggest` (~40 سطر) |
-| `src/pages/CVInterview.tsx` | إعادة كتابة `askSuggestion` (~15 سطر) |
+## ١) `src/pages/CVInterview.tsx`
+- `suggestAi`: "اطلب اقتراح AI" → **"اطلب اقتراح واكب AI"** / "Get AI suggestion" → **"Get Wakeb AI suggestion"**
+- `suggesting`: "AI يفكّر..." → **"واكب AI يفكّر..."** / "AI is thinking..." → **"Wakeb AI is thinking..."**
+- `suggestionTitle`: "اقتراح من AI..." → **"اقتراح من واكب AI..."** / "AI suggestion..." → **"Wakeb AI suggestion..."**
+- intro: "...يولّد AI اقتراحاً..." → **"...يولّد واكب AI اقتراحاً..."** / "...AI suggestion..." → **"...Wakeb AI suggestion..."**
+- toast الفارغ (السطر 434-435): "AI will improve" → **"Wakeb AI will improve"** / "وسيحسّنها AI" → **"وسيحسّنها واكب AI"**
 
-# المخاطر / خارج النطاق
+## ٢) `src/components/cv-builder/CVChatPanel.tsx`
+- `title`: "تحدّث مع AI..." → **"تحدّث مع واكب AI..."** / "Chat with AI..." → **"Chat with Wakeb AI..."**
+- intro: "AI سيشرح..." → **"واكب AI سيشرح..."** / "AI will explain..." → **"Wakeb AI will explain..."**
+- زر "اعتمد كتحسين": لا تغيير (لا يذكر AI).
+- ليبل "النص المُحسَّن (من الذكاء)" → **"النص المُحسَّن (من واكب AI)"** / "(from AI)" → **"(from Wakeb AI)"**
 
-- لن يتم تعديل قائمة الأسئلة الـ ١٥ ولا منطق الحفظ.
-- لن يتم تعديل قاعدة البيانات.
-- الأسئلة من نوع choice ستبقى بدون زر (سلوك مقصود).
+## ٣) `src/components/cv-hub/CVHubSection.tsx` (بطاقات الطرق الثلاث)
+- "AI يقترح إجابات نموذجية" → **"واكب AI يقترح إجابات نموذجية"**
+- "AI suggestions في كل سؤال" → **"اقتراحات واكب AI في كل سؤال"**
+- "زر AI لتحويل أي وصف..." → **"زر واكب AI لتحويل أي وصف..."**
+- "AI assist عند الطلب" → **"مساعدة واكب AI عند الطلب"**
+- "محادثة AI تشرح لماذا" → **"محادثة واكب AI تشرح لماذا"**
+- الهيدر السفلي: "كلها بـ AI..." → **"كلها بـ واكب AI..."**
+
+## ٤) `src/pages/Features.tsx`
+- "يحاورك AI بـ ١٥ سؤال" → **"يحاورك واكب AI بـ ١٥ سؤال"**
+- "تطلب اقتراحاً من AI" → **"تطلب اقتراحاً من واكب AI"**
+- "AI suggestion في كل سؤال" → **"اقتراح واكب AI في كل سؤال"**
+- "منشئ يدوي مع AI assist" → **"منشئ يدوي مع مساعدة واكب AI"**
+- "زر ✨ AI..." → **"زر ✨ واكب AI..."**, "AI يحوّله إلى STAR..." → **"واكب AI يحوّله إلى STAR..."**
+
+## ٥) `supabase/functions/cv-interview-step/index.ts`
+- `hint_ar/en` للخبرات: "AI سيحوّلها لـ STAR" → **"واكب AI سيحوّلها لـ STAR"** / "AI will polish" → **"Wakeb AI will polish"**
+
+# خارج النطاق
+- لا تعديل على رسائل error/console الداخلية (مخفية عن المستخدم).
+- لا تعديل على system prompts للنماذج (يبقى تعليم النموذج بالإنجليزية للأداء).
+- لا تعديل على باقي صفحات المقابلات/التدريب (لها branding مستقلّ في Core memory).
