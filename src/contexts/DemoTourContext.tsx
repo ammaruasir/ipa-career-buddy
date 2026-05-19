@@ -442,10 +442,8 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
         await runAction(step.action!);
         if (cancelRef.current) return;
         // After swapping to the candidate session, pre-grant PDPL consents so
-        // the ConsentBanner doesn't pop up mid-tour.
-        if (step.action!.kind === "swap-session" && step.action!.role === "candidate") {
-          await prefillDemoConsents();
-        }
+        // the ConsentBanner doesn't pop up mid-tour. (Skipped — see below — so
+        // the dedicated PDPL step can still showcase the banner.)
       }
 
       const resolvedRoute =
@@ -457,10 +455,6 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       if (cancelRef.current) return;
 
       // Pre-scroll the spotlight target into view BEFORE narration begins.
-      // Without this, the viewer hears "look at the cohort detail" while the
-      // spotlight is still off-screen, and the page only scrolls once
-      // DemoSpotlight's own scrollIntoView kicks in mid-narration. Doing it
-      // here keeps the visual + audio aligned. Idempotent with DemoSpotlight.
       const spotlightSel = step.spotlight?.selector;
       if (spotlightSel) {
         const target = document.querySelector(spotlightSel) as HTMLElement | null;
@@ -471,36 +465,51 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       }
       if (cancelRef.current) return;
 
-      appendTranscript({ role: "presenter", text: step.narration });
+      const hasNarration = !!step.narration && step.narration.trim().length > 0;
+      if (hasNarration) appendTranscript({ role: "presenter", text: step.narration });
       const preloaded = preloadedAudioRef.current.get(step.id);
-      // Consume the preload so re-runs (resume/next) refetch instead of reusing stale.
       if (preloaded) preloadedAudioRef.current.delete(step.id);
       const preloadedBlob = preloaded ? await preloaded.catch(() => null) : null;
-      const speaking = voice
-        .speak(step.narration, undefined, step.id, preloadedBlob)
-        .catch((e) => {
-          console.warn("voice.speak threw unexpectedly:", e);
-          appendTranscript({ role: "presenter", text: "(تعذّر النطق لهذه الخطوة)" });
-        });
+      const speaking = hasNarration
+        ? voice
+            .speak(step.narration, undefined, step.id, preloadedBlob)
+            .catch((e) => {
+              console.warn("voice.speak threw unexpectedly:", e);
+              appendTranscript({ role: "presenter", text: "(تعذّر النطق لهذه الخطوة)" });
+            })
+        : Promise.resolve();
 
+      // Long-running actions (start/end interview, AI-vs-AI turn) gate the
+      // step — narration finishes early, but we must let the action complete
+      // before advancing or the next step navigates away mid-flow.
+      const isBlockingAction =
+        step.action?.kind === "start-live-interview" ||
+        step.action?.kind === "end-live-interview" ||
+        step.action?.kind === "ai-vs-ai-turn";
+
+      let actionPromise: Promise<void> = Promise.resolve();
       if (step.action && !isSessionSwap && !takeOverMode) {
-        runAction(step.action).catch((e) =>
-          console.warn("Tour action failed:", e)
-        );
+        actionPromise = runAction(step.action).catch((e) => {
+          console.warn("Tour action failed:", e);
+        });
+        if (!isBlockingAction) {
+          // fire-and-forget — let typing/clicks overlap narration
+          actionPromise = Promise.resolve();
+          runAction(step.action).catch((e) => console.warn("Tour action failed:", e));
+        }
       }
 
-      // Race voice against an estimated duration so the step never finishes
-      // sooner than is readable for a human viewer. If voice fails (autoplay
-      // block, network), durationEstimateMs or MIN_STEP_DURATION_MS holds.
+      // Floor each step at MIN_STEP_DURATION_MS for readability — but skip the
+      // floor entirely for silent transition steps (empty narration) so they
+      // don't introduce dead air.
+      const baseMin = hasNarration ? MIN_STEP_DURATION_MS : 0;
       const desired = Math.min(
         MAX_STEP_DURATION_MS,
-        Math.max(MIN_STEP_DURATION_MS, step.durationEstimateMs ?? MIN_STEP_DURATION_MS),
+        Math.max(baseMin, step.durationEstimateMs ?? baseMin),
       );
       const minWait = new Promise<void>((r) => setTimeout(r, desired));
 
-      // If voice still speaking when min duration ends, wait for voice;
-      // if voice ended first, wait the remaining min duration.
-      await Promise.all([speaking, minWait]);
+      await Promise.all([speaking, minWait, actionPromise]);
     },
     [navigate, voice, appendTranscript, takeOverMode, runAction]
   );
