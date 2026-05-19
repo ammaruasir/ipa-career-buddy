@@ -116,7 +116,7 @@ const TEXT = {
   ar: {
     title: "إنشاء سيرة ذاتية من الصفر",
     intro:
-      "سنطرح عليك ١٥ سؤالاً لبناء سيرة احترافية. كل سؤال يمكن أن يولّد AI اقتراحاً لمساعدتك.",
+      "سنطرح عليك ١٥ سؤالاً لبناء سيرة احترافية. كل سؤال يمكن أن يولّد واكب AI اقتراحاً لمساعدتك.",
     chooseLang: "بأي لغة تريد البدء؟",
     arOnly: "العربية",
     enOnly: "English",
@@ -124,13 +124,13 @@ const TEXT = {
     begin: "ابدأ المقابلة",
     next: "التالي",
     skip: "تخطّي",
-    suggestAi: "اطلب اقتراح AI",
-    suggesting: "AI يفكّر...",
+    suggestAi: "اطلب اقتراح واكب AI",
+    suggesting: "واكب AI يفكّر...",
     yourAnswer: "إجابتك",
     done: "اكتمل! جارٍ بناء سيرتك...",
     openBuilder: "فتح في منشئ السيرة",
     required: "هذا السؤال إلزامي",
-    suggestionTitle: "اقتراح من AI (للإلهام، لست مضطرّاً للأخذ به)",
+    suggestionTitle: "اقتراح من واكب AI (للإلهام، لست مضطرّاً للأخذ به)",
     useSuggestion: "استخدم هذا",
     progressLabel: "السؤال",
     of: "من",
@@ -138,7 +138,7 @@ const TEXT = {
   en: {
     title: "Build a CV from Scratch",
     intro:
-      "We'll ask 15 questions to build a professional CV. Each question can get an AI suggestion to help you.",
+      "We'll ask 15 questions to build a professional CV. Each question can get a Wakeb AI suggestion to help you.",
     chooseLang: "Which language to start with?",
     arOnly: "Arabic",
     enOnly: "English",
@@ -146,13 +146,13 @@ const TEXT = {
     begin: "Start interview",
     next: "Next",
     skip: "Skip",
-    suggestAi: "Get AI suggestion",
-    suggesting: "AI is thinking...",
+    suggestAi: "Get Wakeb AI suggestion",
+    suggesting: "Wakeb AI is thinking...",
     yourAnswer: "Your answer",
     done: "Done! Building your CV...",
     openBuilder: "Open in CV Builder",
     required: "This question is required",
-    suggestionTitle: "AI suggestion (for inspiration, you don't have to use it)",
+    suggestionTitle: "Wakeb AI suggestion (for inspiration, you don't have to use it)",
     useSuggestion: "Use this",
     progressLabel: "Question",
     of: "of",
@@ -431,8 +431,8 @@ const CVInterview = () => {
       } else {
         toast.info(
           uiLang === "en"
-            ? "No suggestion available — try writing your own and AI will improve it later."
-            : "لا يوجد اقتراح الآن — جرّب اكتب إجابتك وسيحسّنها AI لاحقاً.",
+            ? "No suggestion available — try writing your own and Wakeb AI will improve it later."
+            : "لا يوجد اقتراح الآن — جرّب اكتب إجابتك وسيحسّنها واكب AI لاحقاً.",
         );
       }
     } catch (e) {

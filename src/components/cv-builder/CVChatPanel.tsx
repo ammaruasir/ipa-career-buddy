@@ -43,9 +43,9 @@ interface CVChatPanelProps {
 
 const TEXT = {
   ar: {
-    title: "تحدّث مع AI حول سيرتك",
+    title: "تحدّث مع واكب AI حول سيرتك",
     intro:
-      "اطرح أي سؤال عن سيرتك ('ما الذي يجب تحسينه في خبراتي؟' / 'أعد كتابة الملخّص' / 'لماذا هذا البند ضعيف؟'). AI سيشرح لك المنطق وراء كل ملاحظة.",
+      "اطرح أي سؤال عن سيرتك ('ما الذي يجب تحسينه في خبراتي؟' / 'أعد كتابة الملخّص' / 'لماذا هذا البند ضعيف؟'). واكب AI سيشرح لك المنطق وراء كل ملاحظة.",
     placeholder: "اكتب سؤالك...",
     send: "إرسال",
     sending: "جارٍ التحليل...",
@@ -60,9 +60,9 @@ const TEXT = {
     ],
   },
   en: {
-    title: "Chat with AI about your CV",
+    title: "Chat with Wakeb AI about your CV",
     intro:
-      "Ask any question about your CV ('What should I improve in my experience?' / 'Rewrite the summary' / 'Why is this bullet weak?'). AI will explain the reasoning behind every observation.",
+      "Ask any question about your CV ('What should I improve in my experience?' / 'Rewrite the summary' / 'Why is this bullet weak?'). Wakeb AI will explain the reasoning behind every observation.",
     placeholder: "Type your question...",
     send: "Send",
     sending: "Analyzing...",
@@ -404,7 +404,7 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
           <div className="space-y-3">
             <div>
               <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
-                {language === "en" ? "Improved (from AI)" : "النص المُحسَّن (من الذكاء)"}
+                {language === "en" ? "Improved (from Wakeb AI)" : "النص المُحسَّن (من واكب AI)"}
               </div>
               <Textarea
                 value={pickerImproved}
