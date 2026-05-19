@@ -276,10 +276,9 @@ const CVChatPanel = ({
                 <div key={m.id} className="space-y-1.5" dir={dir}>
                   <Message from={m.role as any}>
                     <MessageContent
-                      variant={isAssistant ? "flat" : "contained"}
                       className={cn(
                         isAssistant
-                          ? "bg-transparent p-0 text-foreground"
+                          ? "bg-transparent p-0 text-foreground border-0"
                           : "bg-primary text-primary-foreground",
                       )}
                     >
