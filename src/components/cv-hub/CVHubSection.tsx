@@ -40,8 +40,8 @@ const PATHS: CVPath[] = [
     icon: PenLine,
     title: "أنشئ بنفسك خطوة بخطوة",
     description:
-      "Stepper من ٧ خطوات. تكتب بنفسك مع زر AI لتحويل أي وصف إلى STAR bullets احترافية بالعربية الفصحى.",
-    bullets: ["تحكّم كامل", "AI assist عند الطلب", "حفظ تلقائي"],
+      "Stepper من ٧ خطوات. تكتب بنفسك مع زر واكب AI لتحويل أي وصف إلى STAR bullets احترافية بالعربية الفصحى.",
+    bullets: ["تحكّم كامل", "مساعدة واكب AI عند الطلب", "حفظ تلقائي"],
     cta: "افتح المنشئ",
     href: "/cv/builder",
     color: "secondary",
