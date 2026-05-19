@@ -154,12 +154,13 @@ const HiringPipeline = () => {
         </div>
 
         {/* Kanban Board */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 min-h-[60vh]">
+        <div data-tour="pipeline-board" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 min-h-[60vh]">
           {STAGES.map((stage) => {
             const stageApps = filteredApps.filter((a) => a.pipeline_stage === stage.key);
             return (
               <div
                 key={stage.key}
+                data-tour={`pipeline-column-${stage.key}`}
                 className="rounded-2xl border border-border bg-muted/30 p-3 flex flex-col"
                 onDragOver={handleDragOver}
                 onDrop={() => handleDrop(stage.key)}

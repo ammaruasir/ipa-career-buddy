@@ -208,7 +208,7 @@ const HRDashboard = () => {
 
       <div className="container mx-auto px-4 py-8 space-y-8">
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div data-tour="hr-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { icon: Users, label: "إجمالي المرشحين", value: toArabicNumerals(candidates.length), color: "bg-primary/10 text-primary" },
             { icon: FileText, label: "سير ذاتية مرفوعة", value: toArabicNumerals(candidatesWithResume.length), color: "bg-secondary/10 text-secondary" },
@@ -283,7 +283,7 @@ const HRDashboard = () => {
         </div>
 
         {/* Candidates Table */}
-        <Card className="rounded-2xl shadow-lg overflow-hidden">
+        <Card data-tour="hr-candidates-table" className="rounded-2xl shadow-lg overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>

@@ -126,7 +126,7 @@ const InterviewResults = () => {
         )}
 
         {/* Overall Score */}
-        <Card className="rounded-2xl shadow-lg">
+        <Card data-tour="overall-score" className="rounded-2xl shadow-lg">
           <CardContent className="p-8 flex flex-col items-center gap-4">
             <p className="text-muted-foreground">الدرجة الإجمالية</p>
             <div className="relative w-32 h-32">
@@ -195,8 +195,8 @@ const InterviewResults = () => {
         )}
 
         {/* DISC + Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card className="rounded-2xl shadow-lg">
+        <div data-tour="disc-and-metrics" className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card data-tour="disc-card" className="rounded-2xl shadow-lg">
             <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Brain className="w-5 h-5 text-primary" />نوع الشخصية (DISC)</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               <Badge className={`text-sm px-3 py-1 ${disc.color}`}>{disc.label}</Badge>
@@ -278,16 +278,20 @@ const InterviewResults = () => {
           </Card>
         </div>
 
-        {/* AI Feedback */}
-        <Card className="rounded-2xl shadow-lg">
-          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Eye className="w-5 h-5 text-primary" />ملاحظات محرك واكب للذكاء الاصطناعي</CardTitle></CardHeader>
+        {/* Wakeb feedback */}
+        <Card data-tour="wakeb-feedback" className="rounded-2xl shadow-lg">
+          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Eye className="w-5 h-5 text-primary" />ملاحظات محرّك واكب</CardTitle></CardHeader>
           <CardContent>
             <p className="text-sm text-foreground leading-relaxed">{evaluation.ai_feedback_ar}</p>
           </CardContent>
         </Card>
 
-        {/* P0.2: Per-answer STAR coaching */}
-        {id && <CoachingSection interviewId={id} practice={isPractice} />}
+        {/* Per-answer STAR coaching */}
+        {id && (
+          <div data-tour="star-coaching">
+            <CoachingSection interviewId={id} practice={isPractice} />
+          </div>
+        )}
 
         <div className="flex justify-center pb-8">
           <Button size="lg" className="rounded-xl" onClick={() => navigate("/dashboard")}>العودة للوحة التحكم</Button>

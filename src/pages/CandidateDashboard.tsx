@@ -183,7 +183,7 @@ const CandidateDashboard = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div data-tour="candidate-stats" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="rounded-2xl shadow-lg">
             <CardContent className="p-6 flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -220,7 +220,7 @@ const CandidateDashboard = () => {
         </div>
 
         {/* Browse Jobs */}
-        <Card className="rounded-2xl shadow-lg border-2 border-primary/20 bg-gradient-to-l from-primary/5 to-transparent">
+        <Card data-tour="browse-jobs-card" className="rounded-2xl shadow-lg border-2 border-primary/20 bg-gradient-to-l from-primary/5 to-transparent">
           <CardContent className="p-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Briefcase className="w-6 h-6 text-primary" />
@@ -239,10 +239,14 @@ const CandidateDashboard = () => {
         <ConsentBanner language="ar" />
 
         {/* CV Hub — 3 paths to build/review a CV with AI */}
-        <CVHubSection />
+        <div data-tour="cv-hub-section">
+          <CVHubSection />
+        </div>
 
         {/* Practice Mode */}
-        <TrainingSection interviews={interviews} evaluations={evaluations} />
+        <div data-tour="training-section">
+          <TrainingSection interviews={interviews} evaluations={evaluations} />
+        </div>
 
         {/* Progress Chart */}
         {chartData.length > 1 && (

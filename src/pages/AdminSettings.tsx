@@ -371,15 +371,15 @@ const AdminSettings = () => {
 
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         <Tabs defaultValue="questions" dir="rtl">
-          <TabsList className="w-full flex flex-wrap justify-start gap-1 h-auto p-1 mb-6">
-            <TabsTrigger value="questions" className="font-tajawal"><BookOpen className="w-4 h-4 ml-1" /> بنك الأسئلة</TabsTrigger>
-            <TabsTrigger value="scoring" className="font-tajawal"><SlidersHorizontal className="w-4 h-4 ml-1" /> معايير التقييم</TabsTrigger>
-            <TabsTrigger value="interview" className="font-tajawal"><Clock className="w-4 h-4 ml-1" /> إعدادات المقابلة</TabsTrigger>
-            <TabsTrigger value="jobs" className="font-tajawal"><Briefcase className="w-4 h-4 ml-1" /> الوظائف</TabsTrigger>
-            <TabsTrigger value="vacancies" className="font-tajawal"><Building2 className="w-4 h-4 ml-1" /> الشواغر</TabsTrigger>
-            <TabsTrigger value="users" className="font-tajawal"><Users className="w-4 h-4 ml-1" /> المستخدمون</TabsTrigger>
-            <TabsTrigger value="branding" className="font-tajawal"><Palette className="w-4 h-4 ml-1" /> الهوية</TabsTrigger>
-            <TabsTrigger value="system" className="font-tajawal"><Server className="w-4 h-4 ml-1" /> النظام</TabsTrigger>
+          <TabsList data-tour="admin-tabs" className="w-full flex flex-wrap justify-start gap-1 h-auto p-1 mb-6">
+            <TabsTrigger value="questions" data-tour="tab-questions" className="font-tajawal"><BookOpen className="w-4 h-4 ml-1" /> بنك الأسئلة</TabsTrigger>
+            <TabsTrigger value="scoring" data-tour="tab-scoring" className="font-tajawal"><SlidersHorizontal className="w-4 h-4 ml-1" /> معايير التقييم</TabsTrigger>
+            <TabsTrigger value="interview" data-tour="tab-interview" className="font-tajawal"><Clock className="w-4 h-4 ml-1" /> إعدادات المقابلة</TabsTrigger>
+            <TabsTrigger value="jobs" data-tour="tab-jobs" className="font-tajawal"><Briefcase className="w-4 h-4 ml-1" /> الوظائف</TabsTrigger>
+            <TabsTrigger value="vacancies" data-tour="tab-vacancies" className="font-tajawal"><Building2 className="w-4 h-4 ml-1" /> الشواغر</TabsTrigger>
+            <TabsTrigger value="users" data-tour="tab-users" className="font-tajawal"><Users className="w-4 h-4 ml-1" /> المستخدمون</TabsTrigger>
+            <TabsTrigger value="branding" data-tour="tab-branding" className="font-tajawal"><Palette className="w-4 h-4 ml-1" /> الهوية</TabsTrigger>
+            <TabsTrigger value="system" data-tour="tab-system" className="font-tajawal"><Server className="w-4 h-4 ml-1" /> النظام</TabsTrigger>
           </TabsList>
 
           {/* Questions */}

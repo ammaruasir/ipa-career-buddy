@@ -181,6 +181,12 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
     async (selector: string, opts?: { settleMs?: number }): Promise<HTMLElement | null> => {
       const el = await findElement(selector);
       if (!el) return null;
+      // Scroll the target into the visible viewport BEFORE computing the
+      // cursor position. Without this, off-screen targets get a cursor at
+      // negative coords (or at the page bottom) and the click/type fires
+      // into the void.
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      await sleep(380); // smooth-scroll settle window
       const rect = el.getBoundingClientRect();
       setCursor({
         x: rect.left + rect.width / 2,
@@ -437,6 +443,21 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
       if (resolvedRoute) {
         navigate(resolvedRoute);
         await sleep(400);
+      }
+      if (cancelRef.current) return;
+
+      // Pre-scroll the spotlight target into view BEFORE narration begins.
+      // Without this, the viewer hears "look at the cohort detail" while the
+      // spotlight is still off-screen, and the page only scrolls once
+      // DemoSpotlight's own scrollIntoView kicks in mid-narration. Doing it
+      // here keeps the visual + audio aligned. Idempotent with DemoSpotlight.
+      const spotlightSel = step.spotlight?.selector;
+      if (spotlightSel) {
+        const target = document.querySelector(spotlightSel) as HTMLElement | null;
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+          await sleep(380);
+        }
       }
       if (cancelRef.current) return;
 
