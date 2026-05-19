@@ -427,31 +427,19 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
 
       {/* Manual accept dialog (used when AI didn't return structured replacements) */}
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <DialogContent dir={dir} className="max-w-lg">
-          <DialogHeader>
+        <DialogContent dir={dir} className="max-w-2xl max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-3 border-b">
             <DialogTitle>
               {language === "en" ? "Accept improvement" : "اعتماد التحسين"}
             </DialogTitle>
             <DialogDescription className="text-xs">
               {language === "en"
-                ? "Optionally paste the original text from your CV to replace. Leave it empty to add this as a new bullet in the chosen section — it will still be merged on export."
-                : "اختياري: الصق النص الأصلي من سيرتك ليُستبدل. اتركه فارغاً لإضافته كبند جديد في القسم المحدد — وسيُدمج تلقائياً عند التصدير."}
+                ? "Review and edit both texts before approving. The original is what gets replaced in your CV; leave it empty to add the improved text as a new bullet."
+                : "راجع وعدّل النصين قبل الاعتماد. النص الأصلي هو ما سيُستبدل في سيرتك؛ اتركه فارغاً لإضافة النص المحسّن كبند جديد."}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
-            <div>
-              <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
-                {language === "en" ? "Improved (from Wakeb AI)" : "النص المُحسَّن (من واكب AI)"}
-              </div>
-              <Textarea
-                value={pickerImproved}
-                onChange={(e) => setPickerImproved(e.target.value)}
-                rows={4}
-                dir={dir}
-                className="text-sm"
-              />
-            </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
             <div>
               <div className="text-xs font-semibold text-muted-foreground mb-1">
                 {language === "en" ? "Original text from CV (optional)" : "النص الأصلي من السيرة (اختياري)"}
@@ -459,12 +447,29 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
               <Textarea
                 value={pickerOriginal}
                 onChange={(e) => setPickerOriginal(e.target.value)}
-                rows={3}
+                rows={4}
                 dir={dir}
                 placeholder={
                   language === "en"
-                    ? "Leave empty to add as a new bullet"
-                    : "اتركه فارغاً لإضافته كبند جديد"
+                    ? "Paste the exact text from your CV that should be replaced. Leave empty to add as a new bullet."
+                    : "الصق النص الأصلي من سيرتك ليُستبدل. اتركه فارغاً لإضافته كبند جديد."
+                }
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
+                {language === "en" ? "Improved (from Wakeb AI)" : "النص المُحسَّن (من واكب AI)"}
+              </div>
+              <Textarea
+                value={pickerImproved}
+                onChange={(e) => setPickerImproved(e.target.value)}
+                rows={5}
+                dir={dir}
+                placeholder={
+                  language === "en"
+                    ? "We couldn't auto-extract a clean rewrite from the AI reply. Paste or edit the improved version here."
+                    : "تعذّر استخراج نص محسّن واضح من رد الذكاء الاصطناعي. الصق أو عدّل النسخة المحسّنة هنا."
                 }
                 className="text-sm"
               />
@@ -488,9 +493,36 @@ const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVC
                 <option value="other">{language === "en" ? "Other" : "أخرى"}</option>
               </select>
             </div>
+
+            {/* Before / After preview */}
+            {(pickerOriginal.trim() || pickerImproved.trim()) && (
+              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                <p className="text-[11px] font-semibold text-muted-foreground">
+                  {language === "en" ? "Preview before approving" : "معاينة قبل الاعتماد"}
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-background p-2.5 border">
+                    <p className="text-[10px] font-semibold text-muted-foreground mb-1">
+                      {language === "en" ? "Before" : "قبل"}
+                    </p>
+                    <p className="text-xs whitespace-pre-wrap text-muted-foreground line-through min-h-[2rem]">
+                      {pickerOriginal.trim() || (language === "en" ? "(new addition — nothing replaced)" : "(إضافة جديدة — لا يوجد نص يُستبدل)")}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-emerald-500/5 p-2.5 border border-emerald-500/30">
+                    <p className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
+                      {language === "en" ? "After" : "بعد"}
+                    </p>
+                    <p className="text-xs whitespace-pre-wrap text-foreground min-h-[2rem]">
+                      {pickerImproved.trim() || (language === "en" ? "(empty)" : "(فارغ)")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="p-4 border-t">
             <Button variant="ghost" onClick={() => setPickerOpen(false)} disabled={accepting}>
               {language === "en" ? "Cancel" : "إلغاء"}
             </Button>
