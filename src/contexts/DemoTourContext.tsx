@@ -328,25 +328,18 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
         case "start-live-interview": {
           hideCursor();
           // The voice interview page exposes a "ابدأ المقابلة" / start button.
-          // Click whichever start-like button is rendered.
-          const startBtn =
-            (await findElement(
-              "button:not([disabled])[data-tour='start-interview']",
-              1500,
-            )) ??
-            (await findElement(
-              "main button:not([disabled])",
-              3000,
-            ));
+          const startBtn = await findElement(
+            "button:not([disabled])[data-tour='start-interview']",
+            8000,
+          );
           if (!startBtn) {
-            console.warn("start-live-interview: no start button found");
+            console.warn("start-live-interview: [data-tour='start-interview'] not found — skipping");
             return;
           }
-          await moveCursorTo("button:not([disabled])");
+          await moveCursorTo("[data-tour='start-interview']");
           await flashClick();
           startBtn.click();
-          // Wait for the interview UI to flip into "active" state (transcript
-          // entry, mic indicator). 12s gives the AI time to ask the first Q.
+          // Wait for the interview UI to flip into "active" state.
           await sleep(12_000);
           return;
         }
