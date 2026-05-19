@@ -78,6 +78,43 @@ const TEXT = {
   },
 };
 
+// Extract the actionable improvement text from a chatty AI reply.
+// Priority: fenced code block -> quoted block -> text after a labelled cue
+// ("النص المحسّن:", "Improved:", "النسخة المحسّنة:" ...) -> longest paragraph >40 chars.
+const extractImprovementFromReply = (text: string): string => {
+  if (!text) return "";
+  const trimmed = text.trim();
+
+  // 1) Fenced code block ```...```
+  const fence = trimmed.match(/```[a-zA-Z]*\n?([\s\S]+?)```/);
+  if (fence?.[1]?.trim()) return fence[1].trim();
+
+  // 2) Labelled cue — capture text after the label until a blank line or end
+  const labelRe =
+    /(?:النص\s*المحسّن|النسخة\s*المحسّنة|المحسّن|المقترح|Improved(?:\s*version)?|Rewrite|Suggested)\s*[:：\-—]\s*([\s\S]+?)(?:\n\s*\n|$)/i;
+  const labelled = trimmed.match(labelRe);
+  if (labelled?.[1]?.trim()) {
+    return labelled[1].replace(/^["'“”«»]+|["'“”«»]+$/g, "").trim();
+  }
+
+  // 3) Quoted block — first triple/double quoted chunk
+  const quoted =
+    trimmed.match(/"{3}([\s\S]+?)"{3}/) ||
+    trimmed.match(/"([^"]{40,})"/) ||
+    trimmed.match(/«([^»]{20,})»/);
+  if (quoted?.[1]?.trim()) return quoted[1].trim();
+
+  // 4) Longest paragraph >40 chars
+  const paragraphs = trimmed.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const long = paragraphs.filter((p) => p.length > 40);
+  if (long.length) {
+    long.sort((a, b) => b.length - a.length);
+    return long[0];
+  }
+
+  return "";
+};
+
 const CVChatPanel = ({ cvDocumentId, language = "ar", onAcceptImprovement }: CVChatPanelProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
