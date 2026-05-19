@@ -259,7 +259,7 @@ const QUESTIONS: QuestionDef[] = [
   },
   {
     id: "language_preference",
-    step: 15,
+    step: 14,
     field: "language",
     required: true,
     type: "choice",
