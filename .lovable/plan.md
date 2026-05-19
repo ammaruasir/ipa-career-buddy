@@ -1,76 +1,69 @@
-# Fix: Demo tour hangs at "tour is starting" + slow first launch
+# المشكلة
 
-## Root cause analysis
+في صفحة `/cv/interview`، زر **"اطلب اقتراح AI"** لا يعرض شيئاً عند الضغط. السبب موجود حرفياً في الكود (`src/pages/CVInterview.tsx` السطر 420-446):
 
-The demo button stays stuck on **"الجولة قيد التشغيل…"** because of this chain in `src/contexts/DemoTourContext.tsx → start()`:
-
+```ts
+const askSuggestion = async () => {
+  // تعليق المطوّر السابق: "Workaround... Not ideal. Cleanest path: separate endpoint."
+  const { data } = await supabase.functions.invoke("improve-cv-summary", {
+    body: { current_summary: "", full_profile: { question: question.label_ar }, ... }
+  });
+  const text = uiLang === "en" ? data.en?.improved : data.ar?.improved;
+  setSuggestion(text ?? null);  // ← غالباً null، فلا يظهر شيء
+};
 ```
-setStatus("running")        // button now shows "starting…"
-await runStep(tourScript[0])
-└── voice.speak(step.narration, undefined, step.id)
-    ├── try cached /demo-audio/act1-intro.mp3  (no file in /public → falls through, correct)
-    └── POST /functions/v1/demo-wakeb-tts
-        └── if !response.ok → throws "TTS request failed: <status>"
-```
 
-If the TTS POST fails for any reason (IP rate-limit `429` after repeated tries, transient `5xx`, network timeout, autoplay block), `speak()` **throws**. The throw bubbles out of `runStep` → out of the `for` loop in `start()` → the final `setStatus("finished")` never runs, so `status` stays at `"running"` and the button label is frozen.
+أي أن الزر:
+1. يستدعي `improve-cv-summary` — وهي دالة مخصّصة لتحسين **ملخّص سيرة موجود**، لا لإعطاء اقتراح لسؤال.
+2. يمرّر `current_summary: ""` فارغاً + يحشر السؤال داخل `full_profile.question` بشكل غير متوقّع.
+3. الـ JSON Schema الصارم في الدالة يجبر النموذج على إعادة `{ar, en}` ملخّص. مع مدخل فارغ تماماً، يعيد غالباً `null` لكل منهما أو ملخّصاً عاماً بلا معنى → `setSuggestion(null)` → لا شيء يظهر للمستخدم، فقط `setSuggesting(false)`.
 
-There is also **no timeout** on the TTS fetch, so a stalled upstream (ElevenLabs hiccup) hangs the entire tour indefinitely.
+كما أن backend (`cv-interview-step`) يدعم `want_suggestion: true` لكن فقط داخل action `submit` (يعطي اقتراحاً للسؤال **التالي** بعد الإجابة)، ولا يوجد action لطلب اقتراح لـ **السؤال الحالي** بناءً على ما أدخله المستخدم سابقاً.
 
-The "takes too much time to start" complaint is a separate but related issue: the very first step has no pre-cached audio, so after the click the user waits for `primeAudio + TTS roundtrip + first audio chunk` (~2–4 s) of silence before anything visible happens.
+---
 
-I verified `demo-wakeb-tts` itself responds in ~1.5 s with valid `audio/mpeg`, so the function is healthy — the client just isn't resilient to the cases where it isn't.
+# الحل المقترح
 
-## Plan
+## ١) إضافة action جديد `suggest` في `supabase/functions/cv-interview-step/index.ts`
 
-### 1. Make `voice.speak` non-throwing + bounded
-File: `src/hooks/useDemoVoice.ts`
+- يستقبل `{ action: "suggest", session_id, language }`.
+- يقرأ من الـ session: مستوى الخبرة + الوظيفة المستهدفة + القطاع + رقم الخطوة الحالية + الإجابات السابقة.
+- يحدّد السؤال الحالي من `QUESTIONS[currentStep]`.
+- يبني prompt مختصر لـ Lovable AI Gateway (`google/gemini-2.5-flash`) يقول:
+  > "أنت مدرّب سير ذاتية. المستخدم في سؤال: {label}. خبرته: {level}، وظيفته المستهدفة: {role}. أعطه **مثالاً واحداً قصيراً** (٢-٤ أسطر) للإلهام بصياغة محترفة، باللغة المطلوبة. لا تشرح، فقط النص."
+- لأسئلة `repeater` (الخبرات/التعليم/الإنجازات) يعيد عيّنة بند واحد مكتوبة بصياغة قويّة بنمط STAR.
+- لأسئلة `choice` لا يستدعى أصلاً (الزر مخفي حالياً، نُبقي ذلك).
+- يعيد `{ suggestion: string }`.
+- يطبّق `checkRateLimit` (الموجود في `_shared/guards.ts`).
 
-- Wrap the `demo-wakeb-tts` POST with an `AbortController` and a **12 s timeout**.
-- If the request fails or times out, log a `console.warn`, surface a one-time `toast.error` ("تعذّر تشغيل الصوت — تكمل الجولة بدون نطق")، **resolve** instead of throwing, and clear `isSpeaking`.
-- Same treatment for the cache-fetch branch (already swallowed, keep as-is).
-- Net effect: a TTS failure degrades to silent narration; the tour keeps moving.
+## ٢) ربط الواجهة بـ action الجديد في `src/pages/CVInterview.tsx`
 
-### 2. Harden `start()` / `runStep` in the tour engine
-File: `src/contexts/DemoTourContext.tsx`
-
-- Wrap each `await runStep(tourScript[i])` in `try { … } catch (e) { console.warn(...) }` so one bad step never freezes the whole tour status.
-- In `start()`, if the loop exits via `cancelRef`, leave status untouched; otherwise always end with `setStatus("finished")` (already the case once #1 stops the throw).
-- Add a guard so `start()` is a no-op if `status === "running" | "qna"` (prevents the button from re-arming a second loop on accidental double-click).
-
-### 3. Immediate visual feedback after click
-File: `src/contexts/DemoTourContext.tsx` + `src/pages/Demo.tsx`
-
-- Move `setStatus("running")` to **before** `voice.primeAudio()` so the `DemoOverlay` mounts instantly with a "جاري تجهيز الجولة…" indicator instead of the page sitting silent for 2–4 s.
-- Update the Demo page button label: `status === "running" && stepIndex === 0 && !voice.isSpeaking` → show "جاري تجهيز الصوت…" (more honest than "قيد التشغيل").
-
-### 4. Preload the first narration to eliminate the cold-start gap
-File: `src/contexts/DemoTourContext.tsx`
-
-- On `DemoTourProvider` mount, fire a low-priority `fetch` (no playback) to `demo-wakeb-tts` for the first step's narration, store the resulting `Blob` in a ref keyed by `tourScript[0].id`.
-- Modify `voice.speak()` to accept an optional pre-fetched `Blob` and play it directly, skipping the network round-trip on the first step.
-- Cancel/ignore the preload if `start()` is invoked before it resolves (no double-play).
-- Saves ~2–3 s on the very first click and avoids the silent gap that users perceive as "stuck".
-
-### 5. Surface failures instead of hiding them
-File: `src/contexts/DemoTourContext.tsx`
-
-- When the catch in #2 fires, append a `TranscriptEntry` `{ role: "presenter", text: "(تعذّر النطق لهذه الخطوة)" }` so the operator sees what happened in the transcript panel.
-
-## Out of scope
-
-- Recording / committing pre-rendered `/demo-audio/*.mp3` cache files (separate Phase F task).
-- Changes to `demo-wakeb-tts` itself (function is healthy).
-- Procuring distinct presenter/candidate voices.
-- Touching the interviewer (Noura/عبدالله) flow — those fixes already shipped in the previous turn.
-
-## Technical notes
-
-- AbortController pattern:
+- استبدال جسم `askSuggestion` ليستدعي:
   ```ts
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 12_000);
-  try { … fetch(url, { signal: ctrl.signal }) … } finally { clearTimeout(timer); }
+  supabase.functions.invoke("cv-interview-step", {
+    body: { action: "suggest", session_id: sessionId, language }
+  })
   ```
-- The preload-blob ref shape: `Map<stepId, Promise<Blob | null>>` so a single in-flight preload is awaited rather than refetched if `speak()` races it.
-- Button-disabled condition in `Demo.tsx` stays the same; only the label changes based on `stepIndex` and `isSpeaking`.
+- `setSuggestion(data.suggestion)`.
+- إظهار `toast.info` ودّي إذا كانت الاستجابة فارغة (بدل toast.error صامت).
+- إضافة fallback نصّي محلّي بسيط (مثال جاهز للسؤال) إذا فشل النداء، حتى لا يبقى الزر "ميتاً" أبداً.
+
+## ٣) تنظيف الكود
+
+- حذف التعليقات المضلّلة (`Workaround...`, `Not ideal.`) السطور 423-428.
+- لا تغيير على `improve-cv-summary` (تبقى كما هي لقسم الـ Summary في CV Builder).
+
+---
+
+# الملفات المعدّلة
+
+| الملف | التغيير |
+|------|---------|
+| `supabase/functions/cv-interview-step/index.ts` | + action `suggest` (~40 سطر) |
+| `src/pages/CVInterview.tsx` | إعادة كتابة `askSuggestion` (~15 سطر) |
+
+# المخاطر / خارج النطاق
+
+- لن يتم تعديل قائمة الأسئلة الـ ١٥ ولا منطق الحفظ.
+- لن يتم تعديل قاعدة البيانات.
+- الأسئلة من نوع choice ستبقى بدون زر (سلوك مقصود).
