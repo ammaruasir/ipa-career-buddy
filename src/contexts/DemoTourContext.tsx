@@ -489,14 +489,13 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
 
       let actionPromise: Promise<void> = Promise.resolve();
       if (step.action && !isSessionSwap && !takeOverMode) {
-        actionPromise = runAction(step.action).catch((e) => {
+        const running = runAction(step.action).catch((e) => {
           console.warn("Tour action failed:", e);
         });
-        if (!isBlockingAction) {
-          // fire-and-forget — let typing/clicks overlap narration
-          actionPromise = Promise.resolve();
-          runAction(step.action).catch((e) => console.warn("Tour action failed:", e));
+        if (isBlockingAction) {
+          actionPromise = running;
         }
+        // else: fire-and-forget — let typing/clicks overlap narration
       }
 
       // Floor each step at MIN_STEP_DURATION_MS for readability — but skip the
