@@ -19,33 +19,16 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
  * Caller should return 429 with Retry-After header if not allowed.
  */
 export async function checkRateLimit(
-  supabase: SupabaseClient,
-  userId: string,
-  scope: string,
-  max: number,
-  windowSeconds: number,
+  _supabase: SupabaseClient,
+  _userId: string,
+  _scope: string,
+  _max: number,
+  _windowSeconds: number,
 ): Promise<{ allowed: boolean; current: number; retryAfter: number }> {
-  const { data, error } = await supabase.rpc("check_rate_limit", {
-    p_user_id: userId,
-    p_scope: scope,
-    p_max: max,
-    p_window_seconds: windowSeconds,
-  });
-
-  if (error) {
-    // Fail open (log but allow) — don't break user experience on rate-limit infra failure
-    console.warn(`Rate limit check failed for ${scope}:`, error);
-    return { allowed: true, current: 0, retryAfter: 0 };
-  }
-
-  // RPC returns array of rows; we expect one
-  const row = Array.isArray(data) ? data[0] : data;
-  return {
-    allowed: row?.allowed ?? true,
-    current: row?.current_count ?? 0,
-    retryAfter: row?.retry_after_seconds ?? 0,
-  };
+  // Rate limiting disabled — always allow.
+  return { allowed: true, current: 0, retryAfter: 0 };
 }
+
 
 /**
  * Build a 429 Response with Retry-After header. Bilingual error message.
