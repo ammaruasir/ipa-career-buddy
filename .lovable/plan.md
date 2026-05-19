@@ -1,47 +1,98 @@
-# Remove All Rate Limits From Every AI/API Edge Function
+# GPT-style CV Chat — Full Rebuild
 
-Strip rate-limit enforcement from every edge function so usage is unbounded — demo functions AND authenticated functions alike.
+Make the CV coach feel and behave like ChatGPT (streaming bubbles, Markdown, attachments, working buttons) by moving to the AI SDK + AI Elements stack, while keeping the existing structured outputs (justifications, replacements, suggested actions) and the "accept improvement" workflow.
 
-## Scope
+## Problems today
 
-All 20 functions that currently call `enforceIpRateLimit` or `checkRateLimit` + `rateLimitResponse`:
+1. The edge function `chat-with-cv` is non-streaming and forces a tool call. With long CV grounding it now hits **504 IDLE_TIMEOUT (150s)** → the UI stays stuck on "جارٍ التحليل..." forever.
+2. Because the request never resolves, **every button appears broken**: starter prompts, Send / Enter, and the per-message "اعتمد هذا التحسين" (it requires a finished AI reply).
+3. There is no attachment button at all.
+4. The UI is hand-rolled bubbles — not GPT-style, no Markdown rendering, no streaming feel.
 
-**Demo (auth-free, IP-limited):**
-- `demo-candidate-bot`, `demo-chat`, `demo-wakeb-tts`, `demo-transcribe`, `demo-session`
+## Target UX (ChatGPT-style)
 
-**Authenticated AI/API (user-limited):**
-- `wakeb-tts`, `wakeb-voices`
-- `transcribe-audio`
-- `suggest-cv-skills`, `generate-cv-bullets`, `improve-cv-summary`, `proofread-arabic`
-- `generate-cover-letter`
-- `chat-with-cv`, `cv-job-alignment`
-- `analyze-video`
-- `coach-response`, `evaluate-interview`
-- `render-cv-pdf`
+- Streaming assistant bubbles that type out token-by-token.
+- Markdown rendering (lists, bold, code).
+- Sticky scroll-to-bottom + scroll button.
+- Composer with: textarea, attachment button (📎), submit (with stop-while-streaming), Enter to send, Shift+Enter newline.
+- Starter prompt chips on empty state.
+- Each assistant message keeps the existing extras below the bubble:
+  - Justification cards
+  - Replacement cards with **"اعتمد هذا التحسين"** button (writes to `revision.accepted_rewrites` via existing `onAcceptImprovement`)
+  - Suggested-actions panel
+  - "Use as improvement" generic button (opens existing picker dialog)
+- Attachments: image or PDF page sent inline to the AI as a `file` part (e.g. "حلّل هذه الشهادة"). Stored only for the current turn (no upload bucket).
 
-## What changes per function
+## Implementation
 
-In each `index.ts`:
-1. Remove the `enforceIpRateLimit(...)` / `checkRateLimit(...)` call block (and the `rateLimitResponse(...)` short-circuit).
-2. Remove the now-unused imports from `_shared/guards.ts` / `_shared/demo-guards.ts`.
-3. Leave everything else untouched: auth checks (`verify_jwt`, user JWT validation), input validation, CORS, AI logic.
+### 1. Install AI Elements primitives
+Run once:
+```
+bun x ai-elements@latest add conversation message prompt-input shimmer response
+```
+(plus `bun add ai @ai-sdk/react @ai-sdk/openai-compatible zod` if missing).
 
-## Frontend copy
+### 2. New streaming edge function `cv-chat-stream`
+- `supabase/functions/cv-chat-stream/index.ts`
+- Uses `streamText` from `npm:ai` + Lovable AI Gateway provider (`google/gemini-3-flash-preview`).
+- Accepts `{ messages: UIMessage[], cv_document_id, conversation_id?, language }`.
+- Loads CV grounding (same query as today) and prepends as `system`.
+- Streams main coaching text (Markdown allowed).
+- For structured extras, run a **second, fast non-streaming `generateText` with `Output.object`** (schema = `{ justifications, suggested_actions, replacements }`) once the user message is known, and emit it as a **custom data part** via `result.toUIMessageStreamResponse({ messageMetadata })` or `createUIMessageStream` + `writer.write({ type: "data-extras", data: ... })`.
+- `onFinish` saves the completed assistant `UIMessage` (text + extras) to `cv_conversations.messages`, matching today's persistence shape.
+- Keeps existing `checkRateLimit` and `sanitizeForPrompt` guards.
+- `supabase/config.toml` gets `[functions.cv-chat-stream] verify_jwt = false` only if needed (default fine here since we read the auth header manually).
 
-- `src/pages/Demo.tsx` — remove the "حدّ أقصى ٣٠ سؤال لكل جلسة" line.
-- `src/contexts/DemoTourContext.tsx` — drop any hard question counter if one exists (verify during edit; otherwise no change).
+### 3. Rewrite `src/components/cv-builder/CVChatPanel.tsx` with AI Elements
+- Use `useChat` from `@ai-sdk/react` with a `DefaultChatTransport` pointed at the Supabase function URL (`${VITE_SUPABASE_URL}/functions/v1/cv-chat-stream`) with the user's access token in `Authorization`.
+- Compose:
+  ```
+  <Conversation>
+    <ConversationContent>
+      {messages.map(m => (
+        <Message from={m.role}>
+          <MessageContent>
+            {m.parts.map(part => …)}
+          </MessageContent>
+        </Message>
+      ))}
+      {status === "submitted" && <Shimmer>جارٍ التفكير…</Shimmer>}
+    </ConversationContent>
+    <ConversationScrollButton />
+  </Conversation>
+  <PromptInput onSubmit={…}>
+    <PromptInputTextarea />
+    <PromptInputFooter className="justify-between">
+      <AttachmentButton />
+      <PromptInputSubmit status={status} />
+    </PromptInputFooter>
+  </PromptInput>
+  ```
+- Render text parts with `<MessageResponse>` so Markdown streams correctly.
+- Render the custom `data-extras` part → existing JustificationCard, Replacement cards (with working "اعتمد هذا التحسين" calling `onAcceptImprovement`), and suggested-actions list. Generic "Use as improvement" button still opens the picker `Dialog`.
+- Starter prompts on empty state call `sendMessage({ text: prompt })` — guaranteed to work because they go through `useChat`.
+- Attachment button: hidden `<input type="file" accept="image/*,application/pdf">` → on change, call `sendMessage({ files: [file] })` (AI SDK handles base64 file parts).
+- Assistant bubble = transparent background (per chat-agent UI contract). User bubble = `bg-primary text-primary-foreground` rounded.
+- Keep RTL/LTR via `dir={language === "ar" ? "rtl" : "ltr"}`.
+- Auto-focus textarea on mount, after send, after streaming ends.
 
-## What stays
+### 4. Keep the picker dialog
+Existing extract-from-reply + before/after preview dialog stays — just opened from the new message component.
 
-- `_shared/guards.ts` and `_shared/demo-guards.ts` files stay on disk (other helpers may live there) — only the *calls* are removed.
-- The `check_rate_limit` Postgres function and `rate_limits` table stay (harmless, unused).
-- Auth, RLS, input validation, CORS, all AI/business logic untouched.
-- Pre-cached demo TTS MP3s stay.
-
-## Risk
-
-With no limits anywhere, any logged-in user (or any visitor on demo endpoints) can drive unlimited spend against `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, and `LOVABLE_API_KEY`. There is no global daily/monthly budget guard. A single abusive user or scraper could exhaust credits. You're accepting that.
+### 5. Cleanup
+- Leave old `chat-with-cv` function in place for one release (not deleted) but no longer called.
+- No DB migration needed — `cv_conversations.messages` JSON already stores arbitrary shapes; we'll persist AI SDK `UIMessage[]` directly there going forward.
 
 ## Files touched
 
-20 edge function `index.ts` files + `src/pages/Demo.tsx` (+ `DemoTourContext.tsx` if applicable). No DB migration, no schema, no auth changes.
+- **new** `supabase/functions/cv-chat-stream/index.ts`
+- **new** `supabase/functions/_shared/ai-gateway.ts` (Lovable provider helper, if not present)
+- **rewritten** `src/components/cv-builder/CVChatPanel.tsx`
+- **new** `src/components/ai-elements/*` (installed by CLI)
+- `package.json` (new deps)
+
+## Out of scope
+
+- Voice input, image generation, web-search tools.
+- Persistent file uploads (attachments are per-turn only).
+- Threaded conversations (CV chat stays a single conversation per CV doc — matches current behavior).
