@@ -195,7 +195,7 @@ const CandidateCompare = () => {
         {selected.length >= 2 && (
           <>
             {/* Radar Chart */}
-            <Card className="rounded-2xl shadow-lg">
+            <Card data-tour="compare-radar" className="rounded-2xl shadow-lg">
               <CardHeader>
                 <CardTitle className="text-base">مقارنة بصرية</CardTitle>
               </CardHeader>

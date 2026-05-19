@@ -190,7 +190,7 @@ const CohortDetail = () => {
           </TabsList>
 
           <TabsContent value="students" className="mt-4">
-            <Card className="rounded-2xl">
+            <Card data-tour="cohort-students" className="rounded-2xl">
               <CardHeader>
                 <CardTitle className="text-base">طلاب الدفعة</CardTitle>
               </CardHeader>

@@ -187,8 +187,8 @@ const CVHub = () => {
         </div>
 
         {/* Quick actions row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Card className="rounded-xl border-2 hover:border-primary/30 transition-all group">
+        <div data-tour="cv-method-cards" className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Card data-tour="cv-method-interview" className="rounded-xl border-2 hover:border-primary/30 transition-all group">
             <Link to="/cv/interview">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
@@ -202,7 +202,7 @@ const CVHub = () => {
               </CardContent>
             </Link>
           </Card>
-          <Card className="rounded-xl border-2 hover:border-primary/30 transition-all group">
+          <Card data-tour="cv-method-builder" className="rounded-xl border-2 hover:border-primary/30 transition-all group">
             <button onClick={createNew} disabled={creating} className="w-full text-right">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
@@ -210,13 +210,13 @@ const CVHub = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground">منشئ يدوي جديد</p>
-                  <p className="text-xs text-muted-foreground line-clamp-1">٧ خطوات مع AI assist</p>
+                  <p className="text-xs text-muted-foreground line-clamp-1">٧ خطوات مع مساعدة من محرّك واكب</p>
                 </div>
                 <ChevronLeft className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </CardContent>
             </button>
           </Card>
-          <Card className="rounded-xl border-2 hover:border-primary/30 transition-all group">
+          <Card data-tour="cv-method-review" className="rounded-xl border-2 hover:border-primary/30 transition-all group">
             <Link to="/cv/review">
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
