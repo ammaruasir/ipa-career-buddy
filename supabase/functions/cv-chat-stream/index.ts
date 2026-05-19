@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
     const result = streamText({
       model,
       system,
-      messages: convertToModelMessages(messages),
+      messages: await convertToModelMessages(messages),
       abortSignal: req.signal,
     });
 
