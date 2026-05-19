@@ -14,10 +14,29 @@ const VoiceInterview = () => {
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState<number | null>(null);
   const preSelectedJob = searchParams.get("job") || undefined;
+  // Demo-tour shortcut: when the URL pre-specifies a question count (and
+  // either a job or practice mode), skip the JobSelector entirely so the
+  // automated tour can drive straight into the live interview.
+  const urlQuestionCount = searchParams.get("question_count");
+  const isPractice = searchParams.get("practice") === "true";
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/login");
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (settingsLoading) return;
+    if (selectedJob !== null && questionCount !== null) return;
+    const n = urlQuestionCount ? parseInt(urlQuestionCount, 10) : NaN;
+    if (!Number.isFinite(n) || n < 1) return;
+    if (preSelectedJob) {
+      setSelectedJob(preSelectedJob);
+      setQuestionCount(n);
+    } else if (isPractice) {
+      setSelectedJob("عام");
+      setQuestionCount(n);
+    }
+  }, [settingsLoading, urlQuestionCount, preSelectedJob, isPractice, selectedJob, questionCount]);
 
   if (settingsLoading) {
     return (
@@ -26,8 +45,6 @@ const VoiceInterview = () => {
       </div>
     );
   }
-
-  const isPractice = searchParams.get("practice") === "true";
 
   if (!selectedJob || questionCount === null) {
     return (
