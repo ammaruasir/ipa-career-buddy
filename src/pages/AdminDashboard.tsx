@@ -167,6 +167,12 @@ const AdminDashboard = () => {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
+              <Link to="/admin/proctor">
+                <Radio className="w-4 h-4 ml-1 text-destructive" />
+                المراقبة المباشرة
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
               <Link to="/admin/interviews">
                 <Calendar className="w-4 h-4 ml-1" />
                 إدارة المقابلات
