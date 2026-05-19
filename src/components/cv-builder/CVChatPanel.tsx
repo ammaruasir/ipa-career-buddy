@@ -84,30 +84,65 @@ const TEXT = {
   },
 };
 
-// Extract the actionable improvement text from a chatty AI reply.
-const extractImprovementFromReply = (text: string): string => {
-  if (!text) return "";
+// Extract { original, improved } from an assistant reply.
+// The backend system prompt instructs the model to emit two fenced blocks:
+//   ```original
+//   <verbatim text from CV>
+//   ```
+//   ```improved
+//   <replacement only>
+//   ```
+// We grab the LAST improved block (most recent suggestion in the turn) and
+// the nearest preceding original block. Falls back to legacy heuristics when
+// the model didn't follow the structured format.
+const extractSuggestion = (text: string): { original: string; improved: string } => {
+  if (!text) return { original: "", improved: "" };
+
+  const improvedRe = /```\s*improved\s*\n?([\s\S]*?)```/gi;
+  const originalRe = /```\s*original\s*\n?([\s\S]*?)```/gi;
+
+  const improvedMatches = [...text.matchAll(improvedRe)];
+  const originalMatches = [...text.matchAll(originalRe)];
+
+  if (improvedMatches.length) {
+    const lastImproved = improvedMatches[improvedMatches.length - 1];
+    const improvedIdx = lastImproved.index ?? 0;
+    // Pair with the nearest original block before this improved block,
+    // otherwise the last original block overall.
+    const precedingOriginal =
+      [...originalMatches].reverse().find((m) => (m.index ?? 0) < improvedIdx) ??
+      originalMatches[originalMatches.length - 1];
+    return {
+      improved: (lastImproved[1] ?? "").trim(),
+      original: (precedingOriginal?.[1] ?? "").trim(),
+    };
+  }
+
+  // ---- Legacy fallback (unstructured replies) ----
   const trimmed = text.trim();
   const fence = trimmed.match(/```[a-zA-Z]*\n?([\s\S]+?)```/);
-  if (fence?.[1]?.trim()) return fence[1].trim();
+  if (fence?.[1]?.trim()) return { original: "", improved: fence[1].trim() };
   const labelRe =
     /(?:النص\s*المحسّن|النسخة\s*المحسّنة|المحسّن|المقترح|Improved(?:\s*version)?|Rewrite|Suggested)\s*[:：\-—]\s*([\s\S]+?)(?:\n\s*\n|$)/i;
   const labelled = trimmed.match(labelRe);
   if (labelled?.[1]?.trim()) {
-    return labelled[1].replace(/^["'""«»]+|["'""«»]+$/g, "").trim();
+    return {
+      original: "",
+      improved: labelled[1].replace(/^["'""«»]+|["'""«»]+$/g, "").trim(),
+    };
   }
   const quoted =
     trimmed.match(/"{3}([\s\S]+?)"{3}/) ||
     trimmed.match(/"([^"]{40,})"/) ||
     trimmed.match(/«([^»]{20,})»/);
-  if (quoted?.[1]?.trim()) return quoted[1].trim();
+  if (quoted?.[1]?.trim()) return { original: "", improved: quoted[1].trim() };
   const paragraphs = trimmed.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
   const long = paragraphs.filter((p) => p.length > 40);
   if (long.length) {
     long.sort((a, b) => b.length - a.length);
-    return long[0];
+    return { original: "", improved: long[0] };
   }
-  return "";
+  return { original: "", improved: "" };
 };
 
 const messageText = (m: UIMessage): string =>
@@ -335,8 +370,9 @@ const CVChatPanel = ({
                         variant="outline"
                         className="text-xs h-7"
                         onClick={() => {
-                          setPickerImproved(extractImprovementFromReply(fullText));
-                          setPickerOriginal("");
+                          const { original, improved } = extractSuggestion(fullText);
+                          setPickerImproved(improved);
+                          setPickerOriginal(original);
                           setPickerSection("other");
                           setPickerOpen(true);
                         }}
