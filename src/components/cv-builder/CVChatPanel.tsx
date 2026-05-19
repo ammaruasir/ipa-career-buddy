@@ -168,6 +168,13 @@ const CVChatPanel = ({
   const [pickerOriginal, setPickerOriginal] = useState("");
   const [pickerSection, setPickerSection] = useState("other");
   const [accepting, setAccepting] = useState(false);
+  const authTokenRef = useRef<string | null>(null);
+  const cvDocumentIdRef = useRef(cvDocumentId);
+  const languageRef = useRef<Lang>(language);
+
+  authTokenRef.current = authToken;
+  cvDocumentIdRef.current = cvDocumentId;
+  languageRef.current = language;
 
   // Fetch fresh access token for the streaming function
   useEffect(() => {
@@ -185,17 +192,24 @@ const CVChatPanel = ({
   }, []);
 
   const transport = useRef<DefaultChatTransport<UIMessage> | null>(null);
-  if (!transport.current && authToken) {
+  if (!transport.current) {
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cv-chat-stream`;
     transport.current = new DefaultChatTransport({
       api: url,
       headers: () => ({
-        Authorization: `Bearer ${authToken}`,
+        ...(authTokenRef.current ? { Authorization: `Bearer ${authTokenRef.current}` } : {}),
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       }),
-      body: () => ({
-        cv_document_id: cvDocumentId,
-        language,
+      prepareSendMessagesRequest: ({ id, messages, trigger, messageId, body }) => ({
+        body: {
+          ...(body ?? {}),
+          id,
+          messages,
+          trigger,
+          messageId,
+          cv_document_id: cvDocumentIdRef.current,
+          language: languageRef.current,
+        },
       }),
     });
   }
