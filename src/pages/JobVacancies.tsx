@@ -196,7 +196,7 @@ const JobVacancies = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8 space-y-6">
-        <div className="rounded-2xl bg-gradient-to-l from-primary/10 via-secondary/5 to-transparent p-8 border border-border">
+        <div data-tour="jobs-hero" className="rounded-2xl bg-gradient-to-l from-primary/10 via-secondary/5 to-transparent p-8 border border-border">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">استعرض الوظائف المتاحة</h1>
           <p className="text-muted-foreground">اختر الوظيفة المناسبة وقدّم عليها لبدء مقابلتك الذكية</p>
         </div>

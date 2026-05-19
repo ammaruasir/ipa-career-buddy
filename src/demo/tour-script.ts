@@ -113,7 +113,7 @@ export const tourScript: TourStep[] = [
     route: "/cv/interview",
     narration:
       "خلّينا نجرّب المحادثة الموجَّهة. خمسة عشر سؤال — اسم، خبرة، إنجازات — والمنصّة تحوّل إجاباتك إلى مسوّدة احترافية بالمواصفات الصحيحة.",
-    spotlight: { selector: "main", label: "محادثة بناء السيرة" },
+    spotlight: { selector: "[data-tour='cv-interview-start']", label: "محادثة بناء السيرة" },
     durationEstimateMs: 12_000,
   },
   {
@@ -149,7 +149,7 @@ export const tourScript: TourStep[] = [
     route: "/cv/builder",
     narration:
       "الطريقة الثانية: المنشئ اليدوي بسبع خطوات. لاحظ المؤشرات في الأعلى — درجة ATS حيّة، خيارات القالب واللغة، زر مطابقة مع وظيفة، وزر رسالة التقديم. التواريخ تدعم هجري وميلادي.",
-    spotlight: { selector: "main", label: "منشئ السيرة" },
+    spotlight: { selector: "[data-tour='cv-builder-toolbar']", label: "منشئ السيرة" },
     durationEstimateMs: 15_000,
   },
   {
@@ -194,7 +194,7 @@ export const tourScript: TourStep[] = [
     route: "/cv/review?demo=preloaded",
     narration:
       "أمّا لو سارة عندها سيرة جاهزة وحابّة تقييم ثاني، تجي على صفحة التقييم. هنا نموذج جاهز — رسم radar لجودة الأقسام، نقاط ضعف، إعادات كتابة بتبريرات، وفحص امتثال للهجري وجدارات.",
-    spotlight: { selector: "main", label: "تقييم السيرة" },
+    spotlight: { selector: "[data-tour='cv-review-radar']", label: "تقييم السيرة" },
     durationEstimateMs: 14_000,
   },
   {
@@ -234,7 +234,7 @@ export const tourScript: TourStep[] = [
     route: "/interview/voice?practice=true&question_count=2",
     narration:
       "خلّيني أوريك جلسة تدريبية سريعة. سارة راح تخوض مقابلة قصيرة مع نورة، المحاوِرة في المنصّة. اسمع كيف تجري الأمور.",
-    spotlight: { selector: "main", label: "بدء جلسة تدريب" },
+    spotlight: { selector: "[data-tour='start-interview']", label: "بدء جلسة تدريب" },
     durationEstimateMs: 11_000,
   },
   {
@@ -340,7 +340,7 @@ export const tourScript: TourStep[] = [
     route: "/jobs",
     narration:
       "تدرّبت سارة، أتقنت الإطار، وقت التطبيق الحقيقي. هذي صفحة الوظائف المتاحة. تختار وظيفة، تقدّم عليها، وتدخل في تقييم رسمي مُسجَّل بدرجات.",
-    spotlight: { selector: "main", label: "الوظائف المتاحة" },
+    spotlight: { selector: "[data-tour='jobs-hero']", label: "الوظائف المتاحة" },
     durationEstimateMs: 13_000,
   },
   {
@@ -349,7 +349,7 @@ export const tourScript: TourStep[] = [
     route: "/interview/voice?job=%D8%B9%D8%A7%D9%85&question_count=2",
     narration:
       "نفس الفكرة بس في الوضع الرسمي. تتطلّب موافقة صريحة وفحص ميكروفون، ثم تنطلق الجلسة المُسجَّلة. تعال نشوفها قصيرة.",
-    spotlight: { selector: "main", label: "المقابلة الرسمية" },
+    spotlight: { selector: "[data-tour='start-interview']", label: "المقابلة الرسمية" },
     durationEstimateMs: 12_000,
   },
   {
