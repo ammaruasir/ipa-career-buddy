@@ -346,7 +346,7 @@ export const tourScript: TourStep[] = [
   {
     id: "act5-assessment-open",
     act: "Act 5 — Formal Assessment",
-    route: "/interview/voice?job=demo&question_count=2",
+    route: "/interview/voice?job=%D8%B9%D8%A7%D9%85&question_count=2",
     narration:
       "نفس الفكرة بس في الوضع الرسمي. تتطلّب موافقة صريحة وفحص ميكروفون، ثم تنطلق الجلسة المُسجَّلة. تعال نشوفها قصيرة.",
     spotlight: { selector: "main", label: "المقابلة الرسمية" },
@@ -501,9 +501,9 @@ export const tourScript: TourStep[] = [
     id: "act7-timestamped",
     act: "Act 7 — Instructor",
     narration:
-      "وأهم ميزة على الإطلاق للمدرّبين: تعليقات على لحظة محدّدة من فيديو الطالب. اضغطي على الثانية ٠٢:٣٥، اكتبي 'هنا الإجابة دافعها ممتاز لكن انتقلتي بسرعة'، الطالب يشوف التعليق بالضبط على تلك اللحظة. تعليم سياقي، مو ملاحظات عامّة بعد الجلسة.",
-    spotlight: { selector: "[data-tour='cohort-students']", label: "تعليقات بـ timestamps" },
-    durationEstimateMs: 16_000,
+      "ومن هنا، المدرّبة تتابع كل طالب على حدة — تشوف جلساته، إجاباته، وتتركله ملاحظات مرتبطة بلحظات محدّدة من فيديو المقابلة. تعليم سياقي، مو ملاحظات عامّة بعد الجلسة.",
+    spotlight: { selector: "[data-tour='cohort-students']", label: "متابعة الطلّاب" },
+    durationEstimateMs: 14_000,
   },
 
   // ────────────────────────────── ACT 8 — CLOSE ────────────────────────
