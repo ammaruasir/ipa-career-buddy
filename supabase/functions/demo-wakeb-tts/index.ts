@@ -31,12 +31,14 @@ serve(async (req) => {
     if (limited) return limited;
 
     const WAKEB_TTS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
-    if (!WAKEB_TTS_API_KEY) {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!WAKEB_TTS_API_KEY && !LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: "Wakeb TTS API key not set" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     const body = await req.json().catch(() => ({}));
     const { text, voiceId } = body as { text?: string; voiceId?: string };
@@ -63,7 +65,7 @@ serve(async (req) => {
         {
           method: "POST",
           headers: {
-            "xi-api-key": WAKEB_TTS_API_KEY,
+            "xi-api-key": WAKEB_TTS_API_KEY!,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -80,21 +82,53 @@ serve(async (req) => {
         },
       );
 
-    let response = await callUpstreamTts("eleven_multilingual_v2");
-    if (!response.ok) {
-      const errText = await response.text();
-      console.warn(`[demo-wakeb-tts] multilingual_v2 failed (${response.status}): ${errText}. Retrying flash_v2_5`);
-      response = await callUpstreamTts("eleven_flash_v2_5");
+    let response: Response | null = null;
+
+    if (WAKEB_TTS_API_KEY) {
+      for (const modelId of ["eleven_multilingual_v2", "eleven_flash_v2_5"]) {
+        const r = await callUpstreamTts(modelId);
+        if (r.ok && r.body) {
+          response = r;
+          break;
+        }
+        const errText = await r.text().catch(() => "");
+        console.warn(`[demo-wakeb-tts] ${modelId} failed (${r.status}): ${errText}`);
+      }
     }
 
-    if (!response.ok || !response.body) {
-      const errorText = await response.text().catch(() => "");
-      console.error("[demo-wakeb-tts] upstream error:", response.status, errorText);
+    // Fallback: platform TTS via the Lovable AI Gateway. Used whenever the
+    // upstream voice provider is unavailable (e.g. plan/quota errors).
+    if (!response && LOVABLE_API_KEY) {
+      const gatewayVoice = selectedVoiceId === "gVzwmdZzRgBrNjXaTmi5" ? "ash" : "onyx";
+      const r = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-4o-mini-tts",
+          input: text,
+          voice: gatewayVoice,
+          response_format: "mp3",
+        }),
+      });
+      if (r.ok && r.body) {
+        response = r;
+      } else {
+        console.error(`[demo-wakeb-tts] gateway TTS failed (${r.status}): ${await r.text().catch(() => "")}`);
+      }
+    }
+
+    if (!response || !response.body) {
+      console.error("[demo-wakeb-tts] all TTS attempts failed");
       return new Response(JSON.stringify({ error: "Wakeb TTS generation failed" }), {
-        status: response.status,
+        status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+
 
     return new Response(response.body, {
       headers: {
