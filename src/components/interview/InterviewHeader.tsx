@@ -33,7 +33,7 @@ const InterviewHeader = ({
             <Button variant="ghost" size="icon" className="rounded-xl" onClick={onBack}>
               <ArrowRight className="w-5 h-5" />
             </Button>
-            <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="w-9 h-9 rounded-xl object-contain" />
+            <img src="/wakeb-logo.png" alt="واكب" className="h-8 w-auto object-contain" />
             <div>
               <h2 className="text-sm font-bold leading-tight">المقابلة الذكية</h2>
               <p className="text-xs text-muted-foreground">معهد الإدارة العامة</p>

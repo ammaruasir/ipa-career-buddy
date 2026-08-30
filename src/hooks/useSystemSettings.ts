@@ -36,7 +36,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
   job_positions: ["محلل أعمال", "أخصائي موارد بشرية", "مدير مشاريع", "مطور برمجيات", "محاسب", "أخصائي تسويق"],
   ai_model: "wakeb-default",
   maintenance_mode: false,
-  brand_color: "#006C35",
+  brand_color: "#2B1364",
   evaluation_thresholds: { highly_recommended: 80, recommended: 60 },
   filler_words: ["ممم", "يعني", "أحس", "كدا", "طبعاً", "بصراحة", "الله يعطيك العافية"],
   interview_engine: "built_in",
