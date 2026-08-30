@@ -187,7 +187,7 @@ const Index = () => {
           <div className="max-w-4xl mx-auto text-center space-y-7">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-5 py-2.5 rounded-full text-sm font-semibold border border-primary/20">
               <Shield className="w-4 h-4" />
-              معهد الإدارة العامة (IPA) · متوافقة مع رؤية ٢٠٣٠
+              واكب · متوافقة مع رؤية ٢٠٣٠
             </div>
 
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold text-foreground leading-[1.15] tracking-tight">
@@ -610,7 +610,7 @@ const Index = () => {
             <div className="space-y-4">
               <h3 className="font-bold text-foreground">تواصل ومعلومات</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>البريد: info@ipa-training.sa</li>
+                <li>البريد: info@wakebdata.com</li>
                 <li>الرياض، المملكة العربية السعودية</li>
                 <li>متوافقة مع نظام حماية البيانات (PDPL)</li>
               </ul>

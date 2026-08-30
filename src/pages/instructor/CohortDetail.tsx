@@ -76,7 +76,7 @@ const CohortDetail = () => {
     if (id === "demo") {
       setCohort({
         id: "demo",
-        name: "دفعة معهد الإدارة العامة — تجريبية",
+        name: "دفعة واكب — تجريبية",
         description: "دفعة عرض تستعرض كيف يتابع المدرّب طلّابه عبر المنصّة.",
         track: "تطوير الذات",
         status: "active",

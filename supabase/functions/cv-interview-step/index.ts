@@ -330,7 +330,7 @@ async function suggestForQuestion(
     const sysPrompt =
       language === "en"
         ? `You are a professional CV coach for Wakeb. Output ONLY the suggestion text the user can paste, no preface, no markdown, no quotes. ${formatHint_en}`
-        : `أنت مدرّب سير ذاتية محترف لمعهد الإدارة العامة. أعِد فقط نصّ الاقتراح القابل للنسخ، بدون مقدّمة ولا تنسيق markdown ولا علامات تنصيص. ${formatHint_ar}`;
+        : `أنت مدرّب سير ذاتية محترف لواكب. أعِد فقط نصّ الاقتراح القابل للنسخ، بدون مقدّمة ولا تنسيق markdown ولا علامات تنصيص. ${formatHint_ar}`;
 
     const contextSummary = {
       experience_level: answersSoFar?.experience_level?.answer,

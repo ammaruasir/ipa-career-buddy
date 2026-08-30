@@ -153,7 +153,7 @@ const InterviewSettings = () => {
                 <>
                   <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
                   <div className="absolute bottom-3 left-3 bg-primary/80 text-primary-foreground text-xs px-2 py-1 rounded font-tajawal">
-                    معهد الإدارة العامة - IPA
+                    واكب
                   </div>
                 </>
               ) : (
