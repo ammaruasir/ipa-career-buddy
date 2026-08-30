@@ -8,7 +8,7 @@ const Demo = () => {
   const { status, start, micConsent, setMicConsent, stepIndex, isSpeaking } = useTourEngine();
 
   useEffect(() => {
-    document.title = "جولة AI تفاعلية — منصّة IPA";
+    document.title = "جولة تفاعلية — منصّة واكب";
   }, []);
 
   const launching = status === "running" || status === "paused" || status === "qna";
@@ -26,7 +26,7 @@ const Demo = () => {
             جولة AI تفاعلية في المنصّة
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            تعرّف على منصّة IPA كاملة في جولة موجَّهة بالذكاء الاصطناعي — تشرح، تتنقّل،
+            تعرّف على منصّة واكب كاملة في جولة موجَّهة بالذكاء الاصطناعي — تشرح، تتنقّل،
             وتجيب على أسئلتك مباشرةً. تقدر تقاطع الجولة في أي وقت.
           </p>
         </div>

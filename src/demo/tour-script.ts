@@ -1,6 +1,6 @@
 import type { TourStep } from "./types";
 
-// Coherent end-to-end demo for IPA Career Buddy.
+// Coherent end-to-end demo for Wakeb Career Buddy.
 // Persona: عبدالله من فريق واكب (human guide voice — never references "AI",
 // "ذكاء اصطناعي", "LLM", "GPT", "روبوت"). Follows سارة الراشد from sign-up
 // through CV → practice interview → formal assessment → HR processing →

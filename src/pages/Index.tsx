@@ -268,7 +268,7 @@ const Index = () => {
               },
               {
                 icon: Target,
-                title: "تقييم رسمي بمعايير IPA",
+                title: "تقييم رسمي بمعايير واكب",
                 desc: "عند الجاهزية، شغّل وضع التقييم. DISC + ٥ أبعاد + توصية معتمَدة للوظائف الحكومية.",
                 badges: ["DISC", "٥ أبعاد"],
                 href: "/jobs",
@@ -301,8 +301,8 @@ const Index = () => {
               {
                 icon: Users,
                 title: "للمدرّبين: لوحة الدفعات",
-                desc: "أنشئ دفعات IPA، تابع تقدّم الطلاب، أضف تعليقات timestamped على إجاباتهم.",
-                badges: ["IPA-grade", "RLS-secure"],
+                desc: "أنشئ دفعات واكب، تابع تقدّم الطلاب، أضف تعليقات timestamped على إجاباتهم.",
+                badges: ["Wakeb-grade", "RLS-secure"],
                 href: "/dashboard/instructor",
                 grad: "from-blue-500 to-blue-300",
               },
@@ -387,7 +387,7 @@ const Index = () => {
                   "AI يحلّل ويقترح",
                   "تحدّث مع سيرتك للتفهّم",
                 ],
-                outcome: "سيرة معتمَدة لـ IPA",
+                outcome: "سيرة معتمَدة من واكب",
               },
               {
                 step: "٣",
@@ -438,7 +438,7 @@ const Index = () => {
           <div className="text-center mb-14 space-y-3">
             <span className="text-sm font-semibold text-secondary tracking-wide">ما يميّزنا</span>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-              لماذا منصّة IPA وليس أداة عامّة؟
+              لماذا منصّة واكب وليس أداة عامّة؟
             </h2>
           </div>
 
@@ -485,14 +485,14 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-14 space-y-3">
             <span className="text-sm font-semibold text-secondary tracking-wide">آراء المستخدمين</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground">من تجارب طلاب IPA</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">من تجارب طلاب واكب</h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {[
               {
                 name: "أحمد الغامدي",
-                role: "طالب IPA — برنامج الإدارة العامة",
+                role: "طالب واكب — برنامج الإدارة العامة",
                 quote:
                   "وضع التدريب غيّر كل شيء. كنت أتجمّد في المقابلات السابقة. الآن أدخل ٥ جلسات practice، أقرأ الـ STAR coaching، أتحسّن. مقابلتي الرسمية كانت أسهل من التدريبات.",
               },
@@ -504,7 +504,7 @@ const Index = () => {
               },
               {
                 name: "د. خالد العنزي",
-                role: "مدرّب IPA",
+                role: "مدرّب واكب",
                 quote:
                   "لوحة الدفعات وفّرت عليّ ساعات. أضع تعليقات على لحظة محدّدة من فيديو الطالب، وهو يرى التعليق مع timestamp. التعلّم تسارع.",
               },
@@ -543,7 +543,7 @@ const Index = () => {
             <div className="absolute top-0 left-0 w-40 h-40 rounded-full bg-secondary/20 blur-3xl" />
             <div className="relative z-10 space-y-6">
               <h2 className="text-2xl md:text-3xl font-bold text-primary-foreground">
-                ابدأ رحلتك التدريبية مع IPA
+                ابدأ رحلتك التدريبية مع واكب
               </h2>
               <p className="text-primary-foreground/80 text-base max-w-md mx-auto">
                 مجّاناً. خمس دقائق لإنشاء حسابك، وأنت في وضع التدريب الأوّل.

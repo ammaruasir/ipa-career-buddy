@@ -1,4 +1,4 @@
-// Authoritative fact sheet of the IPA platform, sent to demo-chat as part of
+// Authoritative fact sheet of the Wakeb platform, sent to demo-chat as part of
 // the presenter's system prompt to prevent hallucination. Arabic-only.
 
 export const featureSpec = `
@@ -29,5 +29,5 @@ export const featureSpec = `
 
 ما لا تقدّمه: ليست منصّة وظائف عامّة، لا تَعِد بالتعيين، لا تخزّن بيانات في مكان عام.
 
-الأسعار: تجريبيّة لطلاب IPA حاليًا. للتراخيص المؤسسية: info@wakebdata.com.
+الأسعار: تجريبيّة لطلاب واكب حاليًا. للتراخيص المؤسسية: info@wakebdata.com.
 `.trim();
