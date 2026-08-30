@@ -59,17 +59,13 @@ serve(async (req) => {
         ? voiceId
         : "yXEnnEln9armDCyhkXcA";
 
-    // Premade voices are available on every plan (including free). Library
-    // voices are not — so a 402 "paid_plan_required" falls back to these.
-    const PREMADE_FALLBACK_VOICES = ["9BWtsMINqrJLrRacOk9x", "21m00Tcm4TlvDq8ikWAM"];
-
-    const callUpstreamTts = (modelId: string, vId: string) =>
+    const callUpstreamTts = (modelId: string) =>
       fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${vId}/stream?output_format=mp3_44100_128`,
+        `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}/stream?output_format=mp3_44100_128`,
         {
           method: "POST",
           headers: {
-            "xi-api-key": WAKEB_TTS_API_KEY,
+            "xi-api-key": WAKEB_TTS_API_KEY!,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -86,22 +82,42 @@ serve(async (req) => {
         },
       );
 
-    const attempts: Array<[string, string]> = [
-      ["eleven_multilingual_v2", selectedVoiceId],
-      ["eleven_flash_v2_5", selectedVoiceId],
-      ...PREMADE_FALLBACK_VOICES.flatMap((v): Array<[string, string]> => [
-        ["eleven_multilingual_v2", v],
-        ["eleven_flash_v2_5", v],
-      ]),
-    ];
-
     let response: Response | null = null;
-    for (const [modelId, vId] of attempts) {
-      response = await callUpstreamTts(modelId, vId);
-      if (response.ok && response.body) break;
-      const errText = await response.text().catch(() => "");
-      console.warn(`[demo-wakeb-tts] ${modelId}/${vId} failed (${response.status}): ${errText}`);
-      response = null;
+
+    if (WAKEB_TTS_API_KEY) {
+      for (const modelId of ["eleven_multilingual_v2", "eleven_flash_v2_5"]) {
+        const r = await callUpstreamTts(modelId);
+        if (r.ok && r.body) {
+          response = r;
+          break;
+        }
+        const errText = await r.text().catch(() => "");
+        console.warn(`[demo-wakeb-tts] ${modelId} failed (${r.status}): ${errText}`);
+      }
+    }
+
+    // Fallback: platform TTS via the Lovable AI Gateway. Used whenever the
+    // upstream voice provider is unavailable (e.g. plan/quota errors).
+    if (!response && LOVABLE_API_KEY) {
+      const gatewayVoice = selectedVoiceId === "gVzwmdZzRgBrNjXaTmi5" ? "ash" : "onyx";
+      const r = await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-4o-mini-tts",
+          input: text,
+          voice: gatewayVoice,
+          response_format: "mp3",
+        }),
+      });
+      if (r.ok && r.body) {
+        response = r;
+      } else {
+        console.error(`[demo-wakeb-tts] gateway TTS failed (${r.status}): ${await r.text().catch(() => "")}`);
+      }
     }
 
     if (!response || !response.body) {
@@ -111,6 +127,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
 
     return new Response(response.body, {
