@@ -57,9 +57,13 @@ serve(async (req) => {
         ? voiceId
         : "yXEnnEln9armDCyhkXcA";
 
-    const callUpstreamTts = (modelId: string) =>
+    // Premade voices are available on every plan (including free). Library
+    // voices are not — so a 402 "paid_plan_required" falls back to these.
+    const PREMADE_FALLBACK_VOICES = ["9BWtsMINqrJLrRacOk9x", "21m00Tcm4TlvDq8ikWAM"];
+
+    const callUpstreamTts = (modelId: string, vId: string) =>
       fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}/stream?output_format=mp3_44100_128`,
+        `https://api.elevenlabs.io/v1/text-to-speech/${vId}/stream?output_format=mp3_44100_128`,
         {
           method: "POST",
           headers: {
@@ -80,21 +84,32 @@ serve(async (req) => {
         },
       );
 
-    let response = await callUpstreamTts("eleven_multilingual_v2");
-    if (!response.ok) {
-      const errText = await response.text();
-      console.warn(`[demo-wakeb-tts] multilingual_v2 failed (${response.status}): ${errText}. Retrying flash_v2_5`);
-      response = await callUpstreamTts("eleven_flash_v2_5");
+    const attempts: Array<[string, string]> = [
+      ["eleven_multilingual_v2", selectedVoiceId],
+      ["eleven_flash_v2_5", selectedVoiceId],
+      ...PREMADE_FALLBACK_VOICES.flatMap((v): Array<[string, string]> => [
+        ["eleven_multilingual_v2", v],
+        ["eleven_flash_v2_5", v],
+      ]),
+    ];
+
+    let response: Response | null = null;
+    for (const [modelId, vId] of attempts) {
+      response = await callUpstreamTts(modelId, vId);
+      if (response.ok && response.body) break;
+      const errText = await response.text().catch(() => "");
+      console.warn(`[demo-wakeb-tts] ${modelId}/${vId} failed (${response.status}): ${errText}`);
+      response = null;
     }
 
-    if (!response.ok || !response.body) {
-      const errorText = await response.text().catch(() => "");
-      console.error("[demo-wakeb-tts] upstream error:", response.status, errorText);
+    if (!response || !response.body) {
+      console.error("[demo-wakeb-tts] all TTS attempts failed");
       return new Response(JSON.stringify({ error: "Wakeb TTS generation failed" }), {
-        status: response.status,
+        status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     return new Response(response.body, {
       headers: {
