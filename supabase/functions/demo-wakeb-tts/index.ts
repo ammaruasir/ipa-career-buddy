@@ -31,12 +31,14 @@ serve(async (req) => {
     if (limited) return limited;
 
     const WAKEB_TTS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
-    if (!WAKEB_TTS_API_KEY) {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!WAKEB_TTS_API_KEY && !LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: "Wakeb TTS API key not set" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     const body = await req.json().catch(() => ({}));
     const { text, voiceId } = body as { text?: string; voiceId?: string };
