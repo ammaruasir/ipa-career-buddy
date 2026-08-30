@@ -153,7 +153,7 @@ const InterviewSettings = () => {
                 <>
                   <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
                   <div className="absolute bottom-3 left-3 bg-primary/80 text-primary-foreground text-xs px-2 py-1 rounded font-tajawal">
-                    معهد الإدارة العامة - IPA
+                    واكب
                   </div>
                 </>
               ) : (
@@ -207,7 +207,7 @@ const InterviewSettings = () => {
               {[
                 { name: "ضبابي", desc: "Blur" },
                 { name: "مكتب", desc: "Office" },
-                { name: "حرم المعهد", desc: "IPA Campus" },
+                { name: "مقر واكب", desc: "Wakeb HQ" },
               ].map((bg) => (
                 <div key={bg.desc} className="relative rounded-lg border p-4 text-center space-y-2 bg-muted/50">
                   <div className="w-full h-20 bg-muted rounded flex items-center justify-center">

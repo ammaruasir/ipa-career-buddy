@@ -1,5 +1,5 @@
 // =============================================================================
-// Shared guards for IPA edge functions.
+// Shared guards for Wakeb edge functions.
 //
 // IMPORTANT: This file lives at supabase/functions/_shared/guards.ts.
 // Supabase Edge Functions deployment SKIPS any directory whose name starts

@@ -664,7 +664,7 @@ export function DemoTourProvider({ children }: { children: React.ReactNode }) {
         resumeStrategy?: "continue" | "stay" | "jumpTo";
         jumpToStepId?: string | null;
       };
-      const answer = data.answer || "ما عندي معلومة كافية عن هذي النقطة، تقدر تتواصل معنا عبر info@ipa-training.sa";
+      const answer = data.answer || "ما عندي معلومة كافية عن هذي النقطة، تقدر تتواصل معنا عبر info@wakebdata.com";
       setPendingAnswer(answer);
       appendTranscript({ role: "presenter", text: answer });
       await voice.speak(answer);

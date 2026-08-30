@@ -36,7 +36,7 @@ const InterviewHeader = ({
             <img src="/wakeb-logo.png" alt="واكب" className="h-8 w-auto object-contain" />
             <div>
               <h2 className="text-sm font-bold leading-tight">المقابلة الذكية</h2>
-              <p className="text-xs text-muted-foreground">معهد الإدارة العامة</p>
+              <p className="text-xs text-muted-foreground">واكب</p>
             </div>
           </div>
 

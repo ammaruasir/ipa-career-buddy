@@ -1,6 +1,6 @@
 import type { TourStep } from "./types";
 
-// Coherent end-to-end demo for IPA Career Buddy.
+// Coherent end-to-end demo for Wakeb Career Buddy.
 // Persona: عبدالله من فريق واكب (human guide voice — never references "AI",
 // "ذكاء اصطناعي", "LLM", "GPT", "روبوت"). Follows سارة الراشد from sign-up
 // through CV → practice interview → formal assessment → HR processing →
@@ -15,7 +15,7 @@ export const tourScript: TourStep[] = [
     id: "act1-intro",
     act: "Act 1 — Hook",
     narration:
-      "السلام عليكم. أنا عبدالله من فريق واكب. خلال الدقائق القادمة، راح أمشي معك خطوة بخطوة في منصّة معهد الإدارة العامة، وراح نتابع رحلة مرشّحة اسمها سارة من تسجيل الدخول لأوّل مرّة لين ما تصلها موافقة فريق التوظيف.",
+      "السلام عليكم. أنا عبدالله من فريق واكب. خلال الدقائق القادمة، راح أمشي معك خطوة بخطوة في منصّة واكب، وراح نتابع رحلة مرشّحة اسمها سارة من تسجيل الدخول لأوّل مرّة لين ما تصلها موافقة فريق التوظيف.",
     durationEstimateMs: 17_000,
   },
   {
@@ -48,7 +48,7 @@ export const tourScript: TourStep[] = [
     action: {
       kind: "type",
       selector: "input[type='email']",
-      text: "sarah.alrashid@ipa.sa",
+      text: "sarah.alrashid@wakebdata.com",
       speedMs: 38,
     },
     durationEstimateMs: 14_000,
@@ -484,7 +484,7 @@ export const tourScript: TourStep[] = [
     id: "act7-bridge",
     act: "Act 7 — Instructor",
     narration:
-      "وبموازاة كل هذا، مدرّبة سارة في معهد الإدارة العامة كانت تتابع جلساتها التدريبية وتقدّم لها ملاحظات. خلّيني أبدّل لحساب مدرّبة لنشوف هذي الزاوية.",
+      "وبموازاة كل هذا، مدرّبة سارة في واكب كانت تتابع جلساتها التدريبية وتقدّم لها ملاحظات. خلّيني أبدّل لحساب مدرّبة لنشوف هذي الزاوية.",
     action: { kind: "swap-session", role: "instructor" },
     durationEstimateMs: 11_000,
   },
@@ -521,7 +521,7 @@ export const tourScript: TourStep[] = [
     act: "Act 8 — Close",
     route: "/login?tab=signup",
     narration:
-      "إذا حابب تجرّب بنفسك، عبّي هذا النموذج بإيميلك الحقيقي. راح تبدأ من نفس المكان اللي بدأت منه سارة. شكراً، وأهلاً بك في معهد الإدارة العامة.",
+      "إذا حابب تجرّب بنفسك، عبّي هذا النموذج بإيميلك الحقيقي. راح تبدأ من نفس المكان اللي بدأت منه سارة. شكراً، وأهلاً بك في واكب.",
     spotlight: { selector: "form", label: "ابدأ مجاناً" },
     durationEstimateMs: 14_000,
   },

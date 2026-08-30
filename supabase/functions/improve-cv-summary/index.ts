@@ -38,8 +38,8 @@ const RULES_EN = `Summary mandatory rules:
 - American English unless target is UK.
 - Professional humility — avoid aggressive self-promotion.`;
 
-const SYSTEM_BASE = `أنت مدرّب سير ذاتية محترف لمعهد الإدارة العامة (IPA) في السعودية.
-You are a professional CV coach for Saudi Arabia's Institute of Public Administration (IPA).
+const SYSTEM_BASE = `أنت مدرّب سير ذاتية محترف لواكب في السعودية.
+You are a professional CV coach for Saudi Arabia's Wakeb.
 
 مهمّتك: تحسين أو توليد ملخّص السيرة الذاتية.
 Task: Improve or generate a CV summary.

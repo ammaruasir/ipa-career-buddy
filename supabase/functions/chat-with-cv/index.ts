@@ -25,7 +25,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT_AR = `أنت مدرّب سير ذاتية صبور لمعهد الإدارة العامة (IPA) في السعودية.
+const SYSTEM_PROMPT_AR = `أنت مدرّب سير ذاتية صبور لواكب في السعودية.
 المستخدم يسألك أسئلة حول سيرته الذاتية. هدفك تعليمي قبل كل شيء.
 
 قواعد:
@@ -38,7 +38,7 @@ const SYSTEM_PROMPT_AR = `أنت مدرّب سير ذاتية صبور لمعه�
 7) إذا كان التحسين إضافة جديدة (لا يوجد نص أصلي للاستبدال)، اترك original فارغاً ("") وضع improved فقط — سيُضاف لاحقاً كبند جديد.
 8) كل improved يجب أن يكون مكتفياً بذاته وجاهزاً للنسخ مباشرة في السيرة.`;
 
-const SYSTEM_PROMPT_EN = `You are a patient CV coach for Saudi Arabia's Institute of Public Administration (IPA).
+const SYSTEM_PROMPT_EN = `You are a patient CV coach for Saudi Arabia's Wakeb.
 The user is asking questions about their CV. Your goal is educational above all.
 
 Rules:

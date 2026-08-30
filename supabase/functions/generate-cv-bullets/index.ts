@@ -18,7 +18,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT_AR = `أنت مدرّب سير ذاتية محترف لمعهد الإدارة العامة (IPA) في السعودية.
+const SYSTEM_PROMPT_AR = `أنت مدرّب سير ذاتية محترف لواكب في السعودية.
 
 مهمّتك: تحويل وصف حرّ لإنجاز إلى ١-٣ نقاط (bullets) احترافية بصيغة STAR (الموقف، المهمّة، الإجراء، النتيجة).
 
@@ -33,7 +33,7 @@ const SYSTEM_PROMPT_AR = `أنت مدرّب سير ذاتية محترف لمع�
 
 لكل bullet، قدّم justification يشرح لماذا اخترت هذه الصياغة (للتعليم).`;
 
-const SYSTEM_PROMPT_EN = `You are a professional CV coach for Saudi Arabia's Institute of Public Administration (IPA).
+const SYSTEM_PROMPT_EN = `You are a professional CV coach for Saudi Arabia's Wakeb.
 
 Task: Transform a free-form achievement description into 1-3 polished STAR bullets (Situation, Task, Action, Result).
 
