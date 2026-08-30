@@ -6,26 +6,26 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --background: 262 30% 98%;
+    --foreground: 262 45% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 262 45% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 262 45% 12%;
 
-    --primary: 222 72% 33%;
+    --primary: 262 72% 22%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 174 84% 38%;
+    --secondary: 199 76% 53%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 40 28% 66%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 302 59% 36%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
@@ -38,40 +38,40 @@
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 222 72% 33%;
+    --ring: 262 72% 22%;
 
     --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 222 72% 33%;
+    --sidebar-primary: 262 72% 22%;
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 222 72% 33%;
+    --sidebar-ring: 262 72% 22%;
   }
 
   .dark {
-    --background: 222 47% 6%;
+    --background: 262 55% 7%;
     --foreground: 210 40% 98%;
 
-    --card: 222 47% 8%;
+    --card: 262 45% 10%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222 47% 8%;
+    --popover: 262 45% 10%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 222 72% 50%;
+    --primary: 199 76% 53%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 174 84% 38%;
+    --secondary: 302 55% 45%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 40 28% 50%;
+    --accent: 302 59% 46%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 63% 31%;
@@ -85,16 +85,16 @@
 
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 222 72% 50%;
+    --ring: 199 76% 53%;
 
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 222 72% 50%;
+    --sidebar-primary: 199 76% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 222 72% 50%;
+    --sidebar-ring: 199 76% 53%;
   }
 }
 
