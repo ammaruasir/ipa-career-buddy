@@ -18,7 +18,7 @@ const corsHeaders = {
 };
 
 const SYSTEM_BASE = `أنت مدرّب سير ذاتية محترف لمعهد الإدارة العامة (IPA) في السعودية.
-You are a professional CV coach for Saudi Arabia's Institute of Public Administration (IPA).
+You are a professional CV coach for Saudi Arabia's Wakeb.
 
 مهمّتك: اقتراح مهارات منظَّمة بناءً على خبرة المستخدم وتعليمه والوظيفة المستهدفة.
 Task: Suggest organized skills based on user's experience, education, and target role.

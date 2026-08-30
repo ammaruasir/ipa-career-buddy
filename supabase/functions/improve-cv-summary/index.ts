@@ -39,7 +39,7 @@ const RULES_EN = `Summary mandatory rules:
 - Professional humility — avoid aggressive self-promotion.`;
 
 const SYSTEM_BASE = `أنت مدرّب سير ذاتية محترف لمعهد الإدارة العامة (IPA) في السعودية.
-You are a professional CV coach for Saudi Arabia's Institute of Public Administration (IPA).
+You are a professional CV coach for Saudi Arabia's Wakeb.
 
 مهمّتك: تحسين أو توليد ملخّص السيرة الذاتية.
 Task: Improve or generate a CV summary.

@@ -33,7 +33,7 @@ const SYSTEM_PROMPT_AR = `أنت مدرّب سير ذاتية محترف لمع�
 
 لكل bullet، قدّم justification يشرح لماذا اخترت هذه الصياغة (للتعليم).`;
 
-const SYSTEM_PROMPT_EN = `You are a professional CV coach for Saudi Arabia's Institute of Public Administration (IPA).
+const SYSTEM_PROMPT_EN = `You are a professional CV coach for Saudi Arabia's Wakeb.
 
 Task: Transform a free-form achievement description into 1-3 polished STAR bullets (Situation, Task, Action, Result).
 
