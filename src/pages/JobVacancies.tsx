@@ -190,7 +190,7 @@ const JobVacancies = () => {
           <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate("/dashboard/candidate")}>
             <ArrowRight className="w-5 h-5" />
           </Button>
-          <img src="/ipa-logo.png" alt="معهد الإدارة العامة" className="w-10 h-10 rounded-xl object-contain" />
+          <img src="/wakeb-logo.png" alt="واكب" className="h-9 w-auto object-contain" />
           <h2 className="text-lg font-bold">الوظائف المتاحة</h2>
         </div>
       </header>

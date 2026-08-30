@@ -60,9 +60,9 @@ const Index = () => {
         <div className="container mx-auto flex items-center justify-between py-3 px-4">
           <Link to="/" className="flex items-center gap-3 group">
             <img
-              src="/ipa-logo.png"
-              alt="معهد الإدارة العامة"
-              className="w-11 h-11 rounded-xl object-contain shadow-md group-hover:shadow-lg transition-shadow"
+              src="/wakeb-logo.png"
+              alt="واكب"
+              className="h-10 w-auto object-contain shadow-md group-hover:shadow-lg transition-shadow"
             />
             <div className="hidden sm:block">
               <h2 className="text-base font-bold text-foreground leading-tight">
@@ -570,7 +570,7 @@ const Index = () => {
           <div className="grid md:grid-cols-3 gap-12 mb-12">
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <img src="/ipa-logo.png" alt="IPA" className="w-10 h-10 rounded-xl object-contain" />
+                <img src="/wakeb-logo.png" alt="واكب" className="h-9 w-auto object-contain" />
                 <div>
                   <h3 className="font-bold text-foreground">منصّة تدريب IPA</h3>
                   <p className="text-xs text-muted-foreground">إعداد للوظائف الحكومية بالذكاء الاصطناعي</p>
