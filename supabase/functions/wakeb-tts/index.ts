@@ -137,14 +137,40 @@ serve(async (req) => {
       response = await callUpstreamTts("eleven_multilingual_v2");
     }
 
+    // Last resort: platform TTS via the Lovable AI Gateway, so voice features
+    // keep working when the upstream voice provider rejects the request.
     if (!response.ok || !response.body) {
       const errorText = await response.text().catch(() => "");
       console.error("[wakeb-tts] upstream error:", response.status, errorText);
-      return new Response(JSON.stringify({ error: "Wakeb TTS generation failed" }), {
-        status: response.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      const gatewayResp = LOVABLE_API_KEY
+        ? await fetch("https://ai.gateway.lovable.dev/v1/audio/speech", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "openai/gpt-4o-mini-tts",
+              input: text,
+              voice: "onyx",
+              response_format: "mp3",
+            }),
+          })
+        : null;
+
+      if (!gatewayResp || !gatewayResp.ok || !gatewayResp.body) {
+        if (gatewayResp) {
+          console.error("[wakeb-tts] gateway TTS failed:", gatewayResp.status, await gatewayResp.text().catch(() => ""));
+        }
+        return new Response(JSON.stringify({ error: "Wakeb TTS generation failed" }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      response = gatewayResp;
     }
+
 
     // Stream the response body straight back to the client for lowest latency.
     return new Response(response.body, {
