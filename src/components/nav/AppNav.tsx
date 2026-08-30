@@ -82,10 +82,10 @@ const AppNav = () => {
           <img
             src="/wakeb-logo.png"
             alt="واكب"
-            className="h-8 w-auto object-contain shadow-sm group-hover:shadow-md transition-shadow"
+            className="h-8 w-auto object-contain"
           />
           <div className="hidden sm:flex flex-col leading-tight">
-            <span className="text-sm font-bold text-foreground">منصّة تدريب IPA</span>
+            <span className="text-sm font-bold text-foreground">منصّة واكب</span>
             <span className="text-[10px] text-muted-foreground">
               التدريب · السيرة · المقابلات
             </span>

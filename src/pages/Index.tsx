@@ -62,11 +62,11 @@ const Index = () => {
             <img
               src="/wakeb-logo.png"
               alt="واكب"
-              className="h-10 w-auto object-contain shadow-md group-hover:shadow-lg transition-shadow"
+              className="h-10 w-auto object-contain"
             />
             <div className="hidden sm:block">
               <h2 className="text-base font-bold text-foreground leading-tight">
-                منصّة تدريب IPA الذكية
+                منصّة واكب الذكية
               </h2>
               <p className="text-[11px] text-muted-foreground">
                 تدرّب · ابنِ سيرتك · انطلق للوظيفة الحكومية
@@ -572,7 +572,7 @@ const Index = () => {
               <div className="flex items-center gap-3">
                 <img src="/wakeb-logo.png" alt="واكب" className="h-9 w-auto object-contain" />
                 <div>
-                  <h3 className="font-bold text-foreground">منصّة تدريب IPA</h3>
+                  <h3 className="font-bold text-foreground">منصّة واكب</h3>
                   <p className="text-xs text-muted-foreground">إعداد للوظائف الحكومية بالذكاء الاصطناعي</p>
                 </div>
               </div>
@@ -619,7 +619,7 @@ const Index = () => {
 
           <div className="border-t border-border pt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} منصّة تدريب IPA — جميع الحقوق محفوظة
+              © {new Date().getFullYear()} منصّة واكب — جميع الحقوق محفوظة
             </p>
           </div>
         </div>
